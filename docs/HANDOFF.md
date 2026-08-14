@@ -3,7 +3,7 @@
 > 更新日期：2026-08-14
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-14 晚）**：成果已 git 提交（lan-auth 包入库）。运行中的 `dsh web` 实例已加载全部修复：远端可用性三件套（标记头剥离 / WS 隧道 / browse 选择器）与本地一致。待办收缩为：商店 webui 面板、全家桶功能清单、发布流程。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 定稿并全部实现——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。剩余待办：发布流程（npm 发布、版本规范）；v2 功能候选见 §5。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -59,9 +59,9 @@
 - 验证：`dsh web --dump-config` 看配置树；`dsh --profile headless "任务"` 快速冒烟
 - 脚手架 `--verify` 可自动 build + install + dump-config
 
-## 5. 全家桶选型（规划中，未定稿）
+## 5. 全家桶功能清单（v1 已定稿，2026-08-15）
 
-catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
+**重要**：用户要的是「自己写」插件，不是收录别人的！以下候选只作为功能方向参考。catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选方向：
 
 | 类别 | 仓库 | Stars | 用途 |
 |---|---|---|---|
@@ -71,11 +71,22 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
 | 确定性工具包 | `omdsh-dev/dsh-toolkit` | 10 | time/encoding/json/calculator/csv/regex/markdown/diff/stat/schema 十个零依赖工具 |
 | 侧边栏工作台 | `omdsh-dev/DSH-better-sidebar` | 370 | 文件编辑/终端/Git/子代理 |
 | 终端 TUI | `ccch1mneyyy/dsh-TUI` | 483 | Claude Code 风格全屏终端 |
-| 自动化 | `titanwings/dsh-automation` | 15 | 定时任务 |
 | 记忆 | `csyangwen/dsh-memory-evolve` | 24 | 跨会话长期记忆 |
-| 通知 | `omdsh-dev/dsh-notification` | 26 | 桌面通知 |
 
-**重要**：用户要的是「自己写」插件，不是收录别人的！这些只作为功能方向参考。
+### v1 全家桶（已实现并验证）
+
+| 插件 | 功能 | 对应的候选方向 |
+|---|---|---|
+| `dsh-kit` | 插件管理 + 功能商店设置面板（底座） | —（自研底座） |
+| `dsh-kit-lan-auth` | 局域网远程访问网关（认证/登出/browse 注入） | —（自研核心诉求） |
+| `dsh-kit-notifier` | 桌面通知 | 通知（`dsh-notification`） |
+| `dsh-kit-scheduler` | cron 定时任务 | 自动化/定时（`dsh-automation`） |
+
+### v2 候选（未选，未定优先级）
+
+按价值/工作量初步排序：**记忆（跨会话长期记忆）** > **确定性工具包**（简单零依赖） > **搜索桥** > **Web UI 面板** > **侧边栏工作台** > **终端 TUI** > **视觉 OCR**。
+
+> 决策规则：只做「自己写、开箱即用、与现有 4 插件互补」的功能；不收录他人插件。
 
 ## 6. 踩坑记录（重要）
 
@@ -125,7 +136,7 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
   - 配套：lan-auth 登出（`__dsh_kit_lan_logout` + `revokeToken` + LogoutButton）
 - [x] `dsh-kit-notifier` 桌面通知（2026-08-15 实现）：监听 `session/event` 的 `turn/end`，按 reason 发跨平台桌面通知——macOS `osascript` / Linux `notify-send` / Windows PowerShell toast，零 npm 依赖（dep: `@deepseek-ai/dsh-session` 取类型）
 - [x] `dsh-kit-scheduler` 定时任务（2026-08-15 实现）：用户级 cron（5 字段）+ 持久化 `~/.dsh/dsh-kit-scheduler/tasks.json` + 管理路由 `/dsh-kit-scheduler/tasks`（GET/POST/DELETE/PATCH）+ 每秒 tick 触发；命令走 `/bin/sh -c`（支持管道/变量，用户配置的本地信任面）
-- [ ] 确定全家桶功能清单（自己写，非收录）
+- [x] **确定全家桶功能清单（v1 定稿）**：4 个功能（dsh-kit / lan-auth / notifier / scheduler）定为 v1，全部实现并验证；v2 候选与排序见 §5
 - [ ] 发布流程（npm 发布、版本规范）
 
 ## 8. 关键命令速查
