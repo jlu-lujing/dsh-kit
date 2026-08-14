@@ -324,6 +324,19 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
   const targetPort = Number(target.port || 80)
   let boundPort: number | undefined
 
+  /**
+   * Whether a LAN path is a harmless public static resource the browser
+   * requests without credentials (PWA/manifest/icon discovery). These carry
+   * no user data and no DSH API surface, so forwarding them anonymously only
+   * quiets the console 401 noise — the fully-qualified sensitive planes
+   * (session, workspace, settings, credentials, /api) stay behind the token
+   * fence. Exact-match prefixes only; a trailing dot-segment or deeper path
+   * never matches.
+   */
+  const PUBLIC_STATIC_PREFIXES = ['/manifest.webmanifest', '/favicon.', '/robots.txt', '/site.webmanifest']
+  const isPublicStatic = (pathname: string): boolean =>
+    PUBLIC_STATIC_PREFIXES.some((p) => (p.endsWith('.') ? pathname.startsWith(p) : pathname === p))
+
   const forward = (req: IncomingMessage, res: ServerResponse, viaLan: boolean): void => {
     const out = httpRequest({
       host: targetHostname,
@@ -350,6 +363,15 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
 
     const pathname = (req.url ?? '/').split('?')[0]
     const tokenIn = bearerToken(req)
+
+    // Harmless public static resources (manifest/favicon/robots) are fetched
+    // by the browser without credentials on every load; let them through so
+    // they do not spam the console with 401s. Marked as proxy traffic so DSH
+    // trusts the rewritten loopback Host while the gateway's own management
+    // routes still refuse them.
+    if (isPublicStatic(pathname)) {
+      return forward(req, res, true)
+    }
 
     // Internal login endpoint lives on the gateway itself (not proxied).
     if (pathname === '/__dsh_kit_lan_login') {
