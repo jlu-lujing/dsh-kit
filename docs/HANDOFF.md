@@ -1,9 +1,9 @@
 # 交接文档（HANDOFF）
 
-> 更新日期：2026-08-14
+> 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 定稿并全部实现——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。剩余待办：发布流程（npm 发布、版本规范）；v2 功能候选见 §5。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 定稿并全部实现——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。剩余待办：发布流程（npm 发布、版本规范）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -12,17 +12,19 @@
 
 ## 2. 当前状态
 
-- **架构方案已定稿**：见 `docs/ARCHITECTURE.md`（含开发架构：pnpm dev 热重载 / 多 profile / 热开关）
-- **MVP 骨架已搭好并验证**：
-  - `packages/dsh-kit/` 聚合 bundle（host 提供 `dshKit.store` service + **CLI 管理命令** `dsh-kit list/enable/disable`）
-  - `packages/dsh-kit-notifier/`、`packages/dsh-kit-scheduler/` 两个占位功能子包（独立 bundle，patch 带动态 disabled 表达式）
-  - 根 workspace：`pnpm build` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
+- **架构方案已定稿并全部实现**：见 `docs/ARCHITECTURE.md`（含开发架构：pnpm dev 热重载 / 多 profile / 热开关）
+- **4 个插件全部落地**：
+  - `packages/dsh-kit/` 聚合 bundle（host 提供 `dshKit.store` service + **CLI 管理命令** `dsh-kit list/enable/disable` + 设置页「功能商店」面板）
+  - `packages/dsh-kit-lan-auth/` 局域网远程访问网关（HTTPS 反向代理 + token/登录认证 + 登出 + browse 选择器注入 + 管理路由 + 设置页）
+  - `packages/dsh-kit-notifier/` 桌面通知（监听 `session/event` 的 `turn/end`，跨平台通知）
+  - `packages/dsh-kit-scheduler/` 定时任务（cron + 持久化 + 管理路由）
+  - 根 workspace：`pnpm build` / `pnpm build:client` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
 - **插件管理机制已验证（核心成果）**：
   - 子包 patch 的 `disabled` 用自包含 `!!js` 表达式直接读状态文件（`process.getBuiltinModule('fs')` + `dshHomePath`）
   - 双向开关 + 重启保留全通过：`dsh-kit disable dsh-kit-notifier` → 重启 → notifier 不加载；enable 后加载
 - **验证通过**：
   - `pnpm install && pnpm -r build` 全绿
-  - `dsh plugin --profile dev add -w <paths>` 三个包装入 dev profile
+  - `dsh plugin --profile dev add -w <paths>` 四个包装入 dev profile
   - `dsh --profile dev --dump-config` 三层 patch 正确展开、无重复 id
   - `dsh --profile dev --port <p>` 启动，动态 disabled 生效（off 不加载 / on 加载）
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
@@ -61,32 +63,16 @@
 
 ## 5. 全家桶功能清单（v1 已定稿，2026-08-15）
 
-**重要**：用户要的是「自己写」插件，不是收录别人的！以下候选只作为功能方向参考。catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选方向：
+全家桶 v1 共 4 个插件，全部为自研（**不收录他人插件**，仅参考其功能方向）：
 
-| 类别 | 仓库 | Stars | 用途 |
-|---|---|---|---|
-| Web UI 全家桶 | `zhu1090093659/dsh-web-ui` | 914 | 任务看板/Git图谱/右侧面板/宠物/实时token/皮肤 |
-| 视觉 | `liustack/modlens` | 853 | 图片→结构化JSON（OCR/布局/语义） |
-| 搜索 | `liustack/modsearch` | 71 | Web/X 搜索桥 |
-| 确定性工具包 | `omdsh-dev/dsh-toolkit` | 10 | time/encoding/json/calculator/csv/regex/markdown/diff/stat/schema 十个零依赖工具 |
-| 侧边栏工作台 | `omdsh-dev/DSH-better-sidebar` | 370 | 文件编辑/终端/Git/子代理 |
-| 终端 TUI | `ccch1mneyyy/dsh-TUI` | 483 | Claude Code 风格全屏终端 |
-| 记忆 | `csyangwen/dsh-memory-evolve` | 24 | 跨会话长期记忆 |
-
-### v1 全家桶（已实现并验证）
-
-| 插件 | 功能 | 对应的候选方向 |
+| 插件 | 功能 | 说明 |
 |---|---|---|
-| `dsh-kit` | 插件管理 + 功能商店设置面板（底座） | —（自研底座） |
-| `dsh-kit-lan-auth` | 局域网远程访问网关（认证/登出/browse 注入） | —（自研核心诉求） |
-| `dsh-kit-notifier` | 桌面通知 | 通知（`dsh-notification`） |
-| `dsh-kit-scheduler` | cron 定时任务 | 自动化/定时（`dsh-automation`） |
+| `dsh-kit` | 插件管理 + 功能商店设置面板 | 底座：host 管理路由 + CLI + 设置页 |
+| `dsh-kit-lan-auth` | 局域网远程访问网关 | 认证/登出/browse 选择器注入，默认关闭 |
+| `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知 |
+| `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由 |
 
-### v2 候选（未选，未定优先级）
-
-按价值/工作量初步排序：**记忆（跨会话长期记忆）** > **确定性工具包**（简单零依赖） > **搜索桥** > **Web UI 面板** > **侧边栏工作台** > **终端 TUI** > **视觉 OCR**。
-
-> 决策规则：只做「自己写、开箱即用、与现有 4 插件互补」的功能；不收录他人插件。
+> 决策规则：只做「自己写、开箱即用、与现有插件互补」的功能；候选功能方向调研记录已归档，不再在本项目文档中列举。
 
 ## 6. 踩坑记录（重要）
 
@@ -119,33 +105,35 @@
 21. **动态 loader 注入的插件必须是 profile 已解析的依赖（2026-08-15）**：`ctx.loader.create({ name })` 只能装 profile node_modules 里**可解析**的包。browse pair 是 `@deepseek-ai` 官方包（web-app 已依赖），所以 lan-auth 动态注入可用；若是自研子包需确保在 profile dependencies。`ctx.loader` 类型来自 `@deepseek-ai/cordis-plugin-loader`（devDep，故 lan-auth 补了 `cordis-plugin-loader: 1.0.2`）。
 22. **JSDoc 注释里的 `*/` 会提前闭合块注释（2026-08-15 踩坑）**：写 `cron 表达式 '*/s'` 这类注释时 `*/` 被 TS 当注释终止符，后续内容变成代码 → `TS1005/TS1002`（"Unterminated string/template literal"）。规避：注释里用转义 `*\/` 或改写措辞避开 `*/` 序列。**顺带**：scheduler 任务命令一开始用 `execFile`（无 shell，`$()` 原样），用户期望 shell → 已改 `exec`（`/bin/sh -c`），支持管道/变量（命令来自本地可信配置面，风险可控）。
 
-## 7. 近期待办
+## 7. 完成记录与待办
 
-- [x] 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
-- [x] `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 自签 TLS + token/用户管理 webui + 默认关闭）——已实现并验证
+### 已完成（v1 全部落地）
+
+- 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
+- `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 自签 TLS + token/用户管理 webui + 默认关闭）——已实现并验证
   - 取代了原来的「改 client-connection 源码放开局域网」方案；特权方法管理面保持仅本机
-- [x] 远程可用性（lan-auth 网关 + browse 选择器，2026-08-14 打通，08-15 插件化）：
+- 远程可用性（lan-auth 网关 + browse 选择器）：
   - 网关转发剥浏览器标记头（Origin/sec-fetch-*）→ `/api` 不再 403（踩坑 #17）
   - WebSocket 升级改原生 TCP 隧道 → `events.mux`/`events.host` 握手成功（踩坑 #18）
   - browse 选择器：lan-auth 插件动态注入（禁用 auto + loader.create browse pair）→ 远程浏览器内弹 web 选择器，**零 profile 配置**（踩坑 #19/#21）
-- [x] dsh-kit 商店 webui 面板（2026-08-15 实现并验证）：
+- dsh-kit 商店 webui 面板：
   - host 侧：`GET /dsh-kit/store`（清单+状态）+ `POST /dsh-kit/store/{id}`（启停）管理路由
   - client 侧：设置页「功能商店」（`settings.section` slot，非侧边栏）
   - dsh-kit 变为 dual-face 包（host + client）；`pnpm build:client` 扫 `dsh-kit`+`dsh-kit-*`（修复 glob）
-  - 验证：本机 + 远程经网关（带 token）读清单 200，启停真实写 state.json 并保留
   - 配套：lan-auth 登出（`__dsh_kit_lan_logout` + `revokeToken` + LogoutButton）
-- [x] `dsh-kit-notifier` 桌面通知（2026-08-15 实现）：监听 `session/event` 的 `turn/end`，按 reason 发跨平台桌面通知——macOS `osascript` / Linux `notify-send` / Windows PowerShell toast，零 npm 依赖（dep: `@deepseek-ai/dsh-session` 取类型）
-- [x] `dsh-kit-scheduler` 定时任务（2026-08-15 实现）：用户级 cron（5 字段）+ 持久化 `~/.dsh/dsh-kit-scheduler/tasks.json` + 管理路由 `/dsh-kit-scheduler/tasks`（GET/POST/DELETE/PATCH）+ 每秒 tick 触发；命令走 `/bin/sh -c`（支持管道/变量，用户配置的本地信任面）
-- [x] **确定全家桶功能清单（v1 定稿）**：4 个功能（dsh-kit / lan-auth / notifier / scheduler）定为 v1，全部实现并验证；v2 候选与排序见 §5
+- `dsh-kit-notifier` 桌面通知：监听 `session/event` 的 `turn/end`，按 reason 发跨平台桌面通知——macOS `osascript` / Linux `notify-send` / Windows PowerShell toast，零 npm 依赖（dep: `@deepseek-ai/dsh-session` 取类型）
+- `dsh-kit-scheduler` 定时任务：用户级 cron（5 字段）+ 持久化 `~/.dsh/dsh-kit-scheduler/tasks.json` + 管理路由 `/dsh-kit-scheduler/tasks`（GET/POST/DELETE/PATCH）+ 每秒 tick 触发；命令走 `/bin/sh -c`（支持管道/变量，用户配置的本地信任面）
+- 确定全家桶功能清单（v1 定稿）：4 个功能（dsh-kit / lan-auth / notifier / scheduler）全实现并验证（见 §5）
+
+### 待办
+
 - [ ] 发布流程（npm 发布、版本规范）
 
 ## 8. 关键命令速查
 
 ```sh
-# 本机访问 dsh web（局域网 IP 会 403 特权 API）
+# 本机访问 dsh web
 dsh web --port 3080
-# 局域网开放（需改过源码 + 0.0.0.0 patch）
-dsh web  # patch 已配置 host: 0.0.0.0
 
 # 插件管理
 dsh plugin --profile web add -w <path|pkg>
@@ -153,7 +141,7 @@ dsh plugin --profile web remove <name>
 
 # dsh-kit 全家桶安装（一条命令）
 dsh plugin --profile <p> add -w \
-  <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+  <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler> <dsh-kit-lan-auth>
 
 # dsh-kit 插件管理 CLI（读写 ~/.dsh/dsh-kit/state.json）
 dsh-kit list | status | ls
@@ -164,6 +152,12 @@ dsh-kit disable <feature>
 dsh web --dump-config
 dsh --profile dev --dump-config
 dsh --profile dev --port 3090   # 启动 dev profile（注意不是 dsh web！）
+
+# 远程访问（启用 dsh-kit-lan-auth 后）
+#   局域网设备 -> https://<主机IP>:3443  + token/登录
+#   管理路由（仅本机）: GET /dsh-kit-lan-auth/status | POST .../tokens
+# 功能商店路由: GET /dsh-kit/store | POST /dsh-kit/store/<id> {enabled}
+# 定时任务路由: GET/POST /dsh-kit-scheduler/tasks | DELETE/PATCH .../<id>
 
 # git（私有仓库）
 git push

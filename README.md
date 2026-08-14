@@ -90,7 +90,7 @@ npx create-dsh-plugin my-plugin -t tool
 
 - **状态**：当前通过**本地路径**安装（`dsh plugin add -w <path>`），尚未发布到 npm（registry 404）。
 - **版本**：4 个子包均为 `0.1.0`；根 workspace 为 `private: true`（只承载开发工具链，不发布）。
-- 发布后可用 `dsh plugin add dsh-kit` 直接安装；npm 发布流程与版本规范尚未制定（见 `docs/HANDOFF.md` §7 待办）。
+- 发布后可用 `dsh plugin add dsh-kit` 直接安装；npm 发布流程与版本规范当前尚未制定。
 
 ## License
 

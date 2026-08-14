@@ -1,7 +1,7 @@
 # dsh-kit 架构设计
 
-> 更新日期：2026-08-14
-> 状态：方案已定稿（待实现）
+> 更新日期：2026-08-15
+> 状态：v1 已全部实现并验证（2026-08-15）
 
 ## 1. 定位
 
@@ -29,27 +29,28 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 
 ### 2.3 webui 面板 = client 端 Cordis 插件
 
-- client 端插件通过 `ctx.slots`（如 `sidebar.footer.action`）注入 UI
+- client 端插件通过 `ctx.slots` 注入 UI
 - 官方模板：`@deepseek-ai/dsh-client-ui-cordis`（CordisPanel：inventory 列表 + 启停按钮）
 - 参考 `packages/extensions/ui-cordis/src/client/`（CordisPanel.tsx + inventory.ts）
+- **我们实际用的 slot**：功能商店挂 `settings.section`（设置页），lan-auth 设置页也用 `settings.section`；远程会话登出按钮挂 `sidebar.footer.action`
 
 ### 2.4 动态装载 = `dynamicCordisRunner`（注意边界）
 
 - `@deepseek-ai/dsh-cordis-host-runner` + `@deepseek-ai/dsh-tool-cordis` 提供运行时 define/run/stop/undefine
 - **模型驱动**：session 作用域、vm 沙箱、需审批、**纯进程内存、不持久化**
-- 结论：**不适合做用户傻瓜包的开关机制**，但 browser half 的"投递 UI 到页面"机制可复用于商店面板
+- 结论：**不适合做用户傻瓜包的开关机制**（商店面板用的是持久化状态文件 + 管理路由，见 §3）
 
 ## 3. 架构决策
 
 | 决策点 | 结论 |
 |---|---|
-| 傻瓜包本体 | 聚合 bundle（`dsh-kit`）+ 管理入口（webui 商店面板） |
-| 功能粒度 | 每个功能 = 独立 Cordis bundle（可单装），内部重逻辑可选 Rust sidecar |
-| 商店形态 | 直接做 webui 面板 |
+| 傻瓜包本体 | 聚合 bundle（`dsh-kit`）+ 管理入口（设置页「功能商店」） |
+| 功能粒度 | 每个功能 = 独立 Cordis bundle（可单装） |
+| 商店形态 | webui 设置面板（`settings.section` slot） |
 | 用户开关机制 | 持久化状态文件 + 进程内 apply（**不用** dynamicCordisRunner 做启停） |
-| 面板 UI 投递 | 复用动态 runner 的 browser-half 投递机制（可选，一期可不做） |
+| 面板 UI 投递 | 直接 client 插件 + 管理路由（未用动态 runner 的投递机制） |
 | 持久化位置 | dsh-kit 自管理状态文件（不碰用户 cordis.patch.yml） |
-| Rust 定位 | JS 只做壳（编排/聚合/面板），重计算/重 IO 功能用 Rust sidecar（pet-rs 模式） |
+| Rust 定位 | 未采用（当前 4 插件均为纯 JS，重逻辑暂不拆 Rust sidecar） |
 
 ## 4. 仓库结构
 
@@ -61,21 +62,18 @@ dsh-kit/
 │   │   ├── cordis.patch.yml     #   insert 自身行（host service）
 │   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable
 │   │   └── src/
-│   │       ├── index.ts         #   host 插件：dshKit.store service
-│   │       ├── store.ts         #   商店元数据 + 清单
+│   │       ├── index.ts         #   host 插件：dshKit.store service + 管理路由
+│   │       ├── store.ts         #   功能元数据 + 清单
 │   │       ├── state.ts         #   状态文件读写（~/.dsh/dsh-kit/state.json）
-│   │       └── client/          # （后续）商店 webui 面板
-│   ├── dsh-kit-notifier/        # 功能子包（独立 bundle，patch 带动态 disabled）
-│   ├── dsh-kit-scheduler/       # 功能子包
+│   │       └── client/          #   「功能商店」设置面板
+│   ├── dsh-kit-notifier/        # 桌面通知（监听 turn/end，跨平台通知）
+│   ├── dsh-kit-scheduler/       # 定时任务（cron + 持久化 + 管理路由）
 │   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（自签 HTTPS 反向代理，默认关闭）
-│   │   ├── src/index.ts         #   host：起网关 + 管理路由
-│   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token 校验 + 代理标记）
+│   │   ├── src/index.ts         #   host：起网关 + 管理路由 + browse 注入
+│   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token 校验 + 代理标记 + WS 隧道 + 静态放行）
 │   │   ├── src/store.ts         #   用户/token 持久化（~/.dsh/dsh-kit-lan-auth/）
 │   │   ├── src/cert.ts          #   openssl 自签证书（首启生成）
-│   │   └── src/client/          #   webui 设置页（token/用户管理）
-│   └── ...                      # 每功能一个
-├── crates/                      # （后续）Rust sidecar
-│   └── ...
+│   │   └── src/client/          #   webui 设置页（token/用户/登出）
 └── docs/
     ├── ARCHITECTURE.md          # 本文档
     └── HANDOFF.md               # 交接文档
@@ -88,10 +86,11 @@ dsh-kit/
 ```sh
 dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
     ~/workspace/dsh-kit/packages/dsh-kit-notifier \
-    ~/workspace/dsh-kit/packages/dsh-kit-scheduler
+    ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
+    ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
 ```
 
-- 聚合包 dsh-kit + 各子包一次装入（一条命令带进全家桶）
+- 聚合包 dsh-kit + 各功能子包一次装入（一条命令带进全家桶）
 - pnpm 装入并 reconcile 进 `dsh.profile.bundles`
 - dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务
 
@@ -103,7 +102,7 @@ dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
 - ✅ **聚合包 dsh-kit 只 insert 自身行**（host + 面板），**不重复 insert 子包行**
 - 各子包声明独立 `dsh.bundle.patch`（可单装），聚合包依赖它们（`file:` 或 registry）
 
-**装机命令是一条多参数 add**（见上），三个都进 bundles 栈，patch 各自展开、无重复。
+**装机命令是一条多参数 add**（见上），四个都进 bundles 栈，patch 各自展开、无重复。
 
 ### 5.2 用户开关（CLI / 面板 → 状态文件）
 
@@ -137,9 +136,9 @@ dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
 
 ## 6. 商店可扩展性
 
-- 内置清单：`store.ts` 内置 `dsh-kit-*` 全家桶清单
-- 第三方接入：支持从注册表/git URL 解析插件清单（一期可只读内置）
-- 面板展示：名称、描述、状态、启停按钮、安装/卸载
+- 内置清单：`store.ts` 内置 `dsh-kit-*` 全家桶清单（`GET /dsh-kit/store` 返回）
+- 面板展示：名称、描述、状态、启停按钮（`POST /dsh-kit/store/{id}`）
+- 第三方接入：当前实现为只读内置清单；未做注册表/git URL 动态解析
 
 ## 7. 开发架构（热重载 / 多 profile / 热开关）
 
@@ -168,7 +167,7 @@ pnpm dev（仿 scripts/dev-web.ts）       dsh web（常驻）
 ```
 
 - 官方实现：`scripts/dev-web.ts` + `packages/client/hmr`（host 端轮询 + `/plugins/events` SSE + 浏览器端换 fiber）
-- 我们的 `pnpm dev`：复制 `dev-web.ts` 逻辑，workspace 只扫 `packages/dsh-kit-*/`，无需改动 dsh 本体
+- 我们的 `pnpm dev`：复制 `dev-web.ts` 逻辑，workspace 只扫 `packages/dsh-kit*`（含聚合包本体），无需改动 dsh 本体
 
 ### 7.3 host 插件开发流程
 
@@ -203,14 +202,7 @@ pnpm dev
 pnpm build   # 然后重启 dsh web
 ```
 
-## 8. Rust 定位（后置，一期不实现）
-
-- 原则：JS 只做壳，重逻辑 Rust sidecar（pet-rs 零侵入模式）
-- 候选：notifier 的桌面通知、scheduler 的 cron 引擎、视觉/搜索等重 IO 功能
-- 接入方式：JS 壳 spawn Rust 二进制，HTTP/WS 接 dsh（如 pet-rs 的 RpcClient + SseConnector）
-- 时机：全家桶骨架跑通后，逐个功能评估是否值得上 Rust
-
-## 8.5 局域网鉴权网关（dsh-kit-lan-auth）
+## 8. 局域网鉴权网关（dsh-kit-lan-auth）
 
 > 状态：已实现并验证（2026-08-14）
 
@@ -250,16 +242,20 @@ dsh-kit disable dsh-kit-lan-auth    # 恢复默认关
 
 token 通过 webui 设置页（settings.section「局域网鉴权」）或本机管理员路由 `/dsh-kit-lan-auth/tokens` 生成；token 明文只在生成时显示一次，存储为 sha256。
 
+## 9. 桌面通知（dsh-kit-notifier）
 
-## 9. 一期范围（MVP）
+- 监听 `ctx.on('session/event')`，匹配 `turn/end`（回合结束）；按 `event.data.reason.kind` 区分 completed / error / aborted / blocked / max-tokens
+- 通知走平台原生工具、零 npm 依赖：macOS `osascript` / Linux `notify-send` / Windows PowerShell `Windows.UI.Notifications`
+- 类型依赖：`@deepseek-ai/dsh-session`（devDep，仅取 `SessionEvent` 类型）
 
-1. `dsh-kit` 聚合 bundle：cordis.patch.yml + 2-3 个占位功能子包
-2. `dsh-kit` host 侧：state.ts + host.ts（list/enable/disable API）
-3. 商店 webui 面板：StorePanel 挂到 sidebar slot
-4. `pnpm dev` 热重载工具链（仿官方 dev-web.ts）
-5. 验证闭环：add → 面板开关 → 重启状态保留
+## 10. 定时任务（dsh-kit-scheduler）
 
-## 10. 参考
+- 用户级 cron（5 字段：分 时 日 月 周），`*` / 范围 / 步进 / 列表
+- 持久化：`~/.dsh/dsh-kit-scheduler/tasks.json`（重启保留）
+- 管理路由：`GET/POST /dsh-kit-scheduler/tasks`，`PATCH/DELETE /dsh-kit-scheduler/tasks/:id`
+- 调度：每秒 tick 检查到期任务（含分钟级防重复触发护栏）；任务命令走 `/bin/sh -c`（支持管道/变量）
+
+## 11. 参考
 
 - dsh 源码：`refs/deepseek-harness/`（apps/cli/src/plugin.ts、packages/boot/app-boot、packages/extensions/ui-cordis、packages/extensions/cordis-host-runner）
-- Rust sidecar 参考：`refs/dsh-plugin-pet-rs/`
+- Rust sidecar 参考：`refs/dsh-plugin-pet-rs/`（当前未采用）
