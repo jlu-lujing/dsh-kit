@@ -56,16 +56,16 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 ```
 dsh-kit/
 ├── packages/
-│   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理入口
-│   │   ├── package.json         #   dsh.bundle.patch + dependencies: 全部 dsh-kit-*
-│   │   ├── cordis.patch.yml     #   insert 所有子功能行（默认 enabled，附 config）
+│   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI
+│   │   ├── package.json         #   dsh.bundle.patch + bin: dsh-kit
+│   │   ├── cordis.patch.yml     #   insert 自身行（host service）
+│   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable
 │   │   └── src/
-│   │       ├── host.ts          #   商店 API：list/enable/disable → 状态文件 + apply
-│   │       ├── store.ts         #   商店元数据 + 清单（内置 + 可扩展）
+│   │       ├── index.ts         #   host 插件：dshKit.store service
+│   │       ├── store.ts         #   商店元数据 + 清单
 │   │       ├── state.ts         #   状态文件读写（~/.dsh/dsh-kit/state.json）
-│   │       └── client/
-│   │           └── StorePanel.tsx  # 商店/开关面板（复刻 ui-cordis 结构）
-│   ├── dsh-kit-notifier/        # 功能子包（独立 bundle，可单装）
+│   │       └── client/          # （后续）商店 webui 面板
+│   ├── dsh-kit-notifier/        # 功能子包（独立 bundle，patch 带动态 disabled）
 │   ├── dsh-kit-scheduler/       # 功能子包
 │   └── ...                      # 每功能一个
 ├── crates/                      # （后续）Rust sidecar
@@ -99,23 +99,35 @@ dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
 
 **装机命令是一条多参数 add**（见上），三个都进 bundles 栈，patch 各自展开、无重复。
 
-### 5.2 用户开关（webui 面板）
+### 5.2 用户开关（CLI / 面板 → 状态文件）
 
 ```
-用户点"停用 notifier"
-  → browser 面板调 host API（remote.dshKit.disable('dsh-kit-notifier')）
-  → host 写状态文件 state.json { "dsh-kit-notifier": false }
-  → host 调动态 runner 停用对应行（或标记下次启动跳过）
-  → 立即生效 + 持久化
+用户: dsh-kit disable dsh-kit-notifier      # 或面板点"停用"
+  → CLI/面板调 store.setEnabled('dsh-kit-notifier', false)
+  → 写状态文件 ~/.dsh/dsh-kit/state.json { "features": { "dsh-kit-notifier": false } }
+  → 下次加载（或 HMR 重求值）时生效
 ```
 
-### 5.3 重启后状态保留
+### 5.3 生效机制：子包 patch 动态 disabled 表达式（已验证）
 
+每个功能子包的 patch 里，行带一个**自包含的 `!!js` 表达式**直接读状态文件：
+
+```yaml
+- id: dsh-kit-notifier
+  name: dsh-kit-notifier
+  disabled: !!js "( (function () { try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-notifier'] === false; } catch (e) { return false; } })() )"
 ```
-dsh 启动 → dsh-kit bundle apply
-  → 读取 state.json，对 disabled 的插件行补 disabled: true
-  → 其余按 cordis.patch.yml 默认启用
-```
+
+- **表达式自包含**：用 `process.getBuiltinModule('fs')`（Node 22+）读文件 + `dshHomePath()`（根 ctx 提供的路径函数）——**不依赖任何 service 加载顺序**，首次 loader pass 即正确。
+- 状态文件缺失/损坏 → catch → 返回 false（不禁用，默认启用）。
+- **重启后状态保留**：启动时表达式按状态文件求值，决定该行是否加载。
+
+### 5.4 关键机制发现（实测）
+
+1. **`!!js` 求值环境**：`with (ctx) { eval(expr) }`，可访问 `process`、`process.env`、`ctx` 及根 ctx 提供的 service（如 `dshHomePath`）。`require` **不可用**（Eval 无 CJS），`fs` 需经 `process.getBuiltinModule`。
+2. **时序坑**：patch `disabled` 首次求值在 dsh-kit 插件 apply **之前**（loader 并行加载），所以表达式**不能依赖** `dshKit.featureState` service（首次返回 undefined → guard 短路 false → 不禁用 → 插件仍 init）。**解法**：表达式自给自足直接读文件。
+3. **YAML 引号**：含 `:` 的复杂表达式必须整体用双引号包裹，否则 YAML 误解析为 mapping（dump 里会看到 `{'[object Object]': false)`）。
+4. **loader 动态开关（备选）**：`ctx.loader.entries()` + `entry.update({disabled}, false, true)` 可运行时禁用已加载 entry（`_disabled` → `_dispose` 停 fiber），但 init 已发生一次，不如表达式方案干净。
 
 ## 6. 商店可扩展性
 

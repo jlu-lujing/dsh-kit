@@ -12,14 +12,17 @@
 
 - **架构方案已定稿**：见 `docs/ARCHITECTURE.md`（含开发架构：pnpm dev 热重载 / 多 profile / 热开关）
 - **MVP 骨架已搭好并验证**：
-  - `packages/dsh-kit/` 聚合 bundle（host 逻辑 + store 服务 + patch 只 insert 自身行）
-  - `packages/dsh-kit-notifier/`、`packages/dsh-kit-scheduler/` 两个占位功能子包（独立 bundle）
+  - `packages/dsh-kit/` 聚合 bundle（host 提供 `dshKit.store` service + **CLI 管理命令** `dsh-kit list/enable/disable`）
+  - `packages/dsh-kit-notifier/`、`packages/dsh-kit-scheduler/` 两个占位功能子包（独立 bundle，patch 带动态 disabled 表达式）
   - 根 workspace：`pnpm build` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
+- **插件管理机制已验证（核心成果）**：
+  - 子包 patch 的 `disabled` 用自包含 `!!js` 表达式直接读状态文件（`process.getBuiltinModule('fs')` + `dshHomePath`）
+  - 双向开关 + 重启保留全通过：`dsh-kit disable dsh-kit-notifier` → 重启 → notifier 不加载；enable 后加载
 - **验证通过**：
   - `pnpm install && pnpm -r build` 全绿
   - `dsh plugin --profile dev add -w <paths>` 三个包装入 dev profile
   - `dsh --profile dev --dump-config` 三层 patch 正确展开、无重复 id
-  - `dsh web` 启动成功，dsh-kit host 插件 apply 无错误
+  - `dsh --profile dev --port <p>` 启动，动态 disabled 生效（off 不加载 / on 加载）
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
 - 本地路径：`~/workspace/dsh-kit`
 - dsh 源码 + Rust 参考已 clone 到 `refs/`：`refs/deepseek-harness/`、`refs/dsh-plugin-pet-rs/`
@@ -90,12 +93,17 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
    ```
 9. **pnpm `link:` 装聚合包不传递依赖**：`link:` 协议的包跳过其 dependencies 解析，file: 子依赖也不会 hoist 到 profile 根 node_modules（`nodeLinker: hoisted` 只提升直接依赖）。cordis loader 从 profile 根按包名解析 → 子包不可达。**必须在 profile 根直接安装子包**（如上一条的多参数 add，或独立 add 子包）。
 10. **cordis host 插件 apply**：`config` 参数需默认值 `config: Config = {}`；`ctx.set('x.y', v)` 前必须 `ctx.provide('x.y')`，否则 `cannot set property without provide`。
+11. **`!!js` 表达式求值环境（插件管理核心）**：`with (ctx) { eval(expr) }`。可用：`process`、`process.env`、`ctx`、根 ctx service（如 `dshHomePath`）。**不可用**：`require`（`ReferenceError: require is not defined`）。同步读文件用 `process.getBuiltinModule('fs')`（Node 22.3+，Eval 里可用）。
+12. **`disabled` 表达式时序坑**：patch 的 `disabled` **首次求值发生在 dsh-kit 插件 apply 之前**（loader 并行加载），所以表达式**不能依赖** `dshKit.featureState` service（首轮返回 undefined → guard 短路 false → 不禁用 → 插件仍 init）。**解法**：表达式自给自足（`getBuiltinModule` + `dshHomePath` 直接读状态文件），首次求值即正确。
+13. **YAML `!!js` 引号**：含 `:` 的复杂表达式必须**整体双引号包裹**（`!!js "(...)"`），否则 YAML 误解析为 mapping（`--dump-config` 里看到 `{'[object Object]': false)`）。
+14. **loader 动态开关（备选，非首选）**：`ctx.loader.entries()`（id 带 `include:` 前缀，用 `endsWith(':id')` 匹配）+ `entry.update({disabled}, false, true)` 可停已加载 fiber，但 init 已发生一次。表达式方案更干净。
+15. **验证插件加载**：`dsh --profile dev --port <p>`（不是 `dsh web`——那是 web profile 别名！）。插件 apply 里写临时文件验证是否被加载。
 
 ## 7. 近期待办
 
-- [ ] 用 create-dsh-plugin 生成第一个功能插件（建议先做一个简单 tool 插件验证全家桶流程）
+- [x] 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
 - [ ] 确定全家桶功能清单（自己写，非收录）
-- [ ] 搭聚合包结构（类似 dsh-web-ui-all：aggregate.yml + 子包 dependencies）
+- [ ] 给 `dsh-kit` 加 webui 商店面板（client 插件，验证 pnpm dev 热重载链路）
 - [ ] 发布流程（npm 发布、版本规范）
 
 ## 8. 关键命令速查
@@ -110,9 +118,19 @@ dsh web  # patch 已配置 host: 0.0.0.0
 dsh plugin --profile web add -w <path|pkg>
 dsh plugin --profile web remove <name>
 
+# dsh-kit 全家桶安装（一条命令）
+dsh plugin --profile <p> add -w \
+  <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+
+# dsh-kit 插件管理 CLI（读写 ~/.dsh/dsh-kit/state.json）
+dsh-kit list | status | ls
+dsh-kit enable <feature>
+dsh-kit disable <feature>
+
 # 配置查看
 dsh web --dump-config
-dsh web --dump-default-config
+dsh --profile dev --dump-config
+dsh --profile dev --port 3090   # 启动 dev profile（注意不是 dsh web！）
 
 # git（私有仓库）
 git push

@@ -1,13 +1,16 @@
 # dsh-kit aggregate patch layer.
 #
-# dsh-kit provides the store host + webui panel. Each feature (dsh-kit-*)
-# is its own bundle and inserts its own row; install them alongside via
-# `dsh plugin add dsh-kit dsh-kit-notifier dsh-kit-scheduler` (one command,
-# the whole family). Users toggle a feature by overriding its row in the
-# profile cordis.patch.yml (last layer wins), e.g.:
+# dsh-kit provides the store host (its own row below) and the management CLI.
+# Each feature (dsh-kit-*) is its own bundle that inserts its own row with its
+# own dynamic `disabled` expression; install them alongside via:
 #
-#   - id: dsh-kit-notifier
-#     disabled: true
+#   dsh plugin --profile <p> add -w <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+#
+# The aggregate patch does NOT re-insert feature rows: cordis rejects duplicate
+# loader entry ids within one update, and the feature's own bundle already
+# declares it. Toggling a feature = writing the dsh-kit state file (via the
+# `dsh-kit` CLI or the store panel); the feature row's `disabled` expression
+# reads it live and on every restart.
 
 - insert:
     - id: dsh-kit

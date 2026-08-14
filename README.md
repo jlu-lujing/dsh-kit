@@ -37,6 +37,18 @@ dsh plugin --profile dev add -w \
 dsh web
 ```
 
+## 插件管理
+
+装好全家桶后，用 `dsh-kit` 命令管理各功能开关（状态存 `~/.dsh/dsh-kit/state.json`，重启保留）：
+
+```sh
+dsh-kit list                # 列出所有功能及状态
+dsh-kit enable notifier     # 启用桌面通知
+dsh-kit disable scheduler   # 停用定时任务
+```
+
+每个功能的 `disabled` 由 patch 里的动态表达式读状态文件决定，**无需编辑任何 patch 文件**。
+
 ## 开发
 
 ```sh
