@@ -11,6 +11,15 @@
 # store panel), which writes `features["dsh-kit-lan-auth": true]` to the state
 # file. The disabled expression reads that file directly:
 
+# Remote access needs the in-app (browse) directory picker — the native picker
+# opens only on the host display, invisible to a LAN browser. directory-picker
+# (auto) resolves `native` because the gateway keeps webServer loopback-bound,
+# so disable it here; the lan-auth apply (below) dynamically injects the browse
+# pair when the gateway loads. A remote user who disables lan-auth falls back to
+# the stock auto (native) picker.
+- id: directory-picker
+  disabled: true
+
 - insert:
     - id: dsh-kit-lan-auth
       name: dsh-kit-lan-auth

@@ -103,18 +103,19 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
 16. **lan-auth 路径重复拼接（真实 bug，2026-08-14 已修复）**：`$DSH_HOME` 已是 `~/.dsh`，旧代码又在 `index.ts` 里 `path.join(home, '.dsh')` 二次拼接，导致 token/用户落到 `~/.dsh/.dsh/dsh-kit-lan-auth/`，LAN 带 token 也 401（token 不在运行进程读取的文件里）。已统一为 `store.ts` 的 `lanAuthRoot()`（直接返回 `$DSH_HOME`），`index.ts` 不再重复拼接；升级前嵌套目录里的旧数据需合并回顶层 `~/.dsh/dsh-kit-lan-auth/state.json`。
 17. **网关转发必须剥掉浏览器标记头（真实 bug，2026-08-14 已修复）**：DSH 的 `/api` 路由有**同源信任栅栏**（`client-connection/src/api-request-trust.ts`）：请求带 `Origin` 时要求 `Origin.host === Host.host`。网关原样透传浏览器 `Origin: https://<lan>:3443`、只改写 `Host → 127.0.0.1:3080`，导致所有 `/api` POST（pickDirectory/openPath/settings/credentials/llm.discoverModels）和 WebSocket 升级被 DSH 判 403。修复：`gateway.ts` 的 `outboundHeaders()` 在 LAN 转发时删除 `origin`/`sec-fetch-*`/`referer`/`referrer-policy`，只留 `x-dsh-kit-lan-auth-proxy` 标记 + 重写 Host。**网关就是认证边界**，转发到 loopback 的请求必须让 DSH 视为干净的 loopback 调用者（全权限面）。
 18. **网关 WebSocket 升级不能用 httpRequest 转发（真实 bug，2026-08-14 已修复）**：DSH 的 `WebUpgradeRoute` 把**原始 TCP socket + head 字节**交给 `ws.handleUpgrade` 完成握手；网关原先用 `httpRequest().on('upgrade')` 转发，第二条 HTTP 连接无法把客户端 socket 交接回去，导致 WS 握手永不完成（curl/WS 客户端都挂起）。修复：`gateway.ts` upgrade 分支改为**原生 TCP 隧道**——`tcpConnect(target)` 后重写请求行 + 剥离标记的头部 + 写回 `head` 字节，再双向 pipe socket。
-19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。修复（**纯 profile 配置，零代码**，`~/.dsh/profiles/web/cordis.patch.yml`）：禁用 `directory-picker`(auto) 行，insert `@deepseek-ai/dsh-host-directory-picker-browse`（backend）+ `@deepseek-ai/dsh-client-ui-directory-picker-browse`（client surface）。代价：**本机和远程都用** web 选择器（失去 native 桌面弹窗）。验证：`host.pickDirectory` → `directory-picker-unavailable`（native 停）、`host.listDirectory` 正常列目录（本机 + 经网关 LAN 均 200）。
+19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复，08-15 升级为插件化）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。**当前做法（已插件化）**：`dsh-kit-lan-auth` 的 `cordis.patch.yml` 禁用 `directory-picker`(auto) 行；lan-auth `apply()` 用 `ctx.loader.create` 动态注入 browse pair（`@deepseek-ai/dsh-host-directory-picker-browse` + `@deepseek-ai/dsh-client-ui-directory-picker-browse`），teardown 时 remove——**无需任何 profile 配置**（`~/.dsh/profiles/web/cordis.patch.yml` 已清空为 `[]`）。早期曾用 profile 配置固定 browse，现已废弃。代价：**本机和远程都用** web 选择器。验证：`host.pickDirectory` → `directory-picker-unavailable`、`host.listDirectory` 正常（本机 + 经网关 LAN 均 200）、browse client surface 在 boot graph。
 20. **client bundle（`lib/client.js`）不会随 `pnpm build` 生成（2026-08-14 排查/修复）**：`dsh.client` 包（如 lan-auth 的 `src/client/index.ts`）需要 **tsdown** 产出 `lib/client.js`，而根 `pnpm build` 只跑 `tsc -b`（不产 client bundle）。症状：DSH 把 entry 插进 boot graph，但 `/plugins/<id>/client.js` 404 → 浏览器 `client-modules: bundle script ... failed to load`，**非本机远程访问也报同样错**。修复：新增 `scripts/build-client-once.mjs`（tsdown workspace 单次构建，仿 `scripts/dev-web.ts` 去 watch）；`pnpm dev`（watch）常驻产出亦可。**换机器/重新 clone 后必须跑一次**该脚本（或 `pnpm dev`）再启动 dsh，才有客户端面板。
+21. **动态 loader 注入的插件必须是 profile 已解析的依赖（2026-08-15）**：`ctx.loader.create({ name })` 只能装 profile node_modules 里**可解析**的包。browse pair 是 `@deepseek-ai` 官方包（web-app 已依赖），所以 lan-auth 动态注入可用；若是自研子包需确保在 profile dependencies。`ctx.loader` 类型来自 `@deepseek-ai/cordis-plugin-loader`（devDep，故 lan-auth 补了 `cordis-plugin-loader: 1.0.2`）。
 
 ## 7. 近期待办
 
 - [x] 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
 - [x] `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 自签 TLS + token/用户管理 webui + 默认关闭）——已实现并验证
   - 取代了原来的「改 client-connection 源码放开局域网」方案；特权方法管理面保持仅本机
-- [x] 远程可用性（lan-auth 网关 + browse 选择器，2026-08-14 实操打通并验证）：
+- [x] 远程可用性（lan-auth 网关 + browse 选择器，2026-08-14 打通，08-15 插件化）：
   - 网关转发剥浏览器标记头（Origin/sec-fetch-*）→ `/api` 不再 403（踩坑 #17）
   - WebSocket 升级改原生 TCP 隧道 → `events.mux`/`events.host` 握手成功（踩坑 #18）
-  - web profile 固定 browse 选择器（禁用 auto + insert browse pair）→ 远程浏览器内弹 web 选择器（踩坑 #19）
+  - browse 选择器：lan-auth 插件动态注入（禁用 auto + loader.create browse pair）→ 远程浏览器内弹 web 选择器，**零 profile 配置**（踩坑 #19/#21）
 - [x] dsh-kit 商店 webui 面板（2026-08-15 实现并验证）：
   - host 侧：`GET /dsh-kit/store`（清单+状态）+ `POST /dsh-kit/store/{id}`（启停）管理路由
   - client 侧：设置页「功能商店」（`settings.section` slot，非侧边栏）
