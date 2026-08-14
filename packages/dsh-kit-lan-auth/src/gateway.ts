@@ -218,7 +218,11 @@ button.submit:disabled{opacity:.6;cursor:not-allowed;box-shadow:none}
 </div>
 <script>
 (function(){
+  // Honor the server-rendered default tab (?mode=login). The template stamps
+  // the active tab with an 'on' class before hydration; read it so the client
+  // script does not fight the server's choice back to the token tab.
   var mode = 'token';
+  try { if (document.querySelector('.tab-login').classList.contains('on')) mode = 'login'; } catch (e) {}
   function apply(){
     document.querySelector('.field-token').classList.toggle('show', mode==='token');
     document.querySelector('.field-login').classList.toggle('show', mode==='login');
