@@ -1,8 +1,26 @@
-/** dsh-kit-lan-auth client: settings page to manage gateway tokens/users. */
-
+/** dsh-kit-lan-auth client: settings page to manage gateway tokens/users.
+ *
+ * The management page is host-only: it mutates the loopback DSH server's
+ * user/token store, and the admin routes behind it refuse any LAN-originated
+ * request (the gateway stamps proxied traffic with `x-dsh-kit-lan-auth-proxy`,
+ * which the host routes reject with 403). A remote browser would therefore
+ * render a dead page, so the `settings.section` entry is registered only when
+ * the page authority is loopback — the browser accessing the DSH UI directly
+ * on the host machine (127.0.0.1/localhost). A LAN client arriving through the
+ * HTTPS gateway loads the shell with a non-loopback hostname, so
+ * `connection.isLoopback` is false and the section stays hidden.
+ */
 import { createElement, useEffect, useState } from 'react'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 
 export const name = 'dsh-kit-lan-auth'
+
+/**
+ * Services the fiber waits on before apply. Cordis resolves `connection` so
+ * `isLoopback` is authoritative at apply time (server ordering is otherwise
+ * unconstrained — the wire client provides it, and the loader waits).
+ */
+export const inject = ['connection']
 
 const T = { bg: 'rgba(128,128,128,0.07)', border: 'rgba(128,128,128,0.35)', danger: '#e06c75', ok: '#4caf7d', radius: 8, muted: 'rgba(128,128,128,0.7)' }
 const inputS = { flex: 1, padding: '6px 10px', borderRadius: T.radius, border: '1px solid ' + T.border, background: T.bg }
@@ -111,6 +129,12 @@ function LanAuthPage() {
 export function apply(ctx: { get(name: string): unknown }): void {
   const slots = ctx.get('slots') as { inject(name: string, fn: () => unknown): unknown; register(...a: unknown[]): unknown } | undefined
   if (slots === undefined) return
+  // Host-only management surface: hide the section for LAN browsers. The
+  // admin routes are loopback-only, so a remote client gets nothing useful
+  // here — and showing it would leak the feature into a page that cannot use
+  // it. Gate registration on the same trust signal the connection uses.
+  const connection = ctx.get('connection') as ConnectionHandle | undefined
+  if (connection === undefined || !connection.isLoopback) return
   slots.inject('settings.section', () =>
     slots.register({ name: 'settings.section', id: 'dsh-kit-lan-auth', priority: 40, label: () => '局域网鉴权' }, () => createElement(LanAuthPage, null)),
   )
