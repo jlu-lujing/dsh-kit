@@ -50,7 +50,6 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 | 用户开关机制 | 持久化状态文件 + 进程内 apply（**不用** dynamicCordisRunner 做启停） |
 | 面板 UI 投递 | 直接 client 插件 + 管理路由（未用动态 runner 的投递机制） |
 | 持久化位置 | dsh-kit 自管理状态文件（不碰用户 cordis.patch.yml） |
-| Rust 定位 | 未采用（当前 4 插件均为纯 JS，重逻辑暂不拆 Rust sidecar） |
 
 ## 4. 仓库结构
 
@@ -258,4 +257,3 @@ token 通过 webui 设置页（settings.section「局域网鉴权」）或本机
 ## 11. 参考
 
 - dsh 源码：`refs/deepseek-harness/`（apps/cli/src/plugin.ts、packages/boot/app-boot、packages/extensions/ui-cordis、packages/extensions/cordis-host-runner）
-- Rust sidecar 参考：`refs/dsh-plugin-pet-rs/`（当前未采用）

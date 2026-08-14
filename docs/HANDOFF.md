@@ -29,7 +29,7 @@
   - `dsh --profile dev --port <p>` 启动，动态 disabled 生效（off 不加载 / on 加载）
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
 - 本地路径：`~/workspace/dsh-kit`
-- dsh 源码 + Rust 参考已 clone 到 `refs/`：`refs/deepseek-harness/`、`refs/dsh-plugin-pet-rs/`
+- dsh 源码已 clone 到 `refs/`：`refs/deepseek-harness/`
 
 ## 3. 环境
 
