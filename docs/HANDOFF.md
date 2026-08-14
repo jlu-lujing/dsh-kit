@@ -73,7 +73,7 @@
 | `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知 |
 | `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由 |
 
-> 决策规则：只做「自己写、开箱即用、与现有插件互补」的功能；候选功能方向调研记录已归档，不再在本项目文档中列举。
+> 决策规则：只做「自己写、开箱即用、与现有插件互补」的功能。v2 候选方向与可参考的社区插件蓝本：见 `docs/research/dsh-plugin-ecosystem.md`（GitHub `dsh-plugin` topic 调研，2303 仓库）。
 
 ## 6. 踩坑记录（重要）
 
