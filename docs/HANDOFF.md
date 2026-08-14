@@ -30,6 +30,7 @@
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
 - 本地路径：`~/workspace/dsh-kit`
 - dsh 源码已 clone 到 `refs/`：`refs/deepseek-harness/`
+- 参考：`refs/dsh-plugin-pet-rs/`（Rust desktop 宠物实现，作参考保留；未纳入全家桶）
 
 ## 3. 环境
 
