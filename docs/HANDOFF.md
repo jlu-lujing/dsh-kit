@@ -10,11 +10,19 @@
 
 ## 2. 当前状态
 
-- 空项目骨架已建好：workspace 根 + packages/ 目录 + pnpm workspace
+- **架构方案已定稿**：见 `docs/ARCHITECTURE.md`（含开发架构：pnpm dev 热重载 / 多 profile / 热开关）
+- **MVP 骨架已搭好并验证**：
+  - `packages/dsh-kit/` 聚合 bundle（host 逻辑 + store 服务 + patch 只 insert 自身行）
+  - `packages/dsh-kit-notifier/`、`packages/dsh-kit-scheduler/` 两个占位功能子包（独立 bundle）
+  - 根 workspace：`pnpm build` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
+- **验证通过**：
+  - `pnpm install && pnpm -r build` 全绿
+  - `dsh plugin --profile dev add -w <paths>` 三个包装入 dev profile
+  - `dsh --profile dev --dump-config` 三层 patch 正确展开、无重复 id
+  - `dsh web` 启动成功，dsh-kit host 插件 apply 无错误
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
 - 本地路径：`~/workspace/dsh-kit`
-- 已有文件：README.md（含插件清单待填表格）、.gitignore（排除 refs/ 等）、package.json、pnpm-workspace.yaml
-- **还没有任何实际插件代码** —— 下一步是生成第一个功能插件
+- dsh 源码 + Rust 参考已 clone 到 `refs/`：`refs/deepseek-harness/`、`refs/dsh-plugin-pet-rs/`
 
 ## 3. 环境
 
@@ -76,6 +84,12 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
 5. **dsh-ssh 导入 bug**：ssh config 里没有 IdentityFile 的主机被误判为 password 认证导致全部失败；改为默认走 key 认证（空 keyPath 让 ssh2 用默认密钥）
 6. **环境变量**：DEEPSEEK_API_KEY / OPENCODE_API_KEY（opencode.ai 网关，模型 deepseek-v4-pro，baseURL https://opencode.ai/zen/go/v1）
 7. **之前改过 dsh 全局包的源码**：`dsh-client-connection/lib/index.js`（放开特权方法）、`dsh-web-frontend/dist/index.html`（randomUUID polyfill）——升级 dsh 后需重打补丁
+8. **聚合包 + 子包的重复 id 冲突（实测）**：cordis loader 在同一次 update 里拒绝重复 loader entry id（`duplicate loader entry id`）。聚合包 patch **不能**重复 insert 子包行。正确结构：子包 patch 各 insert 自己，聚合包只 insert 自身行。全家桶通过**一条多参数 add** 装入：
+   ```sh
+   dsh plugin --profile <p> add -w <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+   ```
+9. **pnpm `link:` 装聚合包不传递依赖**：`link:` 协议的包跳过其 dependencies 解析，file: 子依赖也不会 hoist 到 profile 根 node_modules（`nodeLinker: hoisted` 只提升直接依赖）。cordis loader 从 profile 根按包名解析 → 子包不可达。**必须在 profile 根直接安装子包**（如上一条的多参数 add，或独立 add 子包）。
+10. **cordis host 插件 apply**：`config` 参数需默认值 `config: Config = {}`；`ctx.set('x.y', v)` 前必须 `ctx.provide('x.y')`，否则 `cannot set property without provide`。
 
 ## 7. 近期待办
 

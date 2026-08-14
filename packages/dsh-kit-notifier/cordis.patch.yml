@@ -1,0 +1,5 @@
+# dsh-kit-notifier feature patch layer.
+
+- insert:
+    - id: dsh-kit-notifier
+      name: dsh-kit-notifier

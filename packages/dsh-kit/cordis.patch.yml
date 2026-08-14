@@ -1,0 +1,14 @@
+# dsh-kit aggregate patch layer.
+#
+# dsh-kit provides the store host + webui panel. Each feature (dsh-kit-*)
+# is its own bundle and inserts its own row; install them alongside via
+# `dsh plugin add dsh-kit dsh-kit-notifier dsh-kit-scheduler` (one command,
+# the whole family). Users toggle a feature by overriding its row in the
+# profile cordis.patch.yml (last layer wins), e.g.:
+#
+#   - id: dsh-kit-notifier
+#     disabled: true
+
+- insert:
+    - id: dsh-kit
+      name: dsh-kit

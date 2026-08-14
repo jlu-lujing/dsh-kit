@@ -1,0 +1,5 @@
+# dsh-kit-scheduler feature patch layer.
+
+- insert:
+    - id: dsh-kit-scheduler
+      name: dsh-kit-scheduler

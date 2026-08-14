@@ -27,8 +27,11 @@ dsh-kit/
 pnpm install
 pnpm build
 
-# 2. 安装到 dsh web profile（在项目父目录执行）
-dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/<插件名>
+# 2. 安装全家桶到 dev profile（推荐开发隔离，不污染 web）
+dsh plugin --profile dev add -w \
+  ~/workspace/dsh-kit/packages/dsh-kit \
+  ~/workspace/dsh-kit/packages/dsh-kit-notifier \
+  ~/workspace/dsh-kit/packages/dsh-kit-scheduler
 
 # 3. 启动 dsh web
 dsh web
@@ -37,6 +40,8 @@ dsh web
 ## 开发
 
 ```sh
+pnpm dev        # client 插件热构建（仿官方 dev-web.ts，改面板即时生效）
+
 pnpm build       # 全量构建
 pnpm typecheck   # 类型检查
 pnpm test        # 测试
@@ -50,11 +55,17 @@ npx create-dsh-plugin my-plugin -t tool
 
 ## 插件清单
 
-（待补充——每个功能插件一行：名称、用途、状态）
-
 | 包 | 功能 | 状态 |
 | --- | --- | --- |
-| 待定 | 待定 | 规划中 |
+| `dsh-kit` | 聚合包（host + 商店服务） | MVP 骨架已通 |
+| `dsh-kit-notifier` | 桌面通知 | 占位 |
+| `dsh-kit-scheduler` | 定时任务 | 占位 |
+
+> 全家桶安装（一条命令带进全部）：
+> ```sh
+> dsh plugin --profile web add -w <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+> ```
+> 详见 `docs/ARCHITECTURE.md`。
 
 ## 发布
 
