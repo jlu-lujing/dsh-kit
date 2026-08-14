@@ -17,7 +17,7 @@ export interface Store {
 
 const DEFAULT_STATE: StateFile = { features: {} }
 
-export function createStore(stateDir?: string): Store {
+export function createStore(stateDir?: string, defaults?: Partial<Record<FeatureId, boolean>>): Store {
   const dir = stateDir ?? process.env.DSH_HOME ?? join(process.env.HOME ?? '.', '.dsh')
   const file = join(dir, 'dsh-kit', 'state.json')
 
@@ -32,7 +32,8 @@ export function createStore(stateDir?: string): Store {
       }
     },
     isEnabled(id) {
-      return state.features[id] ?? true
+      if (state.features[id] !== undefined) return state.features[id] as boolean
+      return defaults?.[id] ?? true
     },
     setEnabled(id, enabled) {
       state.features[id] = enabled

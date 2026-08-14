@@ -29,7 +29,8 @@ export interface DshKitService {
 }
 
 export function apply(ctx: Context, config: Config = {}): void {
-  const store = createStore(config.stateDir)
+  const defaults = Object.fromEntries(FEATURES.map(f => [f.id, f.defaultEnabled ?? true])) as Partial<Record<FeatureId, boolean>>
+  const store = createStore(config.stateDir, defaults)
   store.load()
 
   const service: DshKitService = {

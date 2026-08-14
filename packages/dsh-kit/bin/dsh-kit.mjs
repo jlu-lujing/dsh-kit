@@ -6,8 +6,10 @@ import { FEATURES } from '../lib/store.js'
 
 const [cmd, arg] = process.argv.slice(2)
 
+const defaults = Object.fromEntries(FEATURES.map(f => [f.id, f.defaultEnabled ?? true]))
+
 if (cmd === undefined || cmd === 'list' || cmd === 'status' || cmd === 'ls') {
-  const store = createStore()
+  const store = createStore(undefined, defaults)
   store.load()
   for (const f of FEATURES) {
     const enabled = store.isEnabled(f.id)
@@ -26,7 +28,7 @@ if (cmd === 'enable' || cmd === 'disable') {
     console.error(`dsh-kit: unknown feature "${id}". Known: ${FEATURES.map(f => f.id).join(', ')}`)
     process.exit(1)
   }
-  const store = createStore()
+  const store = createStore(undefined, defaults)
   store.load()
   store.setEnabled(id, cmd === 'enable')
   console.log(`dsh-kit: ${id} ${cmd}d`)

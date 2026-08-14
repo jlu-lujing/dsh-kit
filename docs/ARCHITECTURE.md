@@ -67,6 +67,12 @@ dsh-kit/
 │   │       └── client/          # （后续）商店 webui 面板
 │   ├── dsh-kit-notifier/        # 功能子包（独立 bundle，patch 带动态 disabled）
 │   ├── dsh-kit-scheduler/       # 功能子包
+│   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（自签 HTTPS 反向代理，默认关闭）
+│   │   ├── src/index.ts         #   host：起网关 + 管理路由
+│   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token 校验 + 代理标记）
+│   │   ├── src/store.ts         #   用户/token 持久化（~/.dsh/dsh-kit-lan-auth/）
+│   │   ├── src/cert.ts          #   openssl 自签证书（首启生成）
+│   │   └── src/client/          #   webui 设置页（token/用户管理）
 │   └── ...                      # 每功能一个
 ├── crates/                      # （后续）Rust sidecar
 │   └── ...
@@ -203,6 +209,47 @@ pnpm build   # 然后重启 dsh web
 - 候选：notifier 的桌面通知、scheduler 的 cron 引擎、视觉/搜索等重 IO 功能
 - 接入方式：JS 壳 spawn Rust 二进制，HTTP/WS 接 dsh（如 pet-rs 的 RpcClient + SseConnector）
 - 时机：全家桶骨架跑通后，逐个功能评估是否值得上 Rust
+
+## 8.5 局域网鉴权网关（dsh-kit-lan-auth）
+
+> 状态：已实现并验证（2026-08-14）
+
+### 定位与动机
+
+DSH Web 界面刻意只监听 `127.0.0.1`，特权方法（settings/credentials/llm.discoverModels）锁 loopback——上游明确等到「真正的鉴权层」才放开。`dsh-kit-lan-auth` 不修改 `dsh-client-connection`，而是在边界加一层**自签名 HTTPS 反向代理网关**，作为唯一暴露到局域网的入口。
+
+```
+局域网设备 ──HTTPS──▶ [网关 :3443 自签TLS] ──验 token/登录──▶ 本机 DSH web (loopback)
+```
+
+### 关键决策
+
+| 决策 | 值 |
+|---|---|
+| 形态 | 独立 HTTPS 反向代理网关（不改 client-connection / webServer） |
+| TLS | 首启 openssl 自签证书（`~/.dsh/dsh-kit-lan-auth/certs/`） |
+| 本机 | loopback 免登录直通 |
+| 局域网 | 需有效 token（`Authorization: Bearer` 或 `X-DSH-Token`） |
+| 权限 | 全放行（网关后一切方法可达，含特权——因网关转发走 loopback，DSH 视为 loopback 信任） |
+| 管理 | **仅本机**：用户/token 管理路由在 loopback DSH 上，LAN 请求（带代理标记头）一律 403 |
+| 默认 | **关闭**（安全优先）：patch `disabled` 表达式要求 `features["dsh-kit-lan-auth"] === true` 才加载 |
+
+### 安全模型（已实测验证）
+
+- **LAN 无 token** → 401（网关层拦截）
+- **LAN 有 token 访问管理路由** → 403（`x-dsh-kit-lan-auth-proxy` 标记头，管理仅本机）
+- **本机管理** → 200（直连 loopback DSH）
+- 自我批评修正：v1 曾把 `/dsh-kit-lan-auth/*` 无鉴权转发，导致 LAN 可达管理面——已改为整体鉴权 + 本地标记头隔离。
+
+### 用户开关（默认关）
+
+```sh
+dsh-kit enable dsh-kit-lan-auth     # 写 state.json → 重启后网关加载
+dsh-kit disable dsh-kit-lan-auth    # 恢复默认关
+```
+
+token 通过 webui 设置页（settings.section「局域网鉴权」）或本机管理员路由 `/dsh-kit-lan-auth/tokens` 生成；token 明文只在生成时显示一次，存储为 sha256。
+
 
 ## 9. 一期范围（MVP）
 

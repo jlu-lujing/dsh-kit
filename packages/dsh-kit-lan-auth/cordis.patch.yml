@@ -1,0 +1,17 @@
+# dsh-kit-lan-auth feature patch layer.
+#
+# dsh-kit-lan-auth exposes a guarded HTTPS gateway (self-signed TLS reverse
+# proxy) over the loopback-bound DSH web server: LAN requests must present a
+# token (or log in), while loopback/localhost requests pass without login.
+# It binds an extra port and never modifies dsh-client-connection or the
+# privileged-method loopback fence.
+#
+# SECURITY: this row is DISABLED by default (safe). It activates only when the
+# user explicitly enables it via `dsh-kit enable dsh-kit-lan-auth` (or the
+# store panel), which writes `features["dsh-kit-lan-auth": true]` to the state
+# file. The disabled expression reads that file directly:
+
+- insert:
+    - id: dsh-kit-lan-auth
+      name: dsh-kit-lan-auth
+      disabled: !!js "( (function () { try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-lan-auth'] !== true; } catch (e) { return true; } })() )"

@@ -1,24 +1,21 @@
 {
-  "name": "dsh-kit",
+  "name": "dsh-kit-lan-auth",
   "version": "0.1.0",
-  "description": "DSH 傻瓜式插件全家桶聚合包 - 装一个包，所有功能开箱即用",
+  "description": "DSH 局域网鉴权网关（dsh-kit 全家桶成员，可独立安装）——自签名 TLS 反向代理，本机免登录，局域网需 token/登录，鉴权全放行",
   "type": "module",
   "main": "lib/index.js",
-  "types": "lib/types/index.d.ts",
-  "bin": {
-    "dsh-kit": "bin/dsh-kit.mjs"
-  },
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "bin/dsh-kit.mjs",
+    "lib/client.js",
     "cordis.patch.yml",
     "lib/types/**/*.d.ts"
   ],
@@ -26,23 +23,22 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --noEmit"
   },
-  "dependencies": {
-    "dsh-kit-notifier": "file:../dsh-kit-notifier",
-    "dsh-kit-scheduler": "file:../dsh-kit-scheduler",
-    "dsh-kit-lan-auth": "file:../dsh-kit-lan-auth"
-  },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/cordis-plugin-loader": "1.0.2",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
     "@types/node": "^26.2.0",
     "typescript": "^5.6.0"
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
   }
 }

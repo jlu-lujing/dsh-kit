@@ -3,6 +3,8 @@
 > 更新日期：2026-08-14
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
+> **当前状态（2026-08-14 晚）**：成果已 git 提交（lan-auth 包入库）。运行中的 `dsh web` 实例已加载全部修复：远端可用性三件套（标记头剥离 / WS 隧道 / browse 选择器）与本地一致。待办收缩为：商店 webui 面板、全家桶功能清单、发布流程。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+
 ## 1. 项目目标
 
 做一个「傻瓜式」的 DSH 插件聚合包：**装一个包，所有功能开箱即用**。
@@ -98,10 +100,20 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
 13. **YAML `!!js` 引号**：含 `:` 的复杂表达式必须**整体双引号包裹**（`!!js "(...)"`），否则 YAML 误解析为 mapping（`--dump-config` 里看到 `{'[object Object]': false)`）。
 14. **loader 动态开关（备选，非首选）**：`ctx.loader.entries()`（id 带 `include:` 前缀，用 `endsWith(':id')` 匹配）+ `entry.update({disabled}, false, true)` 可停已加载 fiber，但 init 已发生一次。表达式方案更干净。
 15. **验证插件加载**：`dsh --profile dev --port <p>`（不是 `dsh web`——那是 web profile 别名！）。插件 apply 里写临时文件验证是否被加载。
+16. **lan-auth 路径重复拼接（真实 bug，2026-08-14 已修复）**：`$DSH_HOME` 已是 `~/.dsh`，旧代码又在 `index.ts` 里 `path.join(home, '.dsh')` 二次拼接，导致 token/用户落到 `~/.dsh/.dsh/dsh-kit-lan-auth/`，LAN 带 token 也 401（token 不在运行进程读取的文件里）。已统一为 `store.ts` 的 `lanAuthRoot()`（直接返回 `$DSH_HOME`），`index.ts` 不再重复拼接；升级前嵌套目录里的旧数据需合并回顶层 `~/.dsh/dsh-kit-lan-auth/state.json`。
+17. **网关转发必须剥掉浏览器标记头（真实 bug，2026-08-14 已修复）**：DSH 的 `/api` 路由有**同源信任栅栏**（`client-connection/src/api-request-trust.ts`）：请求带 `Origin` 时要求 `Origin.host === Host.host`。网关原样透传浏览器 `Origin: https://<lan>:3443`、只改写 `Host → 127.0.0.1:3080`，导致所有 `/api` POST（pickDirectory/openPath/settings/credentials/llm.discoverModels）和 WebSocket 升级被 DSH 判 403。修复：`gateway.ts` 的 `outboundHeaders()` 在 LAN 转发时删除 `origin`/`sec-fetch-*`/`referer`/`referrer-policy`，只留 `x-dsh-kit-lan-auth-proxy` 标记 + 重写 Host。**网关就是认证边界**，转发到 loopback 的请求必须让 DSH 视为干净的 loopback 调用者（全权限面）。
+18. **网关 WebSocket 升级不能用 httpRequest 转发（真实 bug，2026-08-14 已修复）**：DSH 的 `WebUpgradeRoute` 把**原始 TCP socket + head 字节**交给 `ws.handleUpgrade` 完成握手；网关原先用 `httpRequest().on('upgrade')` 转发，第二条 HTTP 连接无法把客户端 socket 交接回去，导致 WS 握手永不完成（curl/WS 客户端都挂起）。修复：`gateway.ts` upgrade 分支改为**原生 TCP 隧道**——`tcpConnect(target)` 后重写请求行 + 剥离标记的头部 + 写回 `head` 字节，再双向 pipe socket。
+19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。修复（**纯 profile 配置，零代码**，`~/.dsh/profiles/web/cordis.patch.yml`）：禁用 `directory-picker`(auto) 行，insert `@deepseek-ai/dsh-host-directory-picker-browse`（backend）+ `@deepseek-ai/dsh-client-ui-directory-picker-browse`（client surface）。代价：**本机和远程都用** web 选择器（失去 native 桌面弹窗）。验证：`host.pickDirectory` → `directory-picker-unavailable`（native 停）、`host.listDirectory` 正常列目录（本机 + 经网关 LAN 均 200）。
 
 ## 7. 近期待办
 
 - [x] 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
+- [x] `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 自签 TLS + token/用户管理 webui + 默认关闭）——已实现并验证
+  - 取代了原来的「改 client-connection 源码放开局域网」方案；特权方法管理面保持仅本机
+- [x] 远程可用性（lan-auth 网关 + browse 选择器，2026-08-14 实操打通并验证）：
+  - 网关转发剥浏览器标记头（Origin/sec-fetch-*）→ `/api` 不再 403（踩坑 #17）
+  - WebSocket 升级改原生 TCP 隧道 → `events.mux`/`events.host` 握手成功（踩坑 #18）
+  - web profile 固定 browse 选择器（禁用 auto + insert browse pair）→ 远程浏览器内弹 web 选择器（踩坑 #19）
 - [ ] 确定全家桶功能清单（自己写，非收录）
 - [ ] 给 `dsh-kit` 加 webui 商店面板（client 插件，验证 pnpm dev 热重载链路）
 - [ ] 发布流程（npm 发布、版本规范）
