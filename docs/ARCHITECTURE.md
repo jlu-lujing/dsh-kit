@@ -67,12 +67,13 @@ dsh-kit/
 │   │       └── client/          #   「功能商店」设置面板
 │   ├── dsh-kit-notifier/        # 桌面通知（监听 turn/end，跨平台通知）
 │   ├── dsh-kit-scheduler/       # 定时任务（cron + 持久化 + 管理路由）
-│   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（自签 HTTPS 反向代理，默认关闭）
+│   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（HTTPS 反向代理，默认关闭）
+│   │   ├── bin/dsh-kit-lan-auth.mjs # CLI：init-ca / status（私有 CA 管理）
 │   │   ├── src/index.ts         #   host：起网关 + 管理路由 + browse 注入
-│   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token 校验 + 代理标记 + WS 隧道 + 静态放行）
-│   │   ├── src/store.ts         #   用户/token 持久化（~/.dsh/dsh-kit-lan-auth/）
-│   │   ├── src/cert.ts          #   openssl 自签证书（首启生成）
-│   │   └── src/client/          #   webui 设置页（token/用户/登出）
+│   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token/登录 + 代理标记 + WS 隧道 + 静态放行 + CA/登出端点 + 登录限速）
+│   │   ├── src/store.ts         #   用户/token 持久化 + TTL 过期 + 爆破限速 + 登出吊销
+│   │   ├── src/cert.ts          #   私有 CA 自动生成（root + leaf，SAN 覆盖本机 IP）+ initPrivateCa
+│   │   └── src/client/          #   webui 设置页（token/用户）+ 远程登出按钮
 └── docs/
     ├── ARCHITECTURE.md          # 本文档
     └── HANDOFF.md               # 交接文档
@@ -203,27 +204,41 @@ pnpm build   # 然后重启 dsh web
 
 ## 8. 局域网鉴权网关（dsh-kit-lan-auth）
 
-> 状态：已实现并验证（2026-08-14）
+> 状态：已实现并验证（2026-08-15）
 
 ### 定位与动机
 
-DSH Web 界面刻意只监听 `127.0.0.1`，特权方法（settings/credentials/llm.discoverModels）锁 loopback——上游明确等到「真正的鉴权层」才放开。`dsh-kit-lan-auth` 不修改 `dsh-client-connection`，而是在边界加一层**自签名 HTTPS 反向代理网关**，作为唯一暴露到局域网的入口。
+DSH Web 界面刻意只监听 `127.0.0.1`，特权方法（settings/credentials/llm.discoverModels）锁 loopback——上游明确等到「真正的鉴权层」才放开。`dsh-kit-lan-auth` 不修改 `dsh-client-connection`，而是在边界加一层**HTTPS 反向代理网关**，作为唯一暴露到局域网的入口。
 
 ```
-局域网设备 ──HTTPS──▶ [网关 :3443 自签TLS] ──验 token/登录──▶ 本机 DSH web (loopback)
+局域网设备 ──HTTPS──▶ [网关 :3443 TLS] ──验 token/登录──▶ 本机 DSH web (loopback)
 ```
+
+### 证书（零配置，私有 CA 方案）
+
+- **首启自动生成私有 CA**：`cert.ts` 的 `ensureCertBundle` 在空目录时调用 `initPrivateCa`，生成根证书 `ca.pem` + 叶子 `key.pem`/`cert.pem`（SAN 自动收集本机全部局域网 IPv4 + `127.0.0.1` + `localhost`）。已有证书则原样使用、绝不覆盖。
+- **登录页 CA 引导（.crt）**：首次访问（浏览器点「继续访问」进入登录页后），页面检测 `hasCa` → 显示「下载根证书永久免警告」引导，提供 `.crt` 下载（MIME `application/x-x509-ca-cert`，Windows 双击即进证书导入向导）与 macOS/iOS/Android/Windows 安装指引。设备装一次根证书后**永久免警告**；不装也能用（每会话点一次「继续访问」）。
+- **CLI**：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`（可查看 SAN/有效期/issuer，`status` 需已有证书）。
+- **Chrome「不安全」图标说明**：私有 CA（IP 直连）站点 Chrome 永远在地址栏显示「不安全」（即使证书被完全信任）——这是 Chrome 对非公共 CA 的固有提示，连接本身已加密且受信任，不影响安全，无法（也不需要）消除。
 
 ### 关键决策
 
 | 决策 | 值 |
 |---|---|
 | 形态 | 独立 HTTPS 反向代理网关（不改 client-connection / webServer） |
-| TLS | 首启 openssl 自签证书（`~/.dsh/dsh-kit-lan-auth/certs/`） |
+| TLS | 首启自动生成私有 CA（root `ca.pem` + 叶子，`~/.dsh/dsh-kit-lan-auth/certs/`）；已有证书则用 verbatim；登录页提供 `.crt` 下载引导 |
 | 本机 | loopback 免登录直通 |
-| 局域网 | 需有效 token（`Authorization: Bearer` 或 `X-DSH-Token`） |
+| 局域网 | 需有效 token（`Authorization: Bearer` 或 `X-DSH-Token`）或账号密码登录 |
 | 权限 | 全放行（网关后一切方法可达，含特权——因网关转发走 loopback，DSH 视为 loopback 信任） |
 | 管理 | **仅本机**：用户/token 管理路由在 loopback DSH 上，LAN 请求（带代理标记头）一律 403 |
 | 默认 | **关闭**（安全优先）：patch `disabled` 表达式要求 `features["dsh-kit-lan-auth"] === true` 才加载 |
+
+### 认证与安全（已加固，2026-08-15）
+
+- **token 过期**：静态 token（管理创建）30 天绝对过期；会话 token（密码登录 `session:*`）12 小时滑动过期（每次使用续期）；`checkToken` 每次先清过期 token（`purgeExpired`）。存量旧 token 在 `load()` 自动回填 `expiresAt`（静态 30 天 / 会话 12 小时）。
+- **登录爆破限速**：每身份（用户名；未知用户名按来源 IP）15 分钟内 >5 次失败即锁定（进程内存态），锁定后即使密码正确也拒绝，登录页提示「尝试次数过多，请 15 分钟后再试」；成功登录自动重置。
+- **登出=吊销**：`/__dsh_kit_lan_logout` 撤销会话 token（`revokeToken`）+ 清除 cookie（`Max-Age=0`）。前端登出按钮仅在远程（非 loopback）会话显示，且只有网关确认成功（200）才跳转，避免旧网关 405 时「假登出→cookie 未清→自动登录」。
+- **安全模型（实测）**：LAN 无 token → 401；LAN 带 token 访问管理路由 → 403（`x-dsh-kit-lan-auth-proxy` 标记头）；本机管理 → 200。管理面仅本机的设计由来见 §8 下方自我批评修正。
 
 ### 安全模型（已实测验证）
 

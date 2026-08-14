@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer, request as httpRequest } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { connect as tcpConnect } from 'node:net'
+import { existsSync, readFileSync } from 'node:fs'
 import { URL } from 'node:url'
 import type { AddressInfo } from 'node:net'
 
@@ -19,6 +20,14 @@ export interface GatewayOptions {
   /** Bind port (0 → OS-assigned). Returned via the `listening` callback. */
   port?: number
   store: Store
+  /**
+   * Optional path to a root CA certificate (`ca.pem`). When present, the
+   * gateway exposes it for download so a first-visit browser can install it
+   * once for permanent warning-free access. Serving the root cert is safe: it
+   * is a public artifact by design (it must be distributed to clients); the
+   * private CA key is never served.
+   */
+  caCertPath?: string
 }
 
 export interface GatewayHandle {
@@ -179,6 +188,32 @@ button.submit:disabled{opacity:.6;cursor:not-allowed;box-shadow:none}
 [data-ds-dark-theme] button.submit:hover{background:#6d9aff;box-shadow:0 4px 16px -6px rgba(86,134,254,.5)}
 .hint{font-size:12px;color:#8288a0;margin-top:16px;text-align:center}
 [data-ds-dark-theme] .hint{color:#7f8593}
+/* ── CA install CTA (first-visit permanent no-warning guidance) ────── */
+.ca-cta{
+  margin-top:14px;padding:12px 14px;border-radius:12px;
+  border:1px solid rgba(65,118,230,.28);background:rgba(65,118,230,.07);
+  color:var(--fg,#eef0f6);font-size:12.5px;line-height:1.6;
+}
+[data-ds-dark-theme] .ca-cta{border-color:rgba(86,134,254,.35);background:rgba(86,134,254,.1);color:#e9eaee}
+.ca-cta[hidden]{display:none}
+.ca-cta-title{font-size:13px;font-weight:600;color:#2f5fd0;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+[data-ds-dark-theme] .ca-cta-title{color:#8fb7ff}
+.ca-cta p{margin:0 0 8px;color:#5a6577}
+[data-ds-dark-theme] .ca-cta p{color:#a9b0be}
+.ca-download{
+  display:inline-block;padding:7px 14px;border-radius:9px;border:0;
+  background:#4176e6;color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;
+  transition:background .15s var(--ds-ease-in-out,cubic-bezier(.4,0,.2,1));
+}
+.ca-download:hover{background:#5692ef}
+[data-ds-dark-theme] .ca-download{background:#5686fe}
+[data-ds-dark-theme] .ca-download:hover{background:#6d9aff}
+.ca-guide{margin-top:8px}
+.ca-guide summary{cursor:pointer;color:#3a6df0;font-size:12px;font-weight:600;outline:none}
+[data-ds-dark-theme] .ca-guide summary{color:#8fb7ff}
+.ca-guide ol{margin:6px 0 0;padding-left:18px;color:#5a6577;font-size:12px}
+[data-ds-dark-theme] .ca-guide ol{color:#a9b0be}
+.ca-guide code{background:rgba(128,128,128,.14);border-radius:4px;padding:0 4px;font-size:11px;word-break:break-all}
 .err{
   display:none;color:rgb(216,64,64);font-size:12.5px;margin-top:14px;padding:10px 12px;border-radius:8px;
   background:rgba(224,68,68,.08);border:1px solid rgba(224,68,68,.22);
@@ -215,6 +250,23 @@ button.submit:disabled{opacity:.6;cursor:not-allowed;box-shadow:none}
 </form>
 <div class="hint">登录后浏览器将记住本次会话</div>
 </div>
+<div class="ca-cta" id="caCta" hidden>
+  <div class="ca-cta-title">当前浏览器未信任此证书</div>
+  <p>本机每登录一次仍需点「继续访问」。安装下面这份根证书后，本设备每次打开都免警告。</p>
+  <a class="ca-download" href="/__dsh_kit_lan_ca" download="dsh-kit-lan-auth-ca.crt">下载根证书（永久免警告）</a>
+  <details class="ca-guide">
+    <summary>查看安装方法</summary>
+    <ol>
+      <li>先下载上面的根证书文件（.crt）。<b>在 Windows 上请不要用「选择应用」打开，直接按下方步骤导入即可</b></li>
+      <li><b>Windows：</b>双击 .crt → 选「安装证书」→ 存储位置选<b>本地计算机</b> → 下一步 → 选「将所有证书放入下列存储」→ 浏览选「受信任的根证书颁发机构」→ 完成</li>
+      <li>（Windows 备选命令行）<code>certutil -user -addstore Root "dsh-kit-lan-auth-ca.crt"</code></li>
+      <li>macOS：双击 .crt → 钥匙串访问 → 在「证书」中双击设为<b>始终信任</b></li>
+      <li>iOS：设置 → 通用 → VPN 与设备管理 → 安装描述文件 → 关于本机 → 证书信任设置 → 开启完全信任</li>
+      <li>Android：设置 → 安全 → 加密与凭据 → 安装证书 → CA 证书</li>
+      <li>装完回本页刷新，警告即消失</li>
+    </ol>
+  </details>
+</div>
 </div>
 <script>
 (function(){
@@ -244,6 +296,12 @@ button.submit:disabled{opacity:.6;cursor:not-allowed;box-shadow:none}
     document.getElementById('submitBtn').disabled = true;
     document.querySelector('.btn-label').innerHTML = '<span class="spin"></span>正在验证…';
   });
+  // Show the CA install CTA when the gateway has a root CA to hand out.
+  try {
+    fetch('/__dsh_kit_lan_ca/state').then(function (r) { return r.json(); }).then(function (s) {
+      if (s && s.hasCa) { var el = document.getElementById('caCta'); if (el) el.hidden = false; }
+    }).catch(function () { /* state endpoint unavailable — leave CTA hidden */ });
+  } catch (e) { /* ignore */ }
   apply(); focusFirst();
 })();
 </script>
@@ -323,7 +381,7 @@ function outboundHeaders(
 }
 
 export function startGateway(opts: GatewayOptions): GatewayHandle {
-  const { store, tls } = opts
+  const { store, tls, caCertPath } = opts
   const target = new URL(opts.target)
   const targetHostname = target.hostname
   const targetPort = Number(target.port || 80)
@@ -399,6 +457,35 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
       }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ ok: true, revoked: gone }))
+      return
+    }
+
+    // Internal, pre-auth CA endpoints: report whether a root CA is available to
+    // install (login page consumes it to show the "permanent no-warning" CTA),
+    // and serve the root certificate for download. The root cert is public by
+    // design — it must reach every client — so no token is required; the
+    // private CA key is never served.
+    if (pathname === '/__dsh_kit_lan_ca/state') {
+      const hasCa = caCertPath !== undefined && existsSync(caCertPath)
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ hasCa, selfSigned: !hasCa }))
+      return
+    }
+    if (pathname === '/__dsh_kit_lan_ca') {
+      if (caCertPath === undefined || !existsSync(caCertPath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ error: 'no-root-ca', message: 'no root CA has been generated' }))
+        return
+      }
+      res.writeHead(200, {
+        // .crt + x-x509-ca-cert: Windows associates this with the certificate
+        // import wizard on double-click (plain .pem has no association there),
+        // while macOS and iOS still recognize the PEM content for Keychain /
+        // profile install.
+        'Content-Type': 'application/x-x509-ca-cert; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="dsh-kit-lan-auth-ca.crt"',
+      })
+      res.end(readFileSync(caCertPath))
       return
     }
 

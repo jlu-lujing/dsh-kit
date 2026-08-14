@@ -76,7 +76,7 @@ npx create-dsh-plugin my-plugin -t tool
 | `dsh-kit` | 聚合包（host + 商店服务 + 设置面板） | 已通：host 管理路由 + 设置页「功能商店」面板 |
 | `dsh-kit-notifier` | 桌面通知 | 已实现：监听回合结束，跨平台通知（macOS/Linux/Windows） |
 | `dsh-kit-scheduler` | 定时任务 | 已实现：cron 任务 + 持久化 + 管理路由（支持 shell 命令） |
-| `dsh-kit-lan-auth` | 局域网鉴权网关（自签 HTTPS + token，默认关闭） | 已实现并验证（含远程可用性：标记头剥离 / WS 隧道 / browse 选择器注入 / 登出） |
+| `dsh-kit-lan-auth` | 局域网鉴权网关（HTTPS 反向代理 + token/登录，默认关闭） | 已实现并验证：私有 CA 自动生成 + 登录页 CA 下载引导（.crt）、token 过期（静态 30 天/会话 12h 滑动）、登录爆破限速、登出吊销、远程可用性（标记头剥离 / WS 隧道 / browse 选择器注入） |
 
 > 全家桶安装（一条命令带进全部）：
 > ```sh
@@ -85,6 +85,8 @@ npx create-dsh-plugin my-plugin -t tool
 > 详见 `docs/ARCHITECTURE.md`。
 >
 > 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；dsh-kit-lan-auth 会在启用时自动注入 browse 目录选择器（无需改 profile 配置），远程浏览器内弹 web 选择器而非宿主原生窗口。
+>
+> 证书（零配置）：首启自动生成私有 CA（`ca.pem` 根 + 叶子 `key.pem`/`cert.pem`，SAN 覆盖本机全部局域网 IP）。设备首次访问在登录页会看到「下载根证书永久免警告」引导（`.crt`），装一次后该设备免警告；不装也能用（浏览器点一次「继续访问」）。管理：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`。
 
 ## 发布
 

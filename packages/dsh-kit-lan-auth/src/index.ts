@@ -7,7 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { ensureSelfSignedCert } from './cert.ts'
+import { ensureCertBundle } from './cert.ts'
 import { startGateway } from './gateway.ts'
 import { createStore, lanAuthRoot } from './store.ts'
 
@@ -67,8 +67,15 @@ export function apply(ctx: Context, config: Config = {}): void {
   const targetPort = typeof webServer.port === 'number' ? webServer.port : 3080
   const target = `http://127.0.0.1:${targetPort}`
 
-  const tls = ensureSelfSignedCert(certDir)
-  const gateway = startGateway({ target, tls, host: config.host ?? '0.0.0.0', port: config.port ?? 3443, store })
+  // Zero-config TLS: exists → use verbatim; empty dir → auto-generate a private
+  // CA + leaf (clients may install the root once for permanent no-warning).
+  const tls = ensureCertBundle(certDir)
+  const caCertPath = path.join(certDir, 'ca.pem')
+  const gateway = startGateway({
+    target, tls,
+    host: config.host ?? '0.0.0.0', port: config.port ?? 3443, store,
+    caCertPath,
+  })
 
   // ── admin / management routes (loopback-hosted on DSH webServer) ────────
   // Management is local-only: it must be a genuine loopback request AND not

@@ -3,12 +3,9 @@ import { defineConfig } from 'tsdown'
 
 const ID = 'dsh-kit-lan-auth'
 
-export default defineConfig(({ env }) => ({
-  // Host pass (the tsc build in package.json emits lib/*.js already); the
-  // dev-web tooling only needs the browser bundle. Keep it self-contained for
-  // this standalone repo.
+export default defineConfig({
   name: `${ID}/client`,
-  entry: env?.DSH_BUILD_FACE === 'host' ? '' : { client: 'src/client/index.ts' },
+  entry: { client: 'src/client/index.ts' },
   outDir: 'lib',
   format: 'cjs',
   platform: 'browser',
@@ -27,4 +24,4 @@ export default defineConfig(({ env }) => ({
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
   },
-}))
+})

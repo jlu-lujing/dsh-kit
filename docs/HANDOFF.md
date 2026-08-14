@@ -111,8 +111,10 @@
 ### 已完成（v1 全部落地）
 
 - 插件管理机制（CLI list/enable/disable + 状态文件 + 动态 disabled 表达式）——已验证
-- `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 自签 TLS + token/用户管理 webui + 默认关闭）——已实现并验证
+- `dsh-kit-lan-auth` 局域网鉴权网关（独立 HTTPS 反向代理 + 私有 CA + token/用户管理 webui + 默认关闭）——已实现并验证
   - 取代了原来的「改 client-connection 源码放开局域网」方案；特权方法管理面保持仅本机
+  - **私有 CA 加固（2026-08-15）**：首启零配置自动生成根 CA `ca.pem` + 叶子证书（SAN 自动收集本机全部局域网 IPv4 + localhost）；登录页提供 `.crt` 下载引导（装一次永久免警告，不装也能用）；CLI `dsh-kit-lan-auth init-ca/status`（详见 ARCHITECTURE §8）
+  - **认证加固（2026-08-15）**：token 过期（静态 30 天 / 会话 12h 滑动续期，存量 token load 时回填）；登录爆破限速（每身份 15 分钟内 >5 次失败锁定）；登出=吊销会话 token + 清 cookie
 - 远程可用性（lan-auth 网关 + browse 选择器）：
   - 网关转发剥浏览器标记头（Origin/sec-fetch-*）→ `/api` 不再 403（踩坑 #17）
   - WebSocket 升级改原生 TCP 隧道 → `events.mux`/`events.host` 握手成功（踩坑 #18）
@@ -157,6 +159,7 @@ dsh --profile dev --port 3090   # 启动 dev profile（注意不是 dsh web！�
 # 远程访问（启用 dsh-kit-lan-auth 后）
 #   局域网设备 -> https://<主机IP>:3443  + token/登录
 #   管理路由（仅本机）: GET /dsh-kit-lan-auth/status | POST .../tokens
+# 证书管理 CLI（本机）: dsh-kit-lan-auth init-ca [--ip ...] | dsh-kit-lan-auth status
 # 功能商店路由: GET /dsh-kit/store | POST /dsh-kit/store/<id> {enabled}
 # 定时任务路由: GET/POST /dsh-kit-scheduler/tasks | DELETE/PATCH .../<id>
 
