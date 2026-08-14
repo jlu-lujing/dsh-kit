@@ -74,9 +74,9 @@ npx create-dsh-plugin my-plugin -t tool
 | 包 | 功能 | 状态 |
 | --- | --- | --- |
 | `dsh-kit` | 聚合包（host + 商店服务 + 设置面板） | 已通：host 管理路由 + 设置页「功能商店」面板 |
-| `dsh-kit-notifier` | 桌面通知 | 占位 |
-| `dsh-kit-scheduler` | 定时任务 | 占位 |
-| `dsh-kit-lan-auth` | 局域网鉴权网关（自签 HTTPS + token，默认关闭） | 已实现并验证（含远程可用性：标记头剥离 / WS 隧道 / browse 选择器 / 登出） |
+| `dsh-kit-notifier` | 桌面通知 | 已实现：监听回合结束，跨平台通知（macOS/Linux/Windows） |
+| `dsh-kit-scheduler` | 定时任务 | 已实现：cron 任务 + 持久化 + 管理路由（支持 shell 命令） |
+| `dsh-kit-lan-auth` | 局域网鉴权网关（自签 HTTPS + token，默认关闭） | 已实现并验证（含远程可用性：标记头剥离 / WS 隧道 / browse 选择器注入 / 登出） |
 
 > 全家桶安装（一条命令带进全部）：
 > ```sh
@@ -84,7 +84,7 @@ npx create-dsh-plugin my-plugin -t tool
 > ```
 > 详见 `docs/ARCHITECTURE.md`。
 >
-> 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；web profile 的 `cordis.patch.yml` 已固定 browse 目录选择器（`directory-picker-auto` 停用），远程浏览器内弹 web 选择器而非宿主原生窗口。
+> 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；dsh-kit-lan-auth 会在启用时自动注入 browse 目录选择器（无需改 profile 配置），远程浏览器内弹 web 选择器而非宿主原生窗口。
 
 ## 发布
 

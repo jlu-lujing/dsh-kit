@@ -106,6 +106,7 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
 19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复，08-15 升级为插件化）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。**当前做法（已插件化）**：`dsh-kit-lan-auth` 的 `cordis.patch.yml` 禁用 `directory-picker`(auto) 行；lan-auth `apply()` 用 `ctx.loader.create` 动态注入 browse pair（`@deepseek-ai/dsh-host-directory-picker-browse` + `@deepseek-ai/dsh-client-ui-directory-picker-browse`），teardown 时 remove——**无需任何 profile 配置**（`~/.dsh/profiles/web/cordis.patch.yml` 已清空为 `[]`）。早期曾用 profile 配置固定 browse，现已废弃。代价：**本机和远程都用** web 选择器。验证：`host.pickDirectory` → `directory-picker-unavailable`、`host.listDirectory` 正常（本机 + 经网关 LAN 均 200）、browse client surface 在 boot graph。
 20. **client bundle（`lib/client.js`）不会随 `pnpm build` 生成（2026-08-14 排查/修复）**：`dsh.client` 包（如 lan-auth 的 `src/client/index.ts`）需要 **tsdown** 产出 `lib/client.js`，而根 `pnpm build` 只跑 `tsc -b`（不产 client bundle）。症状：DSH 把 entry 插进 boot graph，但 `/plugins/<id>/client.js` 404 → 浏览器 `client-modules: bundle script ... failed to load`，**非本机远程访问也报同样错**。修复：新增 `scripts/build-client-once.mjs`（tsdown workspace 单次构建，仿 `scripts/dev-web.ts` 去 watch）；`pnpm dev`（watch）常驻产出亦可。**换机器/重新 clone 后必须跑一次**该脚本（或 `pnpm dev`）再启动 dsh，才有客户端面板。
 21. **动态 loader 注入的插件必须是 profile 已解析的依赖（2026-08-15）**：`ctx.loader.create({ name })` 只能装 profile node_modules 里**可解析**的包。browse pair 是 `@deepseek-ai` 官方包（web-app 已依赖），所以 lan-auth 动态注入可用；若是自研子包需确保在 profile dependencies。`ctx.loader` 类型来自 `@deepseek-ai/cordis-plugin-loader`（devDep，故 lan-auth 补了 `cordis-plugin-loader: 1.0.2`）。
+22. **JSDoc 注释里的 `*/` 会提前闭合块注释（2026-08-15 踩坑）**：写 `cron 表达式 '*/s'` 这类注释时 `*/` 被 TS 当注释终止符，后续内容变成代码 → `TS1005/TS1002`（"Unterminated string/template literal"）。规避：注释里用转义 `*\/` 或改写措辞避开 `*/` 序列。**顺带**：scheduler 任务命令一开始用 `execFile`（无 shell，`$()` 原样），用户期望 shell → 已改 `exec`（`/bin/sh -c`），支持管道/变量（命令来自本地可信配置面，风险可控）。
 
 ## 7. 近期待办
 
@@ -122,6 +123,8 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
   - dsh-kit 变为 dual-face 包（host + client）；`pnpm build:client` 扫 `dsh-kit`+`dsh-kit-*`（修复 glob）
   - 验证：本机 + 远程经网关（带 token）读清单 200，启停真实写 state.json 并保留
   - 配套：lan-auth 登出（`__dsh_kit_lan_logout` + `revokeToken` + LogoutButton）
+- [x] `dsh-kit-notifier` 桌面通知（2026-08-15 实现）：监听 `session/event` 的 `turn/end`，按 reason 发跨平台桌面通知——macOS `osascript` / Linux `notify-send` / Windows PowerShell toast，零 npm 依赖（dep: `@deepseek-ai/dsh-session` 取类型）
+- [x] `dsh-kit-scheduler` 定时任务（2026-08-15 实现）：用户级 cron（5 字段）+ 持久化 `~/.dsh/dsh-kit-scheduler/tasks.json` + 管理路由 `/dsh-kit-scheduler/tasks`（GET/POST/DELETE/PATCH）+ 每秒 tick 触发；命令走 `/bin/sh -c`（支持管道/变量，用户配置的本地信任面）
 - [ ] 确定全家桶功能清单（自己写，非收录）
 - [ ] 发布流程（npm 发布、版本规范）
 

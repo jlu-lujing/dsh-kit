@@ -417,15 +417,42 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
     res.end(JSON.stringify({ error: 'unauthorized', message: 'missing or invalid token' }))
   }
 
+  const clientIp = (req: IncomingMessage): string =>
+    (req.socket?.remoteAddress ?? 'unknown').replace(/^::ffff:/, '')
+
   const handleLogin = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const body = await readBody(req)
+    // Identity for the brute-force damper: the username when the attempt names
+    // one, else a per-source-IP anonymous bucket so unknown-username probes
+    // cannot shard failures across usernames.
+    const identities = (): string => {
+      try {
+        const j = JSON.parse(body) as { username?: string }
+        if (j.username) return j.username
+      } catch {
+        /* fall through */
+      }
+      const p = new URLSearchParams(body)
+      return p.get('username') || `anon:${clientIp(req)}`
+    }
+    if (store.isLoginThrottled(identities())) {
+      const html = wantsHtml(req)
+      res.writeHead(html ? 200 : 429, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(loginPage({ displayLogin: true, mode: 'login', err: html ? '尝试次数过多，请 15 分钟后再试' : 'rate limited' }))
+      return
+    }
+
+    // ── attempt ──
     let token: string | undefined
+    let ok = false
     try {
       const parsed = JSON.parse(body) as { token?: string; username?: string; password?: string }
-      if (parsed.token && store.checkToken(parsed.token)) {
-        token = parsed.token
+      if (parsed.token) {
+        ok = store.checkToken(parsed.token)
+        if (ok) token = parsed.token
       } else if (parsed.username && parsed.password) {
         token = store.loginToken(parsed.username, parsed.password)
+        ok = token !== undefined
       }
     } catch {
       // fall through — parsed as web form below
@@ -433,13 +460,19 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
     if (token === undefined) {
       // try as a URL-encoded form (browser <form> post)
       const params = new URLSearchParams(body)
-      if (params.get('token') && store.checkToken(params.get('token') ?? '')) {
-        token = params.get('token') as string
+      if (params.get('token')) {
+        ok = store.checkToken(params.get('token') ?? '')
+        if (ok) token = params.get('token') as string
       } else if (params.get('username') && params.get('password')) {
         token = store.loginToken(params.get('username') as string, params.get('password') as string)
+        ok = token !== undefined
       }
     }
-    if (token === undefined) {
+    if (token === undefined && !ok) {
+      // A genuine credential failure (never counted when throttled above or
+      // when the request was structurally unparseable) — register it so the
+      // identity's window advances toward the lock.
+      store.noteLoginFailure(identities())
       // Form login failure: render the login page with the error inline.
       // Return 200 (not 401) so the browser keeps the page and just shows the
       // message — a 401 would surface as a network error in the console and
@@ -451,7 +484,8 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
       res.end(loginPage({ displayLogin: mode === 'login', mode, err: html ? 'token 无效或账号密码错误' : 'unauthorized' }))
       return
     }
-    setSessionCookie(res, token)
+    store.resetLoginFailures(identities())
+    setSessionCookie(res, token as string)
     res.writeHead(302, { Location: '/' })
     res.end()
   }

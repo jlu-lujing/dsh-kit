@@ -51,7 +51,7 @@ function LanAuthPage() {
   const { data, err, setErr, refresh } = useFetch()
   const [userF, setUserF] = useState({ username: '', password: '' })
   const [tokenF, setTokenF] = useState({ name: '' })
-  const [newToken, setNewToken] = useState<string | null>(null)
+  const [newToken, setNewToken] = useState<{ token: string; expiresAt?: string } | null>(null)
 
   const addUser = () => {
     setErr('')
@@ -67,7 +67,11 @@ function LanAuthPage() {
   const addToken = () => {
     setErr(''); setNewToken(null)
     api('POST', '/dsh-kit-lan-auth/tokens', tokenF)
-      .then((r) => { setNewToken((r as { token: { token: string } }).token.token); setTokenF({ name: '' }) })
+      .then((r) => {
+        const tk = (r as { token: { token: string; expiresAt?: string } }).token
+        setNewToken({ token: tk.token, expiresAt: tk.expiresAt })
+        setTokenF({ name: '' })
+      })
       .then(refresh)
       .catch((e) => setErr(String((e && e.message) || e)))
   }
@@ -81,7 +85,22 @@ function LanAuthPage() {
       createElement('label', { style: { width: 76, fontSize: 12, opacity: 0.8 } }, label), ctrl)
 
   const users = (data?.users ?? []) as Array<{ id: string; username: string }>
-  const tokens = (data?.tokens ?? []) as Array<{ id: string; name: string; lastUsedAt: string }>
+  const tokens = (data?.tokens ?? []) as Array<{ id: string; name: string; lastUsedAt: string; createdAt: string; expiresAt?: string }>
+
+  const fmtExpiry = (iso: string | undefined): string => {
+    if (!iso) return ''
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return ''
+    const when = new Date(iso).toLocaleString()
+    const now = Date.now()
+    if (t <= now) return `已过期于 ${when}`
+    const ms = t - now
+    const h = Math.floor(ms / 3600000)
+    const d = Math.floor(h / 24)
+    if (d > 0) return `约 ${d} 天后过期（${when}）`
+    if (h > 0) return `约 ${h} 小时后过期（${when}）`
+    return `约 ${Math.max(1, Math.floor(ms / 60000))} 分钟后过期`
+  }
 
   void row
 
@@ -107,13 +126,17 @@ function LanAuthPage() {
       createElement('div', { style: { marginBottom: 6, fontSize: 13, fontWeight: 600 } }, '访问 Token'),
       tokens.length
         ? tokens.map((t) => createElement('div', { key: t.id, style: { display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid ' + T.border } },
-            createElement('div', { style: { flex: 1, fontSize: 13 } }, t.name),
-            createElement('div', { style: { fontSize: 12, opacity: 0.6 } }, 'last: ' + new Date(t.lastUsedAt).toLocaleString()),
+            createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column' } },
+              createElement('div', { style: { fontSize: 13, color: t.expiresAt && new Date(t.expiresAt).getTime() <= Date.now() ? T.danger : undefined } }, t.name),
+              createElement('div', { style: { fontSize: 11, opacity: 0.65 } },
+                (fmtExpiry(t.expiresAt) ? fmtExpiry(t.expiresAt) + ' · ' : '') + 'last: ' + new Date(t.lastUsedAt).toLocaleString()),
+            ),
             createElement('button', { style: buttonS, onClick: () => delToken(t.id) }, '删除')))
         : createElement('div', { style: { opacity: 0.6, fontSize: 12 } }, '还没有 token。'),
       newToken
         ? createElement('div', { style: { marginTop: 8, padding: 8, borderRadius: T.radius, background: 'rgba(76,175,125,0.12)', fontSize: 12 } },
-            '新 token（只显示一次）：', createElement('code', { style: { wordBreak: 'break-all' } }, newToken))
+            '新 token（只显示一次）：', createElement('code', { style: { wordBreak: 'break-all' } }, newToken.token),
+            newToken.expiresAt ? createElement('div', { style: { marginTop: 4, opacity: 0.8 } }, fmtExpiry(newToken.expiresAt)) : null)
         : null,
       createElement('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
         createElement('input', { value: tokenF.name, onChange: (e) => setTokenF({ name: e.target.value }), placeholder: 'token 名称', style: { ...inputS, maxWidth: 200 } }),

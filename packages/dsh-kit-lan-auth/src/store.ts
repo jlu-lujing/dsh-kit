@@ -19,6 +19,8 @@ interface StoredToken {
   tokenHash: string
   createdAt: string
   lastUsedAt: string
+  /** Absolute expiry (ISO). A past value revokes the token; refreshed on use for sliding sessions. */
+  expiresAt: string
 }
 
 interface StoreFile {
@@ -31,6 +33,18 @@ export interface TokenRecord {
   name: string
   createdAt: string
   lastUsedAt: string
+  /** Token expiry (ISO); may be in the past for an expired token. */
+  expiresAt: string
+}
+
+/**
+ * Brute-force guard state for one identity (username, or the whole store when
+ * the request carries no identity). Kept in process memory: a restart clears
+ * it, which is acceptable — the lock is a rate damper, not a durable ban.
+ */
+interface LoginThrottle {
+  /** Rolling window of failed login timestamps (ms epoch). */
+  failures: number[]
 }
 
 export interface Store {
@@ -39,16 +53,22 @@ export interface Store {
   createUser(username: string, password: string): { id: string; username: string } | undefined
   removeUser(id: string): boolean
   listTokens(): TokenRecord[]
-  createToken(name: string): { id: string; name: string; token: string }
+  createToken(name: string, ttlMs?: number): { id: string; name: string; token: string; expiresAt: string }
   removeToken(id: string): boolean
   /** Validate raw password against a username. */
   checkLogin(username: string, password: string): boolean
   /** Validate a raw bearer token; updates lastUsedAt on success. */
   checkToken(raw: string): boolean
   /** Validate a username+password login; returns a fresh session token. */
-  loginToken(username: string, password: string): string | undefined
+  loginToken(username: string, password: string, ttlMs?: number): string | undefined
   /** Revoke a token by its raw value (logout): removes it so it can no longer be used. */
   revokeToken(raw: string): boolean
+  /** Register one failed login attempt; returns whether the identity is now throttled. */
+  noteLoginFailure(identity: string): boolean
+  /** Whether `identity` is currently blocked by too many recent failures. */
+  isLoginThrottled(identity: string): boolean
+  /** Reset the failure window for `identity` (on a successful login or cooldown expiry). */
+  resetLoginFailures(identity: string): void
 }
 
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
@@ -68,14 +88,45 @@ export function createStore(stateDir?: string): Store {
   const file = join(dir, 'dsh-kit-lan-auth', 'state.json')
   let data: StoreFile = { users: [], tokens: [] }
 
+  // ── hardening defaults ───────────────────────────────────────────────
+  // Static (admin-created) tokens: no sliding renewal — they expire on an
+  // absolute deadline. Session tokens (password login): sliding — each use
+  // pushes the expiry forward, capping an idle session.
+  const STATIC_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+  const SESSION_TOKEN_TTL_MS = 12 * 60 * 60 * 1000 // 12 hours
+  // Brute-force damper: more than 5 failed logins for one identity inside 15
+  // minutes blocks further attempts until the window rolls past.
+  const FAIL_WINDOW_MS = 15 * 60 * 1000
+  const FAIL_LIMIT = 5
+  /** In-memory failure buckets keyed by identity (username, or `anon:<source-ip>`). */
+  const failureBuckets = new Map<string, LoginThrottle>()
+
+  const now = () => Date.now()
+  const isoNow = () => new Date().toISOString()
+
   const persist = () => {
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(file, JSON.stringify(data, null, 2))
   }
 
   const normalizeToken = (t: StoredToken): TokenRecord => ({
-    id: t.id, name: t.name, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt,
+    id: t.id, name: t.name, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt, expiresAt: t.expiresAt,
   })
+
+  /** Drop tokens whose absolute expiry has passed (persists on change). */
+  const purgeExpired = (): void => {
+    const before = data.tokens.length
+    const cutoff = now()
+    data.tokens = data.tokens.filter(t => Date.parse(t.expiresAt) > cutoff)
+    if (data.tokens.length !== before) persist()
+  }
+
+  /** Sliding renewal for session tokens: push the expiry forward from now. */
+  const slideToken = (t: StoredToken): void => {
+    const remaining = Math.max(0, Date.parse(t.expiresAt) - Date.parse(t.lastUsedAt))
+    t.lastUsedAt = isoNow()
+    t.expiresAt = new Date(now() + remaining).toISOString()
+  }
 
   return {
     load() {
@@ -85,6 +136,17 @@ export function createStore(stateDir?: string): Store {
       } catch {
         data = { users: [], tokens: [] }
       }
+      // Backfill any pre-hardening tokens (no expiresAt) and drop the expired.
+      let changed = false
+      for (const t of data.tokens) {
+        if (!t.expiresAt) {
+          const hadSession = t.name.startsWith('session:')
+          t.expiresAt = new Date(now() + (hadSession ? SESSION_TOKEN_TTL_MS : STATIC_TOKEN_TTL_MS)).toISOString()
+          changed = true
+        }
+      }
+      purgeExpired()
+      if (changed) persist()
     },
     listUsers() {
       return data.users.map(u => ({ id: u.id, username: u.username, createdAt: u.createdAt }))
@@ -109,15 +171,16 @@ export function createStore(stateDir?: string): Store {
     listTokens() {
       return data.tokens.map(normalizeToken)
     },
-    createToken(name) {
+    createToken(name, ttlMs) {
       const raw = randomBytes(24).toString('base64url')
+      const expiresAt = new Date(now() + (ttlMs ?? STATIC_TOKEN_TTL_MS)).toISOString()
       const token: StoredToken = {
         id: newId('t'), name: name.trim() || 'token',
-        tokenHash: hash(raw), createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(),
+        tokenHash: hash(raw), createdAt: isoNow(), lastUsedAt: isoNow(), expiresAt,
       }
       data.tokens.push(token)
       persist()
-      return { id: token.id, name: token.name, token: raw }
+      return { id: token.id, name: token.name, token: raw, expiresAt }
     },
     removeToken(id) {
       const before = data.tokens.length
@@ -131,24 +194,28 @@ export function createStore(stateDir?: string): Store {
       return hash(password) === user.passwordHash
     },
     /** Validate a username+password login; returns a fresh token on success. */
-    loginToken(username, password) {
+    loginToken(username, password, ttlMs) {
       const user = data.users.find(u => u.username === username)
       if (!user) return undefined
       if (hash(password) !== user.passwordHash) return undefined
       const raw = randomBytes(24).toString('base64url')
       const token: StoredToken = {
         id: newId('t'), name: `session:${username}`, tokenHash: hash(raw),
-        createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(),
+        createdAt: isoNow(), lastUsedAt: isoNow(),
+        expiresAt: new Date(now() + (ttlMs ?? SESSION_TOKEN_TTL_MS)).toISOString(),
       }
       data.tokens.push(token)
       persist()
       return raw
     },
     checkToken(raw) {
+      purgeExpired()
       const h = hash(raw)
       const t = data.tokens.find(x => x.tokenHash === h)
       if (!t) return false
-      t.lastUsedAt = new Date().toISOString()
+      // Session tokens slide (idle cap); static tokens do not.
+      if (t.name.startsWith('session:')) slideToken(t)
+      else t.lastUsedAt = isoNow()
       persist()
       return true
     },
@@ -158,6 +225,24 @@ export function createStore(stateDir?: string): Store {
       data.tokens = data.tokens.filter(t => t.tokenHash !== h)
       if (data.tokens.length !== before) { persist(); return true }
       return false
+    },
+    noteLoginFailure(identity) {
+      const bucket = failureBuckets.get(identity) ?? { failures: [] }
+      const cutoff = now() - FAIL_WINDOW_MS
+      bucket.failures = [...bucket.failures.filter(ts => ts > cutoff), now()]
+      failureBuckets.set(identity, bucket)
+      return bucket.failures.length >= FAIL_LIMIT
+    },
+    isLoginThrottled(identity) {
+      const bucket = failureBuckets.get(identity)
+      if (!bucket) return false
+      const cutoff = now() - FAIL_WINDOW_MS
+      const recent = bucket.failures.filter(ts => ts > cutoff)
+      if (recent.length === 0) failureBuckets.delete(identity)
+      return recent.length >= FAIL_LIMIT
+    },
+    resetLoginFailures(identity) {
+      failureBuckets.delete(identity)
     },
   }
 }
