@@ -47,6 +47,8 @@ export interface Store {
   checkToken(raw: string): boolean
   /** Validate a username+password login; returns a fresh session token. */
   loginToken(username: string, password: string): string | undefined
+  /** Revoke a token by its raw value (logout): removes it so it can no longer be used. */
+  revokeToken(raw: string): boolean
 }
 
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
@@ -149,6 +151,13 @@ export function createStore(stateDir?: string): Store {
       t.lastUsedAt = new Date().toISOString()
       persist()
       return true
+    },
+    revokeToken(raw) {
+      const h = hash(raw)
+      const before = data.tokens.length
+      data.tokens = data.tokens.filter(t => t.tokenHash !== h)
+      if (data.tokens.length !== before) { persist(); return true }
+      return false
     },
   }
 }

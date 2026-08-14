@@ -272,6 +272,11 @@ function setSessionCookie(res: ServerResponse, token: string): void {
   res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax`)
 }
 
+/** Clear the session cookie (logout): same name/path, Max-Age=0 expires it. */
+function clearSessionCookie(res: ServerResponse): void {
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`)
+}
+
 /** Whether a request passes the gateway auth fence. */
 export function isAuthorized(req: IncomingMessage, store: Store): boolean {
   if (isLoopback(req)) return true
@@ -376,6 +381,24 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
     // Internal login endpoint lives on the gateway itself (not proxied).
     if (pathname === '/__dsh_kit_lan_login') {
       void handleLogin(req, res)
+      return
+    }
+
+    // Internal logout endpoint lives on the gateway itself: revoke the session
+    // token (when present) so it stops working, clear the session cookie, and
+    // hand the caller a small response. The client (logout button) then
+    // navigates back to the login page; a direct browser/curl hit gets a 302
+    // to the same effect.
+    if (pathname === '/__dsh_kit_lan_logout') {
+      const gone = tokenIn !== undefined && store.revokeToken(tokenIn)
+      clearSessionCookie(res)
+      if (wantsHtml(req) && req.method === 'GET') {
+        res.writeHead(302, { Location: '/' })
+        res.end()
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ ok: true, revoked: gone }))
       return
     }
 

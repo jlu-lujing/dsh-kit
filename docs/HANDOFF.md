@@ -115,8 +115,13 @@ catalog 调研（1000 个 dsh-plugin 仓库）后筛选的候选：
   - 网关转发剥浏览器标记头（Origin/sec-fetch-*）→ `/api` 不再 403（踩坑 #17）
   - WebSocket 升级改原生 TCP 隧道 → `events.mux`/`events.host` 握手成功（踩坑 #18）
   - web profile 固定 browse 选择器（禁用 auto + insert browse pair）→ 远程浏览器内弹 web 选择器（踩坑 #19）
+- [x] dsh-kit 商店 webui 面板（2026-08-15 实现并验证）：
+  - host 侧：`GET /dsh-kit/store`（清单+状态）+ `POST /dsh-kit/store/{id}`（启停）管理路由
+  - client 侧：设置页「功能商店」（`settings.section` slot，非侧边栏）
+  - dsh-kit 变为 dual-face 包（host + client）；`pnpm build:client` 扫 `dsh-kit`+`dsh-kit-*`（修复 glob）
+  - 验证：本机 + 远程经网关（带 token）读清单 200，启停真实写 state.json 并保留
+  - 配套：lan-auth 登出（`__dsh_kit_lan_logout` + `revokeToken` + LogoutButton）
 - [ ] 确定全家桶功能清单（自己写，非收录）
-- [ ] 给 `dsh-kit` 加 webui 商店面板（client 插件，验证 pnpm dev 热重载链路）
 - [ ] 发布流程（npm 发布、版本规范）
 
 ## 8. 关键命令速查

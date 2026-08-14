@@ -73,10 +73,10 @@ npx create-dsh-plugin my-plugin -t tool
 
 | 包 | 功能 | 状态 |
 | --- | --- | --- |
-| `dsh-kit` | 聚合包（host + 商店服务） | MVP 骨架已通 |
+| `dsh-kit` | 聚合包（host + 商店服务 + 设置面板） | 已通：host 管理路由 + 设置页「功能商店」面板 |
 | `dsh-kit-notifier` | 桌面通知 | 占位 |
 | `dsh-kit-scheduler` | 定时任务 | 占位 |
-| `dsh-kit-lan-auth` | 局域网鉴权网关（自签 HTTPS + token，默认关闭） | 已实现并验证（含远程可用性：标记头剥离 / WS 隧道 / browse 选择器） |
+| `dsh-kit-lan-auth` | 局域网鉴权网关（自签 HTTPS + token，默认关闭） | 已实现并验证（含远程可用性：标记头剥离 / WS 隧道 / browse 选择器 / 登出） |
 
 > 全家桶安装（一条命令带进全部）：
 > ```sh

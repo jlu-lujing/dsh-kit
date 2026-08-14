@@ -1,14 +1,12 @@
-/** dsh-kit-lan-auth client: settings page to manage gateway tokens/users.
+/** dsh-kit-lan-auth client.
  *
- * The management page is host-only: it mutates the loopback DSH server's
- * user/token store, and the admin routes behind it refuse any LAN-originated
- * request (the gateway stamps proxied traffic with `x-dsh-kit-lan-auth-proxy`,
- * which the host routes reject with 403). A remote browser would therefore
- * render a dead page, so the `settings.section` entry is registered only when
- * the page authority is loopback — the browser accessing the DSH UI directly
- * on the host machine (127.0.0.1/localhost). A LAN client arriving through the
- * HTTPS gateway loads the shell with a non-loopback hostname, so
- * `connection.isLoopback` is false and the section stays hidden.
+ * Local (loopback) browser: registers the 局域网鉴权 settings.section — the
+ * token/user management page. Its admin routes are loopback-only, so it is
+ * deliberately absent for remote clients.
+ *
+ * Remote (LAN) browser arriving through the HTTPS gateway: registers a logout
+ * action in `sidebar.footer.action`. The gateway revokes the session token and
+ * clears the cookie, returning the browser to its login page.
  */
 import { createElement, useEffect, useState } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -126,16 +124,105 @@ function LanAuthPage() {
   )
 }
 
+/**
+ * Sidebar-foot logout action for remote (LAN) sessions over the HTTPS gateway.
+ * Local/loopback access renders no button: there is no session to end — the
+ * gateway lets loopback traffic through without credentials, so "logout"
+ * would be meaningless (and the management settings page only appears locally).
+ *
+ * The button styles follow the sidebar's own footer-action badge (the Cordis
+ * panel entry sets the precedent): a full-width, hover-highlighted pill with a
+ * 14px label in wide mode and a centered 36px round icon in the collapsed rail.
+ * It uses the web app's `--dsw-*` tokens so it re-skins with the theme.
+ *
+ * Clicking revokes the current session token (the gateway route invalidates
+ * it) and clears the session cookie, then walks the browser back to the login
+ * page.
+ */
+function LogoutButton({ wide }: { wide: boolean }) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const onClick = () => {
+    if (busy) return
+    setBusy(true)
+    setFailed(false)
+    // Only walk back to the login page when the gateway confirms logout
+    // (200 + cookie cleared). A failure — e.g. a gateway still running the
+    // pre-logout build that answers 405 — must NOT navigate: the session
+    // cookie is still valid there, so reloading "/" would silently re-login.
+    fetch('/__dsh_kit_lan_logout', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    })
+      .then((res) => {
+        if (res.ok) { window.location.assign('/'); return }
+        setFailed(true)
+      })
+      .catch(() => setFailed(true))
+      .finally(() => setBusy(false))
+  }
+  const style: Record<string, string> = {
+    width: wide ? '100%' : '36px',
+    height: '36px',
+    color: 'var(--dsw-alias-label-tertiary)',
+    cursor: 'pointer',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: wide ? '12px' : '50%',
+    alignItems: 'center',
+    justifyContent: wide ? 'flex-start' : 'center',
+    gap: '8px',
+    padding: wide ? '0 8px 0 6px' : '0',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+    lineHeight: '1',
+    display: 'inline-flex',
+    transition: 'background .15s var(--ds-ease-in-out, ease)',
+    opacity: busy ? 0.6 : 1,
+  }
+  return createElement('button', {
+    type: 'button',
+    style,
+    onClick,
+    disabled: busy,
+    'aria-label': '退出登录',
+    title: failed ? '退出登录失败，请重试' : '退出登录',
+  },
+    createElement(LogoutIcon, null),
+    wide ? createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, failed ? '退出登录失败' : '退出登录') : null,
+  )
+}
+
+/** Inline logout glyph (door + exit arrow) matching the 16px sidebar icon scale. */
+function LogoutIcon() {
+  return createElement('svg', {
+    width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': true,
+  },
+    createElement('path', { d: 'M7 3 H3.5 a.5.5 0 0 0-.5.5 v9 a.5.5 0 0 0 .5.5 H7' }),
+    createElement('path', { d: 'M10 5.5 12.5 8 10 10.5' }),
+    createElement('path', { d: 'M12.5 8 H6.5' }),
+  )
+}
+
 export function apply(ctx: { get(name: string): unknown }): void {
   const slots = ctx.get('slots') as { inject(name: string, fn: () => unknown): unknown; register(...a: unknown[]): unknown } | undefined
   if (slots === undefined) return
-  // Host-only management surface: hide the section for LAN browsers. The
-  // admin routes are loopback-only, so a remote client gets nothing useful
-  // here — and showing it would leak the feature into a page that cannot use
-  // it. Gate registration on the same trust signal the connection uses.
   const connection = ctx.get('connection') as ConnectionHandle | undefined
-  if (connection === undefined || !connection.isLoopback) return
-  slots.inject('settings.section', () =>
-    slots.register({ name: 'settings.section', id: 'dsh-kit-lan-auth', priority: 40, label: () => '局域网鉴权' }, () => createElement(LanAuthPage, null)),
+  if (connection === undefined) return
+
+  if (connection.isLoopback) {
+    // Host-only management surface: the admin routes are loopback-only, so a
+    // remote client gets nothing useful here — keep the section off their page.
+    slots.inject('settings.section', () =>
+      slots.register({ name: 'settings.section', id: 'dsh-kit-lan-auth', priority: 40, label: () => '局域网鉴权' }, () => createElement(LanAuthPage, null)),
+    )
+    return
+  }
+
+  // Remote (LAN) session: offer logout at the sidebar foot.
+  slots.inject('sidebar.footer.action', () =>
+    slots.register({ name: 'sidebar.footer.action', id: 'dsh-kit-lan-auth-logout' }, (owner: { wide: boolean }) => createElement(LogoutButton, { wide: owner.wide })),
   )
 }
