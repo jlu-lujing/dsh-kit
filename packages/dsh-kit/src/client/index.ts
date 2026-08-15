@@ -78,11 +78,160 @@ async function api(path: string, body?: unknown) {
   return d
 }
 
+/** One GitHub `topic:dsh-plugin` repository, shown read-only in the store. */
+interface EcosystemEntry {
+  full_name: string
+  owner: string
+  name: string
+  description: string
+  stars: number
+  language: string | null
+  license: string | null
+  html_url: string
+  updated_at: string
+  archived: boolean
+}
+
+interface EcosystemState {
+  ok: boolean
+  total: number
+  entries: EcosystemEntry[]
+  fetched: number
+  partial: boolean
+  cachedAt: number
+  source: 'cache' | 'live' | 'fallback'
+}
+
+function useEcosystem() {
+  const [data, setData] = useState<EcosystemState | null>(null)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const refresh = (force = false) => {
+    setLoading(true)
+    fetch(`/dsh-kit/store/ecosystem${force ? '?refresh=1' : ''}`)
+      .then((r) => r.json())
+      .then((d) => { setData(d as EcosystemState); setErr('') })
+      .catch((e) => setErr(String((e && e.message) || e)))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { refresh() }, [])
+
+  // 目录还在后台补全时，定时再取一次（直到拿满或回退为 fallback 快照）。
+  useEffect(() => {
+    if (!data?.partial || data.source === 'fallback') return
+    const timer = setTimeout(() => refresh(), 30_000)
+    return () => clearTimeout(timer)
+  }, [data?.partial, data?.fetched])
+
+  return { data, err, loading, refresh }
+}
+
+function fmtStars(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`
+  return String(n)
+}
+
+function EcosystemCard({ entry }: { entry: EcosystemEntry }) {
+  const meta = [
+    entry.language,
+    entry.license,
+    entry.archived ? 'archived' : null,
+  ].filter((v): v is string => Boolean(v)).join(' · ')
+
+  return createElement('a', {
+    key: entry.full_name,
+    href: entry.html_url,
+    target: '_blank',
+    rel: 'noreferrer',
+    title: entry.full_name,
+    style: {
+      ...cardS, display: 'flex', flexDirection: 'column', gap: 6, padding: 12,
+      minWidth: 0, textDecoration: 'none', color: tk.text,
+    },
+  },
+    createElement('div', { style: { display: 'flex', alignItems: 'baseline', gap: 8 } },
+      createElement('div', {
+        style: {
+          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.4,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        },
+      }, `${entry.owner}/${entry.name}`),
+      createElement('span', {
+        style: {
+          flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 3,
+          fontSize: 11, lineHeight: '18px', color: tk.tertiary,
+          fontVariantNumeric: 'tabular-nums',
+        },
+      }, '★', fmtStars(entry.stars)),
+    ),
+    createElement('div', {
+      style: {
+        fontSize: 12, lineHeight: 1.5, color: tk.tertiary,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      },
+    }, entry.description || '(无简介)'),
+    meta
+      ? createElement('div', { style: { fontSize: 11, lineHeight: 1.5, color: tk.tertiary, marginTop: 'auto' } }, meta)
+      : null,
+  )
+}
+
+function EcosystemSection({ data, err, loading, limit, onRefresh, onMore }: {
+  data: EcosystemState | null
+  err: string
+  loading: boolean
+  limit: number
+  onRefresh: () => void
+  onMore: () => void
+}) {
+  const entries = data?.entries ?? []
+  const visible = entries.slice(0, limit)
+  const shown = data ? Math.min(entries.length, limit) : 0
+
+  return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 } },
+    createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+      createElement('div', { style: { flex: 1, minWidth: 0 } },
+        createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, 'GitHub 生态插件'),
+        createElement('div', { style: { fontSize: 12, color: tk.tertiary, marginTop: 2 } },
+          `topic:dsh-plugin · 只读展示，安装方式请打开仓库查看 README${data ? ` · 已展示 ${shown}${data.partial ? ` / ${data.fetched}` : ''} 个` : ''}`),
+      ),
+      createElement('button', {
+        style: { ...ghostBtn, cursor: loading ? 'wait' : 'pointer' },
+        onClick: onRefresh,
+        disabled: loading,
+      }, loading ? '刷新中…' : '刷新'),
+    ),
+    data?.source === 'fallback'
+      ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '当前显示内置快照（GitHub 网络受限），点击刷新重试。')
+      : null,
+    data?.partial && data.source !== 'fallback'
+      ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '正在后台补全完整目录，稍后会自动刷新…')
+      : null,
+    err
+      ? createElement('div', { style: { fontSize: 12, color: tk.danger } }, err)
+      : null,
+    visible.length > 0
+      ? createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 } },
+          visible.map((entry) => createElement(EcosystemCard, { key: entry.full_name, entry })),
+        )
+      : loading
+        ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '加载中…')
+        : null,
+    entries.length > limit
+      ? createElement('button', { style: { ...ghostBtn, alignSelf: 'flex-start' }, onClick: onMore }, `再展示 100 个（共 ${entries.length}）`)
+      : null,
+  )
+}
+
 function StorePanel() {
   const { features, err, setErr, refresh } = useStore()
   const [busy, setBusy] = useState<string | null>(null)
   const [installing, setInstalling] = useState(false)
   const [installMsg, setInstallMsg] = useState<string | null>(null)
+  const ecosystem = useEcosystem()
+  const [ecoLimit, setEcoLimit] = useState(100)
 
   const toggle = (f: Feature) => {
     setErr(''); setBusy(f.id)
@@ -163,6 +312,14 @@ function StorePanel() {
         ),
       ),
     ),
+    createElement(EcosystemSection, {
+      data: ecosystem.data,
+      err: ecosystem.err,
+      loading: ecosystem.loading,
+      limit: ecoLimit,
+      onRefresh: () => ecosystem.refresh(true),
+      onMore: () => setEcoLimit((n) => n + 100),
+    }),
     err ? createElement('div', { style: { color: tk.danger, fontSize: 13 } }, err) : null,
   )
 }

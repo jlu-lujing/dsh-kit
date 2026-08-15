@@ -7,6 +7,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
 import { installPreset, uninstallPreset, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
+import { createEcosystemController } from './ecosystem.ts'
 
 /** Feature id of the inline preset feature (matches store.ts / state file). */
 const PRESET_FEATURE_ID = `dsh-${PRESET_ID}` as const
@@ -129,11 +130,24 @@ export function apply(ctx: Context, config: Config = {}): void {
   if (webServer === undefined) return
 
   const PREFIX = '/dsh-kit/store'
+  const ecosystem = createEcosystemController()
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const pathname = (req.url ?? '/').split('?')[0]
     if (req.method === 'GET') {
       if (pathname === PREFIX || pathname === `${PREFIX}/`) {
         return sendJson(res, 200, { features: service.list() })
+      }
+      // GET /dsh-kit/store/ecosystem[?refresh=1]
+      // Read-only showcase of GitHub `topic:dsh-plugin` repositories (star
+      // desc). No install action here: every repo documents its own setup.
+      if (pathname === `${PREFIX}/ecosystem`) {
+        try {
+          const query = new URL(req.url ?? '/', 'http://localhost').searchParams
+          const data = await ecosystem.catalog(query.get('refresh') === '1')
+          return sendJson(res, 200, { ok: true, ...data })
+        } catch (error) {
+          return sendJson(res, 502, { error: String((error as Error).message ?? error) })
+        }
       }
     }
 

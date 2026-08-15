@@ -32,6 +32,7 @@
 | `dsh-kit-scheduler` | 定时任务 | cron 定时任务 + 持久化 + 管理路由（支持 shell 命令） |
 | `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
 | `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
+| GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 
 > 💡 满血模式不是独立 npm 包，由 `dsh-kit` 内置打包分发（详见下方「借鉴」）。
 
@@ -90,6 +91,14 @@ dsh-kit install [--profile <p>]                     # 把全家桶装进指定 p
 - 每个功能的启停由聚合 patch 里的动态表达式读状态文件决定，**无需编辑任何 patch 文件**。
 - 也可以通过设置页「功能商店」面板一键点按开关。
 
+### GitHub 生态目录（只读展示）
+
+功能商店底部会展示 GitHub `topic:dsh-plugin` 生态仓库，按 **Star 数降序**排列，点击卡片打开仓库主页（安装方式各不相同，请以各仓库 README 为准，暂不提供一键安装）。
+
+- 首次打开先秒出 Top 100，随后后台补全完整目录并写入 30 分钟磁盘缓存。
+- 网络受限时自动回退到包内置快照；可配置 `GITHUB_TOKEN` 提升 GitHub API 限流（未认证 10 次/分钟 → 认证 30 次/分钟）。
+- 目录抓取策略参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）。
+
 ---
 
 ## 💻 开发
@@ -143,6 +152,7 @@ cd packages/<pkg> && npm publish    # 4 包各自发布；已构建 lib/ 随包�
 ## 📚 借鉴与许可
 
 - **满血模式 preset** 的算法与文件集合**借鉴**自社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。dsh-kit 以自研的导入/删除管理器（`src/preset.ts`）内置并注明借鉴。
+- **GitHub 生态目录**的分片抓取 / 缓存思路参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）；dsh-kit 只取展示能力，不做安装。
   - 简介：首次请求用 Minimal 工具对（`bash` / `str_replace_editor`），首次持久晋升信号后开放完整工具目录。
   - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除。
 

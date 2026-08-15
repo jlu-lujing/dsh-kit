@@ -23,7 +23,8 @@
     "bin/dsh-kit.mjs",
     "cordis.patch.yml",
     "lib/types/**/*.d.ts",
-    "preset/**/*"
+    "preset/**/*",
+    "ecosystem-fallback.json"
   ],
   "scripts": {
     "build": "tsc -b",
