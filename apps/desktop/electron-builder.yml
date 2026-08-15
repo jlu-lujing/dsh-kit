@@ -1,7 +1,10 @@
 appId: com.dshkit.desktop
 productName: dsh-kit Desktop
+# 图标源：取自 dsh web 的 /favicon.svg（爪印 logo，2026-08-16 抓取）光栅化。
+# build/icon.png (1024x1024) 由 electron-builder 自动生成 .icns/.ico。
 directories:
   output: dist
+  buildResources: build
 files:
   - out/**
   - package.json
@@ -12,12 +15,17 @@ files:
 afterPack: scripts/afterPack.cjs
 mac:
   category: public.app-category.developer-tools
+  # 优先用本地 iconutil 生成的 icns（避免 electron-builder 联网下转换工具）
+  icon: build/icon.icns
   target:
     - dir
 win:
+  # Windows 打包在对应 OS 上进行（本仓库目前不跑 win 产物）
+  icon: build/icon.png
   target:
     - dir
 linux:
+  icon: build/icon.png
   target:
     - dir
 npmRebuild: false
