@@ -14,7 +14,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { app } from 'electron'
 
 /** 就绪行：`dsh web: http://127.0.0.1:<port>`(可带 ` (LAN: ...)` 后缀) */
 export const READY_RE = /dsh web: (http:\/\/127\.0\.0\.1:[0-9]+\/?)/
@@ -56,7 +55,8 @@ export function resolveRuntime(userDataDir: string): { dir: string; meta: Runtim
     join(userDataDir, 'dsh-runtime', 'current'),
     join(process.resourcesPath ?? '', 'dsh-runtime'),
   ]
-  if (!app.isPackaged) {
+  // 打包后（defaultApp=false）不加开发回退；未打包时加仓库内 resources 目录。
+  if (process.defaultApp !== false) {
     candidates.push(join(__dirname, '..', '..', 'resources', 'dsh-runtime'))
   }
   for (const dir of candidates) {

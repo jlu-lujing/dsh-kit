@@ -18,6 +18,11 @@ import {
   spawnWebAndWait,
   stopWeb,
 } from './runtime'
+import {
+  applyUpdate,
+  fetchFeed,
+  type UpdateListener,
+} from './updater'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -128,10 +133,67 @@ async function boot(): Promise<void> {
     appendLog(`boot: dsh ready at ${url}`)
     log.forEach((l) => appendLog(`dsh: ${l.trim()}`))
     createWindow(url)
+    // 启动成功后后台非阻塞检查更新（失败只记录，不影响使用）
+    checkForUpdates()
   } catch (err) {
     appendLog(`boot: spawn failed: ${err instanceof Error ? err.message : String(err)}`)
     dialog.showErrorBox('dsh 启动失败', String(err))
     app.quit()
+  }
+}
+
+/** 更新 feed 的默认地址（发布时可覆盖；本地测试用 file:）。 */
+function updateFeedUrl(): string {
+  return (
+    process.env.DSH_DESKTOP_FEED_URL ??
+    'https://update.dsh-kit.dev/desktop/feed.json'
+  )
+}
+
+/**
+ * 后台检查更新：拉 feed → 有新版本则走完整更新链路（下载→校验→解压→冒烟→
+ * 停旧→切换→重启→失败回滚）。用之内的 listener 记录日志/通知。
+ */
+async function checkForUpdates(): Promise<void> {
+  const currentDir = resolveRuntime(app.getPath('userData'))?.dir
+  // 只有自管 dsh 时才自动更新（external 复用不干预用户自己的实例）
+  if (!managed || managed.external) return
+
+  const listener: UpdateListener = (stage, detail) => {
+    appendLog(`update: ${stage}${detail ? ` — ${detail}` : ''}`)
+  }
+
+  try {
+    listener('检查更新', updateFeedUrl())
+    const feed = await fetchFeed(updateFeedUrl())
+
+    // 与当前运行时版本比较：相同/更低则跳过
+    const nowMeta = managed ? resolveRuntime(app.getPath('userData'))?.meta : undefined
+    if (nowMeta?.dshVersion && nowMeta.dshVersion === feed.dshVersion) {
+      listener('已是最新', feed.dshVersion)
+      return
+    }
+
+    listener('发现新版本', feed.dshVersion)
+    const { managed: nextManaged, url } = await applyUpdate({
+      userDataDir: app.getPath('userData'),
+      feedUrl: updateFeedUrl(),
+      dshHome: dshHome(),
+      current: { dir: currentDir ?? '', child: managed?.child ?? null },
+      desktopVersion: app.getVersion(),
+      listener,
+    })
+    // 更新成功：替换壳状态并让窗口加载新 dsh URL
+    managed = nextManaged
+    dshUrl = url
+    if (mainWindow) {
+      void mainWindow.loadURL(url)
+    } else {
+      createWindow(url)
+    }
+    appendLog(`update: applied, now running dsh ${nextManaged.url}`)
+  } catch (err) {
+    listener('更新失败', err instanceof Error ? err.message : String(err))
   }
 }
 

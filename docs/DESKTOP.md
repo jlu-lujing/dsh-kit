@@ -1,7 +1,7 @@
 # dsh-kit Desktop 桌面客户端设计
 
-> 更新日期：2026-08-15
-> 状态：方案已定稿；**M1（dsh-runtime）已落地并通过冒烟验证**，M2（Electron 壳）待实现
+> 更新日期：2026-08-16
+> 状态：M1–M4 已落地并联调（dsh-runtime 子模块 / Electron 壳 / 打包注入 / 更新链路），见 §9
 > 分支：`feature/client-wrapper`
 
 ## 1. 定位
@@ -180,6 +180,19 @@ dsh-runtime/
   → 失败：自动回滚 previous，错误页提示
 ```
 
+### 7.1 M4 实现（src/main/updater.ts，2026-08-16 联调通过）
+
+- **发布物格式 `tar.gz`**：M4 更新链路不再使用 M1 的 zstd-tar（扩展名 .zip），改用 gzip
+  压缩的 tar。原因是壳内置 Node 无法解 zstd，而 gzip 用 Node 内置 `zlib` + `tar-stream`
+  即可**纯 JS 解压，零外部二进制依赖**（Windows 无需系统 tar/zstd）。
+- **feed 字段**：`schemaVersion / dshVersion / platform / arch / url / sha512 /
+  minDesktopVersion / changelog / format('tar.gz')`。支持 `file:` URL 便于离线/测试。
+- **流程**：`fetchFeed` → `downloadAndVerify`(边下边算 sha512) → `extractRuntime`(解压到
+  next/) → `smokeRuntime`(node --version + web --dump-config) → `atomicSwitch`
+  (current↔previous) → 重启 → `applyUpdate` 编排；启动失败自动 `rollback` 回滚 previous。
+- **壳集成**：boot 成功后后台 `checkForUpdates()`（监听器写 desktop.log）；feed URL 默认
+  占位 `https://update.dsh-kit.dev/desktop/feed.json`，可 `DSH_DESKTOP_FEED_URL` 覆盖。
+
 原则：
 
 - dsh-runtime 更新不强制用户重启壳（切换后重启 dsh 子进程即可）；
@@ -201,7 +214,7 @@ dsh-runtime/
 | M1 | `apps/dsh-runtime` 骨架 + pin dsh 版本 + 当前平台 runtime 构建脚本 | ✅ 本机产出可运行 runtime（`out/dsh-runtime-0.1.0-rc.6-darwin-arm64.zip`，zstd ~32MB）+ runtime.json，冒烟通过 |
 | M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | ✅ self-spawn → ready URL → 窗口加载；退出后子进程无残留（2026-08-15 实测） |
 | M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-kit Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
-| M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | 单独升级 dsh 不需要重新下载壳 |
+| M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | ✅ `src/main/updater.ts` 全链路（feed→下载+sha512→纯 JS 解压→冒烟→原子切换→重启→回滚）Node E2E 实测通过（2026-08-16）；发布物 tar.gz 无外部二进制依赖 |
 | M5 | 签名/公证、托盘、开机自启、错误页打磨 | 可对外发布 |
 | 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
 
