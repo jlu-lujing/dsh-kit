@@ -22,16 +22,6 @@ importers:
         version: 5.9.3
 
   packages/dsh-kit:
-    dependencies:
-      dsh-kit-lan-auth:
-        specifier: file:../dsh-kit-lan-auth
-        version: link:../dsh-kit-lan-auth
-      dsh-kit-notifier:
-        specifier: file:../dsh-kit-notifier
-        version: link:../dsh-kit-notifier
-      dsh-kit-scheduler:
-        specifier: file:../dsh-kit-scheduler
-        version: link:../dsh-kit-scheduler
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: ^4.0.1

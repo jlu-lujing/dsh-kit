@@ -46,7 +46,12 @@ dsh web
 dsh-kit list                # 列出所有功能及状态
 dsh-kit enable notifier     # 启用桌面通知
 dsh-kit disable scheduler   # 停用定时任务
+dsh-kit install             # 一条命令把全家桶装进 profile（发布后，默认 web）
+dsh-kit install --profile dev   # 装进指定 profile
 ```
+
+> `dsh-kit install` 内部执行 `dsh plugin --profile <p> add -w dsh-kit dsh-kit-notifier dsh-kit-scheduler dsh-kit-lan-auth`（4 个包各为独立 bundle，装进 profile 根，可单装/单卸）。
+> 发布前（本地路径安装）不用此命令，见下方[快速开始](#快速开始)。
 
 每个功能的 `disabled` 由 patch 里的动态表达式读状态文件决定，**无需编辑任何 patch 文件**。
 
@@ -90,9 +95,15 @@ npx create-dsh-plugin my-plugin -t tool
 
 ## 发布
 
-- **状态**：当前通过**本地路径**安装（`dsh plugin add -w <path>`），尚未发布到 npm（registry 404）。
-- **版本**：4 个子包均为 `0.1.0`；根 workspace 为 `private: true`（只承载开发工具链，不发布）。
-- 发布后可用 `dsh plugin add dsh-kit` 直接安装；npm 发布流程与版本规范当前尚未制定。
+- **包**：4 个子包（`dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth`）各为独立 npm 包，`license: MIT`，版本统一 `0.1.0`（根 workspace `private: true`，只承载开发工具链，不发布）。
+- **发布**：`cd packages/<pkg> && npm publish`（4 包各自发布；已构建 `lib/` 随包带出）。
+- **安装（发布后）**：
+  ```sh
+  dsh-kit install            # 一条命令装全家桶（默认 web profile）
+  # 等价于: dsh plugin --profile web add -w dsh-kit dsh-kit-notifier dsh-kit-scheduler dsh-kit-lan-auth
+  ```
+  发布前用本地路径安装，见[快速开始](#快速开始)。
+- **架构说明**：4 个包都是独立 bundle（各带 patch，可单装/单卸）；`dsh-kit` 为聚合壳（管理 CLI + 功能商店），不声明子包依赖——全家桶靠一条多参 `add` 装齐。
 
 ## License
 

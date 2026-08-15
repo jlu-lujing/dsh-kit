@@ -130,7 +130,7 @@
 
 ### 待办
 
-- [ ] 发布流程（npm 发布、版本规范）
+- [ ] 发布执行（`npm publish` 4 包）——方案已定案（A2：4 包独立发布 + `dsh-kit install` 一条命令装全家桶），见 README §发布
 
 ## 8. 关键命令速查
 
@@ -150,6 +150,10 @@ dsh plugin --profile <p> add -w \
 dsh-kit list | status | ls
 dsh-kit enable <feature>
 dsh-kit disable <feature>
+dsh-kit install [--profile <p>]    # 一条命令装全家桶（发布后）
+
+# 发布（4 包各自）
+cd packages/<pkg> && npm publish
 
 # 配置查看
 dsh web --dump-config

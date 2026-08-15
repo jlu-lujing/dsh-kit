@@ -28,11 +28,6 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --noEmit"
   },
-  "dependencies": {
-    "dsh-kit-notifier": "file:../dsh-kit-notifier",
-    "dsh-kit-scheduler": "file:../dsh-kit-scheduler",
-    "dsh-kit-lan-auth": "file:../dsh-kit-lan-auth"
-  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6"
@@ -50,7 +45,10 @@
     },
     "client": {
       "platform": "web",
-      "inject": ["@deepseek-ai/dsh-client-connection"]
+      "inject": [
+        "@deepseek-ai/dsh-client-connection"
+      ]
     }
-  }
+  },
+  "license": "MIT"
 }
