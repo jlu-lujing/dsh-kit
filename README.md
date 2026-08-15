@@ -31,6 +31,7 @@
 | `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知（macOS/Linux/Windows），零 npm 依赖 |
 | `dsh-kit-scheduler` | 定时任务 | cron 定时任务 + 持久化 + 管理路由（支持 shell 命令） |
 | `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
+| `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
 | `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 
@@ -48,7 +49,7 @@
 dsh plugin --profile web add -w dsh-kit
 ```
 
-`dsh-kit` 声明 3 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
+`dsh-kit` 声明 4 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
 
 > 💡 **关键**：`dsh-kit install` 这个命令**并不是**全新系统的入口。它内部只是执行上面这条 `dsh plugin ... add -w dsh-kit`；而要运行 `dsh-kit` 命令，你**得先装上 `dsh-kit` 这个 npm 包**（它的 `bin` 才会进入 PATH）。全新系统请直接用上面的 `dsh plugin` 命令；`dsh-kit install` 更适合「dsh-kit 已装到某环境、想在其它 profile 补装 / 重装」的场景。
 
@@ -133,9 +134,9 @@ npx create-dsh-plugin my-plugin -t tool
 
 ## 📤 发布
 
-**已发布**（2026-08-15）：4 个 npm 包（`0.1.0`，均 `license: MIT`）：
+**已发布**（2026-08-15）：5 个 npm 包（`0.1.0`，均 `license: MIT`）：
 
-- `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth`
+- `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history`
 - 满血模式 preset **不是独立 npm 包**，由 `dsh-kit` 内置分发。
 - 根 workspace `private: true`，只承载开发工具链，不发布。
 

@@ -33,6 +33,11 @@ export const FEATURES: readonly Feature[] = [
     defaultEnabled: false,
   },
   {
+    id: 'dsh-kit-input-history',
+    name: '输入历史',
+    description: '记录当前会话发送的消息，输入框无命令菜单时用 ↑/↓ 切换回填',
+  },
+  {
     id: 'dsh-anchored-standard',
     name: '满血模式',
     description: '满血模式：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/anchored-standard',

@@ -31,6 +31,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "dsh-kit-input-history": "^0.1.0",
     "dsh-kit-lan-auth": "^0.1.0",
     "dsh-kit-notifier": "^0.1.0",
     "dsh-kit-scheduler": "^0.1.0"
