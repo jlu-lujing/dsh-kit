@@ -372,16 +372,35 @@ function ArchivePanel() {
       .finally(() => setBusy(null))
   }
 
+  const deleteAll = () => {
+    if (!window.confirm('确定删除【全部】归档会话吗？这会永久删除所有归档会话的日志文件（~/.dsh/sessions 下），不可恢复。')) return
+    setErr(''); setNote(''); setBusy('*all*')
+    api('/dsh-kit/archive/delete-all', {})
+      .then((r) => {
+        const cnt = (r as { deleted?: number }).deleted ?? 0
+        setNote(`已删除全部 ${cnt} 个归档会话，重启 dsh 后侧边栏同步。`)
+        refresh()
+      })
+      .catch((e) => setErr(String((e && e.message) || e)))
+      .finally(() => setBusy(null))
+  }
+
   const rows = items ?? []
   return createElement('div', { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 760, color: tk.text } },
     createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, '归档会话'),
     createElement('div', { style: { fontSize: 12, color: tk.tertiary } },
       '官方「归档」隐藏会话（日志保留）；这里可恢复或彻底删除。操作后需重启 dsh 生效。'),
+    createElement('div', { style: { ...cardS, padding: 12, display: 'flex', gap: 10, alignItems: 'center' } },
+      createElement('div', { style: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.5, color: tk.secondary } },
+        rows.length > 0 ? `共 ${rows.length} 个归档会话` : '暂无归档会话'),
+      createElement('button', {
+        style: { ...ghostBtn, cursor: busy === '*all*' ? 'wait' : 'pointer', color: tk.danger, borderColor: tk.danger },
+        onClick: deleteAll,
+        disabled: busy !== null || rows.length === 0,
+      }, busy === '*all*' ? '删除中…' : '删除所有归档会话'),
+    ),
     rows.length === 0 && !err
       ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '加载中…')
-      : null,
-    rows.length === 0 && err === '' && items !== null
-      ? createElement('div', { style: { ...cardS, padding: 16, fontSize: 13, color: tk.secondary } }, '暂无归档会话。')
       : null,
     rows.map((it) =>
       createElement('div', { key: it.sessionId, style: { ...cardS, padding: 12, display: 'flex', gap: 12, alignItems: 'center' } },

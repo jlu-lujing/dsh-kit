@@ -8,7 +8,7 @@ import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
 import { installPreset, uninstallPreset, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
 import { createEcosystemController } from './ecosystem.ts'
-import { listArchived, restoreSession, deleteSession } from './archive.ts'
+import { listArchived, restoreSession, deleteSession, deleteAllArchived } from './archive.ts'
 
 /** Feature id of the inline preset feature (matches store.ts / state file). */
 const PRESET_FEATURE_ID = `dsh-${PRESET_ID}` as const
@@ -274,6 +274,15 @@ export function apply(ctx: Context, config: Config = {}): void {
         const sessionId = restoreRoute[1]
         const result = restoreSession(dshHome(), sessionId)
         return sendJson(res, 200, { ok: true, sessionId, restored: result.restored })
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+    // POST /dsh-kit/archive/delete-all  — 删除全部归档会话
+    if (req.method === 'POST' && pathname === `${ARCHIVE_PREFIX}/delete-all`) {
+      try {
+        const result = deleteAllArchived(dshHome())
+        return sendJson(res, result.ok ? 200 : 207, result)
       } catch (error) {
         return sendJson(res, 500, { error: String((error as Error).message ?? error) })
       }

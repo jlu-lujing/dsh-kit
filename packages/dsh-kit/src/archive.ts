@@ -142,24 +142,13 @@ export function restoreSession(home: string, sessionId: string): { ok: true; res
 }
 
 /** 删除一个会话：从归档集移除 + 从所有 workspace 的 sessionIds 移除 + 删磁盘目录。 */
-export function deleteSession(home: string, sessionId: string): { ok: boolean; error?: string } {
+export function deleteSession(home: string, sessionId: string): { ok: boolean; error?: string; removedFromWorkspace?: boolean } {
   const state = load(home)
   const ids = state.global.archivedSessionIds ?? []
   // 即使不在归档集也允许删除（清理孤儿会话），但仅当会话确实存在时。
   state.global.archivedSessionIds = ids.filter((id) => id !== sessionId)
 
-  let removedFromWorkspace = false
-  const tables = state.tables
-  if (tables) {
-    for (const group of Object.values(tables)) {
-      for (const record of Object.values(group)) {
-        if (record.sessionIds?.includes(sessionId)) {
-          record.sessionIds = record.sessionIds.filter((id) => id !== sessionId)
-          removedFromWorkspace = true
-        }
-      }
-    }
-  }
+  const removedFromWorkspace = dropFromWorkspaces(state, sessionId)
   save(home, state)
 
   // 删除磁盘上的 session 目录
@@ -168,8 +157,60 @@ export function deleteSession(home: string, sessionId: string): { ok: boolean; e
     try {
       rmSync(dir, { recursive: true, force: true })
     } catch (error) {
-      return { ok: false, error: `session dir remove failed: ${String(error)}` }
+      return { ok: false, error: `session dir remove failed: ${String(error)}`, removedFromWorkspace }
     }
   }
-  return { ok: true }
+  return { ok: true, removedFromWorkspace }
+}
+
+/** 从所有 workspace 的 sessionIds 中摘除一个 id（就地修改 state）。 */
+function dropFromWorkspaces(state: WorkspaceFile, sessionId: string): boolean {
+  const tables = state.tables
+  if (!tables) return false
+  let changed = false
+  for (const group of Object.values(tables)) {
+    for (const record of Object.values(group)) {
+      if (record.sessionIds?.includes(sessionId)) {
+        record.sessionIds = record.sessionIds.filter((id) => id !== sessionId)
+        changed = true
+      }
+    }
+  }
+  return changed
+}
+
+/**
+ * 删除全部归档会话：清空 archivedSessionIds、从所有 workspace 的 sessionIds
+ * 摘除每个归档 id，并删除磁盘上对应的 session 目录。
+ * @returns 删除的条目（含成功/失败明细）与计数。
+ */
+export function deleteAllArchived(home: string): {
+  ok: boolean
+  deleted: number
+  failed: { sessionId: string; error: string }[]
+  archivedCleared: number
+} {
+  const state = load(home)
+  const ids = [...(state.global.archivedSessionIds ?? [])]
+
+  // 逐个在 workspace 摘除（不重新保存，最后一次一并写盘）
+  const failed: { sessionId: string; error: string }[] = []
+  let deleted = 0
+  for (const sessionId of ids) {
+    dropFromWorkspaces(state, sessionId)
+    const dir = findSessionDir(home, sessionId)
+    if (dir) {
+      try {
+        rmSync(dir, { recursive: true, force: true })
+      } catch (error) {
+        failed.push({ sessionId, error: `dir remove failed: ${String(error)}` })
+        continue
+      }
+    }
+    deleted += 1
+  }
+
+  state.global.archivedSessionIds = []
+  save(home, state)
+  return { ok: failed.length === 0, deleted, failed, archivedCleared: ids.length }
 }
