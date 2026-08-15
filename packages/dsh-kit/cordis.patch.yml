@@ -1,9 +1,9 @@
 # dsh-kit aggregate patch layer.
 #
-# Installing dsh-kit installs the whole family: it declares the four feature
+# Installing dsh-kit installs the whole family: it declares the five feature
 # packages (dsh-kit-notifier / dsh-kit-scheduler / dsh-kit-lan-auth /
 # dsh-kit-input-history) as npm dependencies (hoisted into the profile's
-# top-level node_modules), and this patch inserts all five rows below. The
+# top-level node_modules), and this patch inserts all six rows below. The
 # mechanism mirrors how the official
 # dsh-base aggregate works: the bundle's dependencies make the packages
 # resolvable by the Loader, and the bundle's own patch declares the rows.
@@ -33,12 +33,13 @@
 # Remote access needs the in-app (browse) directory picker — the native picker
 # opens only on the host display, invisible to a LAN browser. directory-picker
 # (auto) resolves `native` because the gateway keeps webServer loopback-bound,
-# so always disable it; the lan-auth apply dynamically injects the browse pair
-# when the gateway loads. The local+remote both use the web picker (accepted
-# cost). When lan-auth is off, dsh-kit still claims the row so a remote-only
-# plan has a stable selector.
+# so disable it **only while the lan-auth feature is enabled**; in that case
+# lan-auth's apply dynamically injects the browse pair. When lan-auth is off
+# the official auto picker stays mounted, so a fresh `dsh web` profile boots
+# without a directoryPicker gap (native picker for loopback users). The
+# self-contained expression reads the same state file as every feature row.
 - id: directory-picker
-  disabled: true
+  disabled: !!js "( (function () { try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-lan-auth'] === true; } catch (e) { return false; } })() )"
 
 - insert:
     - id: dsh-kit
@@ -59,3 +60,7 @@
     - id: dsh-kit-input-history
       name: dsh-kit-input-history
       disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-input-history'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-input-history'] === false; } catch (e) { return false; } })() )"
+
+    - id: dsh-kit-webui
+      name: dsh-kit-webui
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-webui'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-webui'] === false; } catch (e) { return false; } })() )"

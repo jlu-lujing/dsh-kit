@@ -1,0 +1,176 @@
+/** 主题编辑器（主题自己风格）+ 全局界面调整编辑器。 */
+import { createElement, useState } from 'react'
+import type { TokenModes, WebUITheme } from './themes.ts'
+import { TOKEN_FIELDS, setTokenMode } from './themes.ts'
+import { tk, cardS, ghostBtn, primaryBtn, inputS } from './ui-style.ts'
+
+const colorInputS = { width: 34, height: 26, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }
+
+/*────────────────────────────── 主题编辑器 ──────────────────────────────*/
+/* 编辑一个主题自己的风格：colorScheme 决定基础深浅模式，tokens 是单值（官方 ThemeDefinition 形状）。 */
+
+/** 深色底主题的默认配色（切换/新建深色主题时载入，保证默认就适配深色）。 */
+const DARK_THEME_DEFAULTS: Record<string, string> = {
+  '--dsw-alias-bg-base': '#16181d',
+  '--dsw-alias-bg-layer-1': '#1e2128',
+  '--dsw-alias-bg-layer-2': '#272b33',
+  '--dsw-alias-border-l2': '#3a3f4b',
+  '--dsw-alias-label-primary': '#e6e8ee',
+  '--dsw-alias-label-secondary': '#9aa1ae',
+  '--dsw-alias-brand-primary': '#3b82f6',
+  '--dsw-alias-state-success-primary': '#22c55e',
+  '--dsw-alias-state-error-primary': '#ef4444',
+  '--dsw-alias-state-warn-primary': '#eab308',
+  '--dsw-specific-sidebar-fill': '#1a1d24',
+}
+
+/** 浅色底主题的默认配色。 */
+const LIGHT_THEME_DEFAULTS: Record<string, string> = {
+  '--dsw-alias-bg-base': '#f5f5f5',
+  '--dsw-alias-bg-layer-1': '#ffffff',
+  '--dsw-alias-bg-layer-2': '#eef0f2',
+  '--dsw-alias-border-l2': '#d9dde3',
+  '--dsw-alias-label-primary': '#1b1f27',
+  '--dsw-alias-label-secondary': '#5b626d',
+  '--dsw-alias-brand-primary': '#2563eb',
+  '--dsw-alias-state-success-primary': '#16a34a',
+  '--dsw-alias-state-error-primary': '#dc2626',
+  '--dsw-alias-state-warn-primary': '#ca8a04',
+  '--dsw-specific-sidebar-fill': '#e7e9ee',
+}
+
+function defaultsFor(scheme: 'light' | 'dark'): Record<string, string> {
+  return { ...(scheme === 'dark' ? DARK_THEME_DEFAULTS : LIGHT_THEME_DEFAULTS) }
+}
+
+export function ThemeEditor(props: {
+  initial?: WebUITheme
+  onSave: (t: WebUITheme) => void
+  onCancel: () => void
+}) {
+  const { initial, onSave, onCancel } = props
+  const [id, setId] = useState(initial?.id ?? '')
+  const [name, setName] = useState(initial?.name ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(initial?.colorScheme ?? 'dark')
+  const [tokens, setTokens] = useState<Record<string, string>>(() => {
+    const scheme = initial?.colorScheme ?? 'dark'
+    const t = defaultsFor(scheme)
+    for (const f of TOKEN_FIELDS) {
+      const value = initial?.tokens[f.name]
+      if (typeof value === 'string' && value !== '') t[f.name] = value
+    }
+    return t
+  })
+
+  const submit = () => {
+    if (!id.trim() || !name.trim()) return
+    onSave({
+      id: id.trim().toLowerCase(),
+      name: name.trim(),
+      description: description.trim() || `${colorScheme === 'dark' ? '深色' : '浅色'} · 自定义主题`,
+      colorScheme,
+      builtin: false,
+      tokens: { ...tokens },
+    })
+  }
+
+  return createElement('div', { style: { ...cardS, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 } },
+    createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, initial ? '编辑主题风格' : '新建主题风格'),
+    createElement('div', { style: { fontSize: 12, color: tk.tertiary } },
+      '这里是「这个主题自己」的部分：切换主题时整体风格随之变化；上面的「全局界面调整」对所有主题生效。切换深色底/浅色底会载入对应的默认配色。'),
+    createElement('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
+      createElement('input', {
+        value: id, onChange: (e: { target: { value: string } }) => setId(e.target.value),
+        placeholder: 'id（小写英数，唯一）', disabled: Boolean(initial), style: { ...inputS, maxWidth: 200 },
+      }),
+      createElement('input', {
+        value: name, onChange: (e: { target: { value: string } }) => setName(e.target.value),
+        placeholder: '名称', style: { ...inputS, maxWidth: 180 },
+      }),
+      createElement('input', {
+        value: description, onChange: (e: { target: { value: string } }) => setDescription(e.target.value),
+        placeholder: '一句话描述', style: { ...inputS, maxWidth: 220 },
+      }),
+      createElement('select', {
+        value: colorScheme,
+        onChange: (e: { target: { value: string } }) => {
+          const next = e.target.value === 'light' ? 'light' : 'dark'
+          setColorScheme(next)
+          // 切换深浅底时载入对应模式默认配色，保证主题默认就适配该模式。
+          setTokens(defaultsFor(next))
+        },
+        style: { ...inputS, maxWidth: 120 },
+      },
+        createElement('option', { value: 'dark' }, '深色底'),
+        createElement('option', { value: 'light' }, '浅色底'),
+      ),
+    ),
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+      TOKEN_FIELDS.map((f) =>
+        createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
+          createElement('input', {
+            type: 'color', value: tokens[f.name] ?? '#888888',
+            onChange: (e: { target: { value: string } }) => setTokens((prev) => ({ ...prev, [f.name]: e.target.value })),
+            title: f.name, style: colorInputS,
+          }),
+          createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, tokens[f.name] ?? ''),
+          createElement('span', { style: { flex: 1, fontSize: 10, color: tk.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+        ),
+      ),
+    ),
+    createElement('div', { style: { display: 'flex', gap: 10, justifyContent: 'flex-end' } },
+      createElement('button', { style: ghostBtn, onClick: onCancel }, '取消'),
+      createElement('button', { style: primaryBtn, onClick: submit, disabled: !id.trim() || !name.trim() }, initial ? '保存' : '创建'),
+    ),
+  )
+}
+
+/*────────────────────────── 全局界面调整编辑器 ──────────────────────────*/
+/* 全局层 = 官方 overrideTokens({light,dark})：叠加在任意主题之上，自动跟随深浅模式。 */
+
+export function GlobalAdjuster(props: {
+  tokens: Record<string, TokenModes>
+  onChange: (next: Record<string, TokenModes>) => void
+  onReset: () => void
+}) {
+  const { tokens, onChange, onReset } = props
+
+  const setOne = (name: string, mode: 'light' | 'dark', value: string) => {
+    // 双模式归一化：另一模式为空时回填同值，避免切模式时 token 失效。
+    onChange(setTokenMode(tokens, name, mode, value))
+  }
+
+  return createElement('div', { style: { ...cardS, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 } },
+    createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+      createElement('div', { style: { flex: 1 } },
+        createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, '全局界面调整'),
+        createElement('div', { style: { fontSize: 12, color: tk.tertiary, marginTop: 2 } },
+          '与主题无关：无论切到哪个主题都叠加生效，并为浅色/深色各存一套值。',
+        ),
+      ),
+      createElement('button', { style: ghostBtn, onClick: onReset }, '清空调整'),
+    ),
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+      TOKEN_FIELDS.map((f) =>
+        createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
+          createElement('input', {
+            type: 'color', value: tokens[f.name]?.light ?? '',
+            onChange: (e: { target: { value: string } }) => setOne(f.name, 'light', e.target.value),
+            title: '浅色模式取值', style: colorInputS,
+          }),
+          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '浅'),
+          createElement('input', {
+            type: 'color', value: tokens[f.name]?.dark ?? '',
+            onChange: (e: { target: { value: string } }) => setOne(f.name, 'dark', e.target.value),
+            title: '深色模式取值', style: colorInputS,
+          }),
+          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '深'),
+          createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, f.name),
+        ),
+      ),
+    ),
+  )
+}

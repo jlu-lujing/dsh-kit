@@ -45,6 +45,11 @@ export const FEATURES: readonly Feature[] = [
     description: '记录当前会话发送的消息，输入框无命令菜单时用 ↑/↓ 切换回填',
   },
   {
+    id: 'dsh-kit-webui',
+    name: 'WebUI 主题商店',
+    description: '全局界面调整（对所有主题生效）+ 各主题独立风格；内置海洋/樱/森林三套深浅色预设，支持自定义主题',
+  },
+  {
     id: 'dsh-anchored-standard',
     name: '满血模式',
     description: '满血模式：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/anchored-standard',

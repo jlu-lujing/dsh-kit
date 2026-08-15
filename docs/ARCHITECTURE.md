@@ -45,7 +45,7 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 | 决策点 | 结论 |
 |---|---|
 | 傻瓜包本体 | 聚合 bundle（`dsh-kit`）+ 管理入口（设置页「功能商店」） |
-| 功能粒度 | 4 个功能包 = dsh-kit 依赖 + dsh-kit 聚合 patch 持有的行（非独立 bundle） |
+| 功能粒度 | 5 个功能包 = dsh-kit 依赖 + dsh-kit 聚合 patch 持有的行（非独立 bundle） |
 | 内置能力粒度 | preset / 生态目录 / 归档 等随 dsh-kit 内置，不走 loader 行 |
 | 商店形态 | webui 设置面板（`settings.section` slot） |
 | 用户开关机制 | 持久化状态文件 + 动态 `disabled` 表达式（**不用** dynamicCordisRunner 做启停） |
@@ -59,8 +59,8 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 dsh-kit/
 ├── packages/
 │   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI + 内置能力
-│   │   ├── package.json         #   dsh.bundle.patch + 4 个功能包 dependencies + bin: dsh-kit
-│   │   ├── cordis.patch.yml     #   insert 全部 5 行（自身 + 4 功能）+ directory-picker 禁用
+│   │   ├── package.json         #   dsh.bundle.patch + 5 个功能包 dependencies + bin: dsh-kit
+│   │   ├── cordis.patch.yml     #   insert 全部 6 行（自身 + 5 功能）；lan-auth 开启时禁用 directory-picker(auto)
 │   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable / install
 │   │   ├── preset/              #   内置满血模式 preset（agent.cordis.yml + 各 .mjs + preset.yml）
 │   │   ├── ecosystem-fallback.json # GitHub 生态目录内置快照（网络失败/无缓存时回退）
@@ -77,7 +77,8 @@ dsh-kit/
 │   ├── dsh-kit-lan-auth/        # 局域网鉴权网关——纯库 + dsh.client，行由 dsh-kit 挂载
 │   │   ├── bin/dsh-kit-lan-auth.mjs # CLI：init-ca / status
 │   │   └── src/                 #   index/gateway/store/cert + src/client（设置页 + 登出按钮）
-│   └── dsh-kit-input-history/   # 输入历史——纯 client surface，行由 dsh-kit 挂载
+│   ├── dsh-kit-input-history/   # 输入历史——纯 client surface，行由 dsh-kit 挂载
+│   └── dsh-kit-webui/           # WebUI 主题商店——host 路由 + dsh.client，行由 dsh-kit 挂载
 ├── apps/
 │   ├── dsh-runtime/             # 内置 dsh 独立运行时子模块（详见 docs/DESKTOP.md）
 │   └── desktop/                 # Electron 壳（托盘/自启/更新/错误页 + 首启自动装全家桶）
@@ -98,19 +99,20 @@ dsh-kit/
 ### 5.1 安装
 
 ```sh
-# 发布后：装 dsh-kit 一个包 = 全家桶（它声明 4 个功能包为依赖，聚合 patch 挂载全部 5 行）
+# 发布后：装 dsh-kit 一个包 = 全家桶（它声明 5 个功能包为依赖，聚合 patch 挂载全部 6 行）
 dsh plugin --profile web add -w dsh-kit
 
-# 本地源码（link: 不解析依赖）：5 包一起 link 进 dev profile
+# 本地源码（link: 不解析依赖）：6 包一起 link 进 dev profile
 dsh plugin --profile web add -w \
     ~/workspace/dsh-kit/packages/dsh-kit \
     ~/workspace/dsh-kit/packages/dsh-kit-notifier \
     ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
     ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
-    ~/workspace/dsh-kit/packages/dsh-kit-input-history
+    ~/workspace/dsh-kit/packages/dsh-kit-input-history \
+    ~/workspace/dsh-kit/packages/dsh-kit-webui
 ```
 
-- 发布版 `pnpm add dsh-kit` → pnpm 把 4 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`。
+- 发布版 `pnpm add dsh-kit` → pnpm 把 5 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`。
 - 满血模式 preset / 生态目录 / 归档由 dsh-kit 内置分发，无需额外包。
 - dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务；若「满血模式」启用且未导入，自动把内置 preset 导入到 `~/.dsh/.agent-presets/anchored-standard`。
 
@@ -118,8 +120,8 @@ dsh plugin --profile web add -w \
 
 **实测发现**：cordis loader 在**同一次 update 内拒绝重复 id**（`duplicate loader entry id`，`vendor/loader/src/config/group.ts:64`）。
 
-- ✅ **聚合包 dsh-kit 的 patch insert 全部 5 行**（自身 + notifier + scheduler + lan-auth + input-history），每行带动态 `disabled` 表达式；
-- ✅ **4 个功能包不再声明 `dsh.bundle`**（改为纯库，仅提供 host/client 代码，行由 dsh-kit 挂载）——彻底避免重复 id；
+- ✅ **聚合包 dsh-kit 的 patch insert 全部 6 行**（自身 + notifier + scheduler + lan-auth + input-history + webui），每行带动态 `disabled` 表达式；
+- ✅ **5 个功能包不再声明 `dsh.bundle`**（改为纯库，仅提供 host/client 代码，行由 dsh-kit 挂载）——彻底避免重复 id；
 - lan-auth / input-history 的 client 面板仍正常：`dsh.client` 注入只要求 loader 里有对应 name 且未 disabled 的 entry，与「该包是否是 bundle」无关。
 
 > 代价（已接受）：功能包不再可**单独**作为 bundle add/remove；想移除某个功能用 `dsh-kit disable <feature>`（行 disabled），保留物理安装（方便随时恢复）。
@@ -308,7 +310,17 @@ token 通过 webui 设置页（settings.section「局域网鉴权」）或本机
 - 记录当前会话用户「已发送」的纯文本消息，每会话独立存 localStorage（上限 100 条）；
 - ↑ / ↓ 在输入框回填历史，仅在「输入框聚焦 + 非 IME + draft 无命令/引用前缀」时接管；写回走官方唯一公开通道 `inputActions.setDraft`，不直接改 DOM。
 
-## 12. 桌面客户端（apps/dsh-runtime + apps/desktop）
+## 12. WebUI 主题商店（dsh-kit-webui）
+
+设置页「主题商店」（`settings.section`，id `dsh-kit-webui-themes`）。功能分两层，全部跑在官方 `ui-theme` 的公开扩展点上，不替换官方主题：
+
+- **全局界面调整**（与主题无关）：`ctx.theme.overrideTokens('dsh-kit-webui.global', { light, dark })` 叠加层——切到任何主题（含官方 light/dark/system）都生效，浅/深模式自动取对应值。
+- **主题风格**（每主题独立）：`ctx.theme.register({ id, colorScheme, tokens })` + `ctx.theme.setTheme(id)`。预设按家族提供深色版 + 浅色版（海洋/樱/森林，共 6 个）；自定义主题可新建/编辑/删除。
+- **生命周期**：`ThemeStoreController` 在插件 `apply()` 作用域创建并持有注册与叠加层，设置页面板开合不会注销正在使用的主题；插件卸载时 dispose。
+- **持久化**：localStorage 存自定义主题 + 当前所选 + 全局调整；host 路由 `GET/POST /dsh-kit-webui/themes`、`POST /dsh-kit-webui/themes/delete` 落盘 `~/.dsh/dsh-kit-webui/themes.json`，跨浏览器/重启恢复。
+- **开关**：聚合 patch 行 id `dsh-kit-webui`，默认开启，可用 `dsh-kit disable dsh-kit-webui` 或功能商店停用。
+
+## 13. 桌面客户端（apps/dsh-runtime + apps/desktop）
 
 逐一实现与验证：见 `docs/DESKTOP.md`。要点：
 
@@ -316,13 +328,13 @@ token 通过 webui 设置页（settings.section「局域网鉴权」）或本机
 - **desktop 壳**：Electron（electron-vite + electron-builder）——探测/复用 3080、self-spawn `web --port 0`、就绪 URL、退出清理、托盘、开机自启、错误页、更新链路（feed + sha512 + 原子切换 + 回滚）、窗口图标。
 - **首启自动装全家桶**：仅自管实例，后台检测 web profile 的 dependencies 是否含 `dsh-kit`，未装则 `dsh plugin --profile web add -w dsh-kit`（尽力而为，失败仅记日志）。
 
-## 13. CI 与发布
+## 14. CI 与发布
 
 - **`ci.yml`**：push / PR 自动 `pnpm -r build` → `typecheck` → `test`；
-- **`release.yml`**：`workflow_dispatch` 手动触发，默认 **dry-run**（只打包校验不上传）；`false` 时用 `NPM_TOKEN` 真实发布；发布前自动校验 5 包版本一致、聚合依赖 `^<version>` 对齐；
+- **`release.yml`**：`workflow_dispatch` 手动触发，默认 **dry-run**（只打包校验不上传）；`false` 时用 `NPM_TOKEN` 真实发布；发布前自动校验 6 包版本一致、聚合依赖 `^<version>` 对齐；
 - 本地手动：`pnpm -r publish --access public --no-git-checks [--dry-run]`。
 
-## 14. 参考
+## 15. 参考
 
 - dsh 源码：`refs/deepseek-harness/`（apps/cli/src/plugin.ts、packages/boot/app-boot、packages/extensions/ui-cordis、packages/extensions/cordis-host-runner）；
 - 社区 preset：`refs/dsh-anchored-standard/`（借鉴来源，MIT）；

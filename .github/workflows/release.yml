@@ -44,12 +44,12 @@ jobs:
       - name: Test
         run: pnpm -r test
 
-      # 发布前校验：5 包版本一致、聚合包依赖指向同版本
+      # 发布前校验：6 包版本一致、聚合包依赖指向同版本
       - name: Verify versions
         run: |
           node - <<'EOF'
           const fs = require('fs')
-          const pkgs = ['dsh-kit-input-history','dsh-kit-lan-auth','dsh-kit-notifier','dsh-kit-scheduler','dsh-kit']
+          const pkgs = ['dsh-kit-input-history','dsh-kit-lan-auth','dsh-kit-notifier','dsh-kit-scheduler','dsh-kit-webui','dsh-kit']
           const versions = new Set()
           for (const p of pkgs) {
             const j = JSON.parse(fs.readFileSync(`packages/${p}/package.json`, 'utf8'))

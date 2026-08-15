@@ -45,6 +45,7 @@ dsh-kit/
 | `dsh-kit-scheduler` | 定时任务 | cron 定时任务 + 持久化 + 管理路由（支持 shell 命令） |
 | `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
 | `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
+| `dsh-kit-webui` | WebUI 主题商店 | **全局界面调整**（叠加在所有主题上，自动适配深/浅色）+ **每主题独立风格**；内置海洋/樱/森林三套预设（各含深色版/浅色版），支持自定义主题的新建/编辑/删除 |
 | `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 | 归档会话管理（内置） | 归档会话恢复 / 删除 | 官方「归档」只隐藏不删；设置页可恢复或彻底删除（含日志文件） |
@@ -63,7 +64,7 @@ dsh-kit/
 dsh plugin --profile web add -w dsh-kit
 ```
 
-`dsh-kit` 声明 4 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
+`dsh-kit` 声明 5 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
 
 > 💡 **关键**：`dsh-kit install` 这个命令**并不是**全新系统的入口。它内部只是执行上面这条 `dsh plugin ... add -w dsh-kit`；而要运行 `dsh-kit` 命令，你**得先装上 `dsh-kit` 这个 npm 包**（它的 `bin` 才会进入 PATH）。全新系统请直接用上面的 `dsh plugin` 命令；`dsh-kit install` 更适合「dsh-kit 已装到某环境、想在其它 profile 补装 / 重装」的场景。
 
@@ -75,19 +76,20 @@ pnpm install
 pnpm build
 pnpm build:client    # 产 client bundle（有 dsh.client 的包必须跑）
 
-# 2. 装进 dev profile（link: 不解析依赖，需 5 包一起 link）
+# 2. 装进 dev profile（link: 不解析依赖，需 6 包一起 link）
 dsh plugin --profile dev add -w \
   ~/workspace/dsh-kit/packages/dsh-kit \
   ~/workspace/dsh-kit/packages/dsh-kit-notifier \
   ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
   ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
-  ~/workspace/dsh-kit/packages/dsh-kit-input-history
+  ~/workspace/dsh-kit/packages/dsh-kit-input-history \
+  ~/workspace/dsh-kit/packages/dsh-kit-webui
 
 # 3. 启动 dsh web
 dsh web
 ```
 
-> **本地源码为什么 5 包一起 link？** `link:` 协议不解析依赖（见 `docs/HANDOFF.md`），所以源码调试要显式 link 全部子包；发布版（registry）则一条命令即可。
+> **本地源码为什么 6 包一起 link？** `link:` 协议不解析依赖（见 `docs/HANDOFF.md`），所以源码调试要显式 link 全部子包；发布版（registry）则一条命令即可。
 
 ---
 
@@ -123,6 +125,17 @@ DSH 官方的「归档」只会把会话从列表隐藏、保留日志；dsh-kit
 - **删除**：从归档集和所有 workspace 的 `sessionIds` 摘除，并删除 `~/.dsh/sessions` 下对应日志目录；**不可恢复，UI 有二次确认**。
 - 操作直接落盘到 `~/.dsh/storages/workspace.json`；dsh 运行期以内存态为准，**操作后需重启 dsh 生效**。
 
+### WebUI 主题商店（dsh-kit-webui）
+
+> 完整验收记录见 [`docs/THEME_STORE_VERIFICATION.md`](docs/THEME_STORE_VERIFICATION.md)。
+
+设置页新增「主题商店」面板。它**不替换官方主题**，而是跑在官方 `ui-theme` 的两个公开扩展点上：
+
+- **全局界面调整**：走官方 `ctx.theme.overrideTokens()` 叠加层——**与主题无关，切到任何主题（含官方浅色/深色/跟随系统）都生效**；每个 token 分别保存浅色/深色两套值，随当前模式自动取值。
+- **主题风格**：走官方 `ctx.theme.register()` + `setTheme()`——每个主题有自己独立的 `--dsw-alias-*` token 集合；预设按「家族」提供深色版 + 浅色版，自定义主题可新建 / 编辑 / 删除。
+- **持久化**：自定义主题与全局调整写入 `~/.dsh/dsh-kit-webui/themes.json`（host 路由 `/dsh-kit-webui/themes` 管理），当前所选主题另存 localStorage；重启 dsh 后自动恢复。
+- **开关**：功能商店面板 / `dsh-kit disable dsh-kit-webui` 可整体停用；停用后设置页不出现该面板，host 路由与 client bundle 一并下线。
+
 ---
 
 ## 💻 开发
@@ -137,7 +150,7 @@ pnpm test              # 测试
 
 > 注意：`pnpm build` 已包含 lan-auth / input-history 的 client bundle；聚合包 `dsh-kit` 的 `lib/client.js` 仍需 `pnpm build:client`（或 `pnpm dev`）产出。换机器/重新 clone 后建议两个都跑一遍。
 > `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
-> 当前各子包暂未配置 `test` 脚本，`pnpm test` 为空跑；CI 已保留测试门禁，后续补充测试会自动生效。
+> `dsh-kit-webui` 已配置 `test` 脚本（9 个测试：预设/持久化/控制器/全局叠加层/host 路由数据），`pnpm test` 会实际执行；其余子包暂未配置，后续补充会自动进入 CI 门禁。
 
 新插件可用官方脚手架生成，再移入 `packages/`：
 
@@ -186,16 +199,16 @@ npm install && npm run dev
 
 ## 📤 发布
 
-**当前版本 `0.2.0`**（2026-08-16）：5 个 npm 包（均 `license: MIT`）：
+**当前版本 `0.2.0`**（2026-08-16）：6 个 npm 包（均 `license: MIT`）：
 
-- `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history`
+- `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history` / `dsh-kit-webui`
 - 满血模式 preset **不是独立 npm 包**，由 `dsh-kit` 内置分发。
 - 根 workspace `private: true`，只承载开发工具链，不发布。
 
 ### GitHub Actions
 
 - **`ci.yml`**：push / PR 自动跑 `pnpm -r build` → `typecheck` → `test`。
-- **`release.yml`**：`workflow_dispatch` 手动触发，默认 **dry-run**（只打包校验，不上传 npm）；把输入改为 `false` 才用 `NPM_TOKEN` 真实发布。发布前会自动校验 5 包版本一致、聚合包依赖指向同版本 `^0.x.0`。
+- **`release.yml`**：`workflow_dispatch` 手动触发，默认 **dry-run**（只打包校验，不上传 npm）；把输入改为 `false` 才用 `NPM_TOKEN` 真实发布。发布前会自动校验 6 包版本一致、聚合包依赖指向同版本 `^0.x.0`。
 
 本地手动发布（仅备选；日常推荐走 CI）：
 
