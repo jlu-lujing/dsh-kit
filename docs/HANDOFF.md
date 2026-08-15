@@ -3,7 +3,7 @@
 > 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 定稿并全部实现——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。剩余待办：发布流程（npm 发布、版本规范）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -130,7 +130,7 @@
 
 ### 待办
 
-- [ ] 发布执行（`npm publish` 4 包）——方案已定案（A2：4 包独立发布 + `dsh-kit install` 一条命令装全家桶），见 README §发布
+- [x] **发布执行**（2026-08-15 完成）：4 包已发布到 npm registry（0.1.0，npm 账号 `dsh-kit`，token bypass-2FA）。发布后 `dsh plugin add -w dsh-kit ...` 从 registry 安装经临时 profile 实测可用。见 README §发布
 
 ## 8. 关键命令速查
 
