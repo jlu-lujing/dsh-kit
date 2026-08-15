@@ -18,17 +18,29 @@ const { join, resolve } = require('node:path')
 
 module.exports = async function afterPack(context) {
   const { appOutDir, packager } = context
+  const resourcesDir = packager.getResourcesDir(appOutDir)
+
+  // 1) 出厂 dsh-runtime
   const src = resolve(__dirname, '..', 'resources', 'dsh-runtime')
-  if (!existsSync(src)) {
+  if (existsSync(src)) {
+    const dest = join(resourcesDir, 'dsh-runtime')
+    cpSync(src, dest, { recursive: true })
+    console.log('[afterPack] dsh-runtime 注入完成 →', dest)
+  } else {
     console.warn(
       '[afterPack] 未找到出厂 runtime 目录（应执行 apps/dsh-runtime 构建后解包到' +
       ' apps/desktop/resources/dsh-runtime），跳过注入：',
       src,
     )
-    return
   }
-  const resourcesDir = packager.getResourcesDir(appOutDir)
-  const dest = join(resourcesDir, 'dsh-runtime')
-  cpSync(src, dest, { recursive: true })
-  console.log('[afterPack] dsh-runtime 注入完成 →', dest)
+
+  // 2) 托盘/窗口图标（打包后 process.resourcesPath 下要能读到 nativeImage）
+  const iconsDir = resolve(__dirname, '..', 'build')
+  for (const name of ['tray-16.png', 'tray-32.png', 'icon.png']) {
+    const from = join(iconsDir, name)
+    if (existsSync(from)) {
+      cpSync(from, join(resourcesDir, name))
+    }
+  }
+  console.log('[afterPack] 图标注入完成 (tray-16/32, icon.png)')
 }

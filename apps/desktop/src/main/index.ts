@@ -7,7 +7,7 @@
  *   → 运行期仅放行同 origin → 退出时优雅停掉自管 dsh 子进程（external 实例不杀）。
  */
 
-import { app, BrowserWindow, shell, dialog } from 'electron'
+import { app, BrowserWindow, shell, dialog, Tray } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -23,6 +23,7 @@ import {
   fetchFeed,
   type UpdateListener,
 } from './updater'
+import { applyAutostart, createTray, windowIconPath, appVersion } from './app-features'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -33,6 +34,7 @@ if (!gotLock) {
 /** 本次壳管理的 dsh 子进程（external 时为 null → 退出不杀） */
 let managed: DshProcess | null = null
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
 let dshUrl: string | null = null
 
 /** 用户数据目录（默认 ~/.dsh，与 CLI 共享 profile/插件/会话） */
@@ -59,6 +61,8 @@ function createWindow(url: string): void {
     height: 820,
     show: false,
     autoHideMenuBar: true,
+    title: `dsh-kit Desktop v${appVersion()}`,
+    icon: windowIconPath(), // 非 darwin 平台窗口图标
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -97,8 +101,47 @@ function externalNav(targetUrl: string): boolean {
   }
 }
 
+function isAutoStartSuffix(): string {
+  return process.env.DSH_DESKTOP_NO_AUTOSTART === '1' ? ' (autostart off)' : ''
+}
+
+/** 当存在托盘且非显式退出时，关闭窗口应驻留后台不退出。 */
+function hasTrayStay(): boolean {
+  return tray !== null && !(app as DeepSeekApp).isQuiting
+}
+
+/** 带自定义标志的 app 类型（isQuiting 由我们维护） */
+interface DeepSeekApp {
+  isQuiting?: boolean
+}
+
+/** 创建托盘（幂等），托盘菜单：显示窗口 / 检查更新 / 退出。 */
+function ensureTray(): void {
+  if (tray) return
+  tray = createTray({
+    onShow: () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.show()
+        mainWindow.focus()
+      } else if (dshUrl) {
+        createWindow(dshUrl)
+      }
+    },
+    onCheckUpdate: () => { void checkForUpdates() },
+    onQuit: () => {
+      (app as DeepSeekApp).isQuiting = true
+      app.quit()
+    },
+  })
+}
+
 async function boot(): Promise<void> {
-  appendLog(`boot: starting, dshHome=${dshHome()}`)
+  appendLog(`boot: starting, dshHome=${dshHome()}${isAutoStartSuffix()}`)
+
+  // 0) 开机自启（默认开；环境变量可关） + 托盘
+  try { applyAutostart(true) } catch { /* 忽略 */ }
+  ensureTray()
 
   // 1) 定位 dsh-runtime
   const runtime = resolveRuntime(app.getPath('userData'))
@@ -136,9 +179,39 @@ async function boot(): Promise<void> {
     // 启动成功后后台非阻塞检查更新（失败只记录，不影响使用）
     checkForUpdates()
   } catch (err) {
-    appendLog(`boot: spawn failed: ${err instanceof Error ? err.message : String(err)}`)
-    dialog.showErrorBox('dsh 启动失败', String(err))
-    app.quit()
+    const msg = err instanceof Error ? err.message : String(err)
+    appendLog(`boot: spawn failed: ${msg}`)
+    // 打磨的错误页：加载 renderer 启动页并把错误写入 query
+    showErrorPage(msg)
+  }
+}
+
+/** 展示启动失败错误页（renderer），并保留进程供用户看日志/重试。 */
+function showErrorPage(message: string): void {
+  try {
+    if (!mainWindow) {
+      mainWindow = new BrowserWindow({
+        width: 1280,
+        height: 820,
+        show: false,
+        autoHideMenuBar: true,
+        title: 'dsh-kit Desktop — 启动失败',
+        webPreferences: {
+          preload: join(__dirname, '../preload/index.mjs'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      })
+      mainWindow.once('ready-to-show', () => mainWindow?.show())
+      mainWindow.on('closed', () => { mainWindow = null })
+    }
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+      query: { error: message },
+    })
+  } catch (pageErr) {
+    // 页面加载也失败时，退回系统错误框
+    dialog.showErrorBox('dsh 启动失败', message)
   }
 }
 
@@ -228,14 +301,23 @@ app.on('second-instance', () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // 有托盘时关闭窗口不退出（驻留后台）；真正退出走托盘菜单/系统退出。
+  if (process.platform !== 'darwin' && !hasTrayStay()) app.quit()
 })
 
 app.on('activate', () => {
   if (mainWindow === null && dshUrl) createWindow(dshUrl)
 })
 
-app.on('before-quit', shutdown)
+app.on('before-quit', () => {
+  (app as DeepSeekApp).isQuiting = true
+  shutdown()
+})
+
+app.on('will-quit', () => {
+  tray?.destroy()
+  tray = null
+})
 
 if (gotLock) {
   void app.whenReady().then(boot)

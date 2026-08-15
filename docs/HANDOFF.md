@@ -3,7 +3,7 @@
 > 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。**桌面客户端开发推进中（`feature/client-wrapper` 分支）**：方案已定稿（`docs/DESKTOP.md`），**M1（dsh-runtime 独立运行时子模块）、M2（Electron 壳 spawn/ready/退出清理）、M3（electron-builder 打包 + 出厂 runtime 注入）、M4（更新 feed + 原子切换 + 回滚）均已落地并真机验证**（见 §7）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。**桌面客户端开发推进中（`feature/client-wrapper` 分支）**：方案已定稿（`docs/DESKTOP.md`），**M1（dsh-runtime 独立运行时子模块）、M2（Electron 壳 spawn/ready/退出清理）、M3（electron-builder 打包 + 出厂 runtime 注入）、M4（更新 feed + 原子切换 + 回滚）、M5（托盘/开机自启/错误页/窗口图标）均已落地并真机验证**（见 §7）。仅签名/公证待 Apple 证书。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -144,8 +144,7 @@
 - [x] **M2：apps/desktop 最小 Electron 壳**（2026-08-15 完成并验证）：electron-vite + electron-builder 工作区。全流程实测：壳启动 → `resolveRuntime` 定位出厂/开发 runtime → 探测 3080（无则复用、有则 self-spawn `web --port 0`）→ 解析 ready 行 → BrowserWindow 加载 loopback URL → 退出 SIGINT/SIGKILL 停子进程无残留。`npm run typecheck` / `build` 全绿
 - [x] **M3：electron-builder 打包**（2026-08-15 完成并验证）：`npm run pack` → `dist/mac-arm64/dsh-kit Desktop.app`。**关键坑**：electron-builder 过滤顶层 node_modules，含 dsh 全依赖树的 runtime 无法用 `extraResources` 原样带入（还易误塞进 asar）；改为**把 `@dsh-kit/dsh-runtime` 移出 shell 的 npm 依赖 + afterPack 钩子（`scripts/afterPack.cjs`）整体拷贝**。验证：`app.asar` 仅 ~12KB、`Resources/dsh-runtime` 220MB 完整，打包 .app 离线自启 dsh → ready → 退出无残留
 - [x] **M4：dsh-runtime 更新链路**（2026-08-16 完成并验证）：新增 `src/main/updater.ts`（fetchFeed / downloadAndVerify / extractRuntime / smokeRuntime / atomicSwitch / rollback / applyUpdate）。**发布物改 `tar.gz`**（Node 内置 zlib + tar-stream 纯 JS 解压，零外部二进制、跨平台含 Windows）。**Node E2E 实测**：起旧 dsh → applyUpdate（file: feed）→ 下载+sha512 校验 → 解压 next/ → 冒烟 node+web --dump-config → 停旧 → 原子切换 → 重启新 dsh ready → 无残留；rollback 核心函数单测通过。壳 boot 后后台 `checkForUpdates()`，feed URL 可 `DSH_DESKTOP_FEED_URL` 覆盖。注：build.smoke/updater 已验，实际更新 feed 发布域名（update.dsh-kit.dev）需发布期配置
-
-## 8. 关键命令速查
+- [x] **M5：托盘 / 开机自启 / 错误页 / 窗口图标**（2026-08-16 完成并验证）：新增 `src/main/app-features.ts`（createTray / applyAutostart / windowIconPath）+ renderer 错误页打磨（爪印 logo + ?error= + 重试）。**logo 取自 dsh web /favicon.svg 爪印**→ build/icon.png(1024) + iconutil 生成本地 icon.icns + tray-16/32.png；afterPack 注入图标。**实测**：正常启动/退出无残留、self-spawn dsh ready、spawn 失败 → loadFile 错误页（进程驻留、无 dsh 残留）、打包产物 Resources 含 icon.icns/tray/icon.png。签名/公证待 Apple Developer ID（当前 pack 走本地 identity 跳过签名）
 
 ```sh
 # 本机访问 dsh web

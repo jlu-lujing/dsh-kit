@@ -1,7 +1,7 @@
 # dsh-kit Desktop 桌面客户端设计
 
 > 更新日期：2026-08-16
-> 状态：M1–M4 已落地并联调（dsh-runtime 子模块 / Electron 壳 / 打包注入 / 更新链路），见 §9
+> 状态：M1–M5 已落地并联调（dsh-runtime 子模块 / Electron 壳 / 打包注入 / 更新链路 / 托盘·自启·错误页），见 §9；签名/公证待证书
 > 分支：`feature/client-wrapper`
 
 ## 1. 定位
@@ -207,6 +207,21 @@ dsh-runtime/
 - 后续可在壳里做“插件管理”页：自己封装 `dsh plugin --profile web ...`，并考虑把
   pnpm 纳入 dsh-runtime（v1 不做）。
 
+### 8.1 M5 实现（托盘 / 开机自启 / 错误页 / 窗口图标，2026-08-16）
+
+- **图标**：logo 取自 dsh web `/favicon.svg`（爪印）→ 光栅化 `build/icon.png`（1024），
+  系统 `iconutil` 生成本地 `build/icon.icns`（避免 electron-builder 联网下转换工具）。
+  `build/tray-16.png` / `tray-32.png` 用于菜单栏托盘。
+- **托盘**：`src/main/app-features.ts#createTray`——菜单栏爪印图标（macOS template image），
+  菜单：显示窗口 / 检查更新 / 退出；有托盘时关闭窗口驻留后台（`app.isQuiting` 显式退出）。
+- **开机自启**：`applyAutostart()`（`app.setLoginItemSettings`），默认开，
+  `DSH_DESKTOP_NO_AUTOSTART=1` 可关（测试/开发）。
+- **错误页**：dsh 启动失败时不弹系统框直接退出，而是 `loadFile(out/renderer/index.html,
+  { query: { error } })` 展示带爪印 logo 的错误页 + 重试按钮，进程驻留便于看日志。
+  boot 成功前 renderer 兜底为“正在启动”状态页。
+- **窗口图标**：`BrowserWindow({ icon, title: v${version} })`，打包后
+  `process.resourcesPath/icon.png` 由 afterPack 注入。
+
 ## 9. 阶段计划
 
 | 阶段 | 内容 | 完成标志 |
@@ -215,7 +230,7 @@ dsh-runtime/
 | M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | ✅ self-spawn → ready URL → 窗口加载；退出后子进程无残留（2026-08-15 实测） |
 | M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-kit Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
 | M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | ✅ `src/main/updater.ts` 全链路（feed→下载+sha512→纯 JS 解压→冒烟→原子切换→重启→回滚）Node E2E 实测通过（2026-08-16）；发布物 tar.gz 无外部二进制依赖 |
-| M5 | 签名/公证、托盘、开机自启、错误页打磨 | 可对外发布 |
+| M5 | 签名/公证、托盘、开机自启、错误页打磨 | ✅ 托盘/开机自启/错误页/窗口图标已实现并验证（2026-08-16，见 §8.1）；签名/公证待 Apple Developer ID 证书 |
 | 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
 
 ## 10. 不侵入 dsh 的边界
