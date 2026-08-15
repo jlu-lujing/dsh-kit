@@ -39,10 +39,13 @@ if (cmd === 'enable' || cmd === 'disable') {
 }
 
 if (cmd === 'install') {
-  // One command brings the whole family into a profile. dsh-kit is the only
-  // install target: it declares the four feature packages as npm
-  // dependencies, so `dsh plugin add dsh-kit` installs them (hoisted into the
-  // profile root node_modules) and its own patch mounts all five rows.
+  // Install the whole family into a profile. This command only makes sense on
+  // a system that ALREADY has the `dsh-kit` CLI installed (its bin is on
+  // PATH) — a brand-new machine must first add dsh-kit itself via:
+  //   dsh plugin --profile <name> add -w dsh-kit
+  // Under the hood this is exactly that same command: dsh-kit declares the
+  // three feature packages as npm dependencies (hoisted into the profile), and
+  // the 满血模式 preset is bundled inside dsh-kit (no separate package).
   //   dsh-kit install [--profile <name>] [extra add flags...]
   const rest = args.slice(1)
   let profile = 'web'
@@ -53,7 +56,7 @@ if (cmd === 'install') {
     passthrough.push(a)
   }
   const dshArgs = ['plugin', '--profile', profile, 'add', '-w', ...passthrough, 'dsh-kit']
-  console.log(`dsh-kit: installing family into profile "${profile}": dsh-kit + 4 feature deps`)
+  console.log(`dsh-kit: installing family into profile "${profile}": dsh-kit + 3 feature deps`)
   const res = spawnSync('dsh', dshArgs, { stdio: 'inherit' })
   process.exit(res.status ?? 1)
 }

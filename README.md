@@ -39,14 +39,17 @@
 
 ## 🚀 快速开始
 
-### 方式一：发布版（一条命令装全家桶）
+### 方式一：发布版（全新系统装全家桶）
+
+装一个包 = 用 DSH 的原生插件命令把 `dsh-kit` 加进某个 profile：
 
 ```sh
-dsh-kit install            # 装进默认 web profile
-# 等价于: dsh plugin --profile web add -w dsh-kit
+dsh plugin --profile web add -w dsh-kit
 ```
 
-只需要 `dsh-kit` 一个包，pnpm 会把 3 个功能包作为依赖自动带出，满血模式 preset 由 dsh-kit 内置——真正的「装一个包，全家桶开箱即用」。
+`dsh-kit` 声明 3 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
+
+> 💡 **关键**：`dsh-kit install` 这个命令**并不是**全新系统的入口。它内部只是执行上面这条 `dsh plugin ... add -w dsh-kit`；而要运行 `dsh-kit` 命令，你**得先装上 `dsh-kit` 这个 npm 包**（它的 `bin` 才会进入 PATH）。全新系统请直接用上面的 `dsh plugin` 命令；`dsh-kit install` 更适合「dsh-kit 已装到某环境、想在其它 profile 补装 / 重装」的场景。
 
 ### 方式二：本地源码调试（推荐隔离环境）
 
@@ -76,10 +79,11 @@ dsh web
 装好全家桶后，用 `dsh-kit` 命令管理各功能开关：
 
 ```sh
-dsh-kit list                # 列出所有功能及状态
-dsh-kit enable notifier     # 启用桌面通知
-dsh-kit disable scheduler   # 停用定时任务
-dsh-kit install [--profile <p>]   # 一条命令装全家桶（默认 web）
+dsh-kit list                                        # 列出所有功能及状态
+dsh-kit enable notifier                             # 启用桌面通知
+dsh-kit disable scheduler                           # 停用定时任务
+dsh-kit install [--profile <p>]                     # 把全家桶装进指定 profile（默认 web）
+# 注：需要系统里已有 dsh-kit 命令；全新系统请用: dsh plugin --profile web add -w dsh-kit
 ```
 
 - 状态保存在 `~/.dsh/dsh-kit/state.json`，**重启后保留**。
