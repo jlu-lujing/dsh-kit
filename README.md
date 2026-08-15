@@ -115,6 +115,14 @@ dsh-kit install [--profile <p>]                     # 把全家桶装进指定 p
 - 网络受限时自动回退到包内置快照；可配置 `GITHUB_TOKEN` 提升 GitHub API 限流（未认证 10 次/分钟 → 认证 30 次/分钟）。
 - 目录抓取策略参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）。
 
+### 归档会话管理
+
+DSH 官方的「归档」只会把会话从列表隐藏、保留日志；dsh-kit 在设置页新增「归档会话」面板，补齐恢复与彻底删除：
+
+- **恢复**：把会话从 `archivedSessionIds` 移除，回到原工作区分组。
+- **删除**：从归档集和所有 workspace 的 `sessionIds` 摘除，并删除 `~/.dsh/sessions` 下对应日志目录；**不可恢复，UI 有二次确认**。
+- 操作直接落盘到 `~/.dsh/storages/workspace.json`；dsh 运行期以内存态为准，**操作后需重启 dsh 生效**。
+
 ---
 
 ## 💻 开发
@@ -129,6 +137,7 @@ pnpm test              # 测试
 
 > 注意：`pnpm build` 已包含 lan-auth / input-history 的 client bundle；聚合包 `dsh-kit` 的 `lib/client.js` 仍需 `pnpm build:client`（或 `pnpm dev`）产出。换机器/重新 clone 后建议两个都跑一遍。
 > `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
+> 当前各子包暂未配置 `test` 脚本，`pnpm test` 为空跑；CI 已保留测试门禁，后续补充测试会自动生效。
 
 新插件可用官方脚手架生成，再移入 `packages/`：
 

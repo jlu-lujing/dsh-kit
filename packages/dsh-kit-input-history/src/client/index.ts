@@ -146,12 +146,24 @@ function InputHistoryDock(props: Record<string, unknown>): unknown {
 
       if (isUp) {
         if (cursor === null) {
-          if (value.trim() === '') cursor = history.length - 1
-          else cursor = history.indexOf(value)
+          // 首次按 ↑：从空输入直接取最新一条历史（不再递减）；若输入框
+          // 已有文本，先定位到该文本在历史中的位置，未命中则当最新条处理。
+          if (value.trim() === '') {
+            cursor = history.length - 1
+          } else {
+            cursor = history.indexOf(value)
+            if (cursor === -1) cursor = history.length - 1
+          }
+          cursorRef.current = cursor
+          inputActions.setDraft(history[cursor])
+          e.preventDefault()
+          e.stopImmediatePropagation()
+          return
         }
-        if (cursor === null) cursor = history.length - 1
-        else if (cursor > 0) cursor -= 1
-        else {
+        // 已在浏览历史：↑ 向更旧的条目移动。
+        if (cursor > 0) {
+          cursor -= 1
+        } else {
           // 已到最旧一条：不阻止（让浏览器默认光标行为接管）。
           cursorRef.current = cursor
           return
