@@ -22,14 +22,16 @@
     "lib/*.js.map",
     "bin/dsh-kit.mjs",
     "cordis.patch.yml",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "preset/**/*",
+    "ecosystem-fallback.json"
   ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
-    "dsh-anchored-standard": "^0.1.0",
+    "dsh-kit-input-history": "^0.1.0",
     "dsh-kit-lan-auth": "^0.1.0",
     "dsh-kit-notifier": "^0.1.0",
     "dsh-kit-scheduler": "^0.1.0"

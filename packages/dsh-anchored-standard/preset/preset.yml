@@ -1,3 +1,0 @@
-name: 锚定标准
-description: 二阶段 Agent 预设：先用极简工具对（bash + str_replace_editor）引导，首次工具调用或回复后开放完整标准工具目录。
-order: 5

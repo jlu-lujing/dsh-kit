@@ -1,75 +1,125 @@
+<div align="center">
+
 # dsh-kit
 
-DeepSeek Harness (DSH) 傻瓜式插件全家桶 —— 装一个包，所有功能开箱即用。
+**DeepSeek Harness (DSH) 傻瓜式插件全家桶**
 
-## 定位
+装一个包，所有功能开箱即用。
 
-- **开箱即用**：一条命令装好，无需手动配置
+`MIT License` · Language: [Chinese](#) · Powered by [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+
+</div>
+
+---
+
+## ✨ 项目定位
+
+`dsh-kit` 是一个 **DSH 插件聚合包**，目标是「傻瓜式」——一条命令装好，无需手动配置。
+
+- **开箱即用**：一条命令装好全家桶，无需手动配置
 - **全家桶**：工具、UI 增强、自动化等插件全部打包在一起
-- **可拔插**：每个功能是独立子包，可单独装、单独卸
+- **可拔插**：每个功能是独立子包（或内置模块），可单独装、单独卸、随时开关
+- **可扩展**：功能商店面板一键管理启停
 
-## 结构
+---
 
 ```
 dsh-kit/
 ├── packages/            # 各功能插件（dsh 前缀，官方 bundle 规范，npm 发布线）
 ├── apps/
 │   ├── dsh-runtime/     # 桌面端内置 dsh 独立运行时子模块（自带 Node + @deepseek-ai/dsh 全依赖树）
-│   └── desktop/         # Electron 壳（尚未实现，方案见 docs/DESKTOP.md）
+│   └── desktop/         # Electron 壳（桌面客户端，见 docs/DESKTOP.md）
 ├── .gitignore
 ├── package.json         # workspace 根
 ├── pnpm-workspace.yaml  # pnpm workspace
 └── README.md
 ```
 
-## 快速开始
+## 📦 功能清单
+
+| 组件 | 功能 | 说明 |
+| --- | --- | --- |
+| `dsh-kit` | 聚合底座 | host 管理 CLI + 设置页「功能商店」+ 内置 preset 管理器 |
+| `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知（macOS/Linux/Windows），零 npm 依赖 |
+| `dsh-kit-scheduler` | 定时任务 | cron 定时任务 + 持久化 + 管理路由（支持 shell 命令） |
+| `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
+| `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
+| `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
+| GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
+
+> 💡 满血模式不是独立 npm 包，由 `dsh-kit` 内置打包分发（详见下方「借鉴」）。
+
+---
+
+## 🚀 快速开始
+
+### 方式一：发布版（全新系统装全家桶）
+
+装一个包 = 用 DSH 的原生插件命令把 `dsh-kit` 加进某个 profile：
+
+```sh
+dsh plugin --profile web add -w dsh-kit
+```
+
+`dsh-kit` 声明 4 个功能包为 npm 依赖（pnpm 自动带出、hoist 进 profile），满血模式 preset 由 dsh-kit 内置——真正「装一个包，全家桶开箱即用」。
+
+> 💡 **关键**：`dsh-kit install` 这个命令**并不是**全新系统的入口。它内部只是执行上面这条 `dsh plugin ... add -w dsh-kit`；而要运行 `dsh-kit` 命令，你**得先装上 `dsh-kit` 这个 npm 包**（它的 `bin` 才会进入 PATH）。全新系统请直接用上面的 `dsh plugin` 命令；`dsh-kit install` 更适合「dsh-kit 已装到某环境、想在其它 profile 补装 / 重装」的场景。
+
+### 方式二：本地源码调试（推荐隔离环境）
 
 ```sh
 # 1. 安装依赖并构建
 pnpm install
 pnpm build
+pnpm build:client    # 产 client bundle（有 dsh.client 的包必须跑）
 
-# 2. 安装全家桶到 dev profile（推荐开发隔离，不污染 web）
-#    发布版：装 dsh-kit 一个包即带出全家桶（它声明 4 个功能包为依赖，聚合 patch 挂载全部 5 行）
-#    本地源码：dsh-kit 用 link: 装入时不解析依赖，需连同 4 个功能包一起 link（见下）
+# 2. 装进 dev profile（link: 不解析依赖，需 4 包一起 link）
 dsh plugin --profile dev add -w \
   ~/workspace/dsh-kit/packages/dsh-kit \
   ~/workspace/dsh-kit/packages/dsh-kit-notifier \
   ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
-  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
-  ~/workspace/dsh-kit/packages/dsh-anchored-standard
+  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
 
 # 3. 启动 dsh web
 dsh web
 ```
 
-> **只装 dsh-kit = 全家桶**（发布后）：`dsh plugin add dsh-kit` 即带出全员——pnpm 把 4 个功能包作为依赖 hoist 进 profile 顶层 node_modules，dsh-kit 的聚合 patch 挂载全部 5 个功能行。
-> **本地源码（link:）需 5 包一起 add**：`link:` 协议不解析依赖（HANDOFF #9），所以源码调试 profile 里要像上面那样把 5 个包都 link。发布后无需此步。
+> **本地源码为什么 4 包一起 link？** `link:` 协议不解析依赖（见 `docs/HANDOFF.md`），所以源码调试要显式 link 全部子包；发布版（registry）则一条命令即可。
 
-## 插件管理
+---
 
-装好全家桶后，用 `dsh-kit` 命令管理各功能开关（状态存 `~/.dsh/dsh-kit/state.json`，重启保留）：
+## 🛠️ 插件管理
+
+装好全家桶后，用 `dsh-kit` 命令管理各功能开关：
 
 ```sh
-dsh-kit list                # 列出所有功能及状态
-dsh-kit enable notifier     # 启用桌面通知
-dsh-kit disable scheduler   # 停用定时任务
-dsh-kit install             # 一条命令把全家桶装进 profile（发布后，默认 web）
-dsh-kit install --profile dev   # 装进指定 profile
+dsh-kit list                                        # 列出所有功能及状态
+dsh-kit enable notifier                             # 启用桌面通知
+dsh-kit disable scheduler                           # 停用定时任务
+dsh-kit install [--profile <p>]                     # 把全家桶装进指定 profile（默认 web）
+# 注：需要系统里已有 dsh-kit 命令；全新系统请用: dsh plugin --profile web add -w dsh-kit
 ```
 
-> `dsh-kit install` 内部执行 `dsh plugin --profile <p> add -w dsh-kit`（发布后 dsh-kit 的依赖自动带出 4 个功能包）。
-> 发布前（本地路径安装）不用此命令，见下方[快速开始](#快速开始)。
+- 状态保存在 `~/.dsh/dsh-kit/state.json`，**重启后保留**。
+- 每个功能的启停由聚合 patch 里的动态表达式读状态文件决定，**无需编辑任何 patch 文件**。
+- 也可以通过设置页「功能商店」面板一键点按开关。
 
-每个功能的 `disabled` 由聚合 patch 里的动态表达式读状态文件决定，**无需编辑任何 patch 文件**。
+### GitHub 生态目录（只读展示）
 
-## 开发
+功能商店底部会展示 GitHub `topic:dsh-plugin` 生态仓库，按 **Star 数降序**排列，点击卡片打开仓库主页（安装方式各不相同，请以各仓库 README 为准，暂不提供一键安装）。
+
+- 首次打开先秒出 Top 100，随后后台补全完整目录并写入 30 分钟磁盘缓存。
+- 网络受限时自动回退到包内置快照；可配置 `GITHUB_TOKEN` 提升 GitHub API 限流（未认证 10 次/分钟 → 认证 30 次/分钟）。
+- 目录抓取策略参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）。
+
+---
+
+## 💻 开发
 
 ```sh
 pnpm dev              # 双 watch：client 热构建（改面板即时生效）+ host tsc watch（自动重编译，重启 dsh 生效）
-
 pnpm build             # 全量构建（tsc，host 端）
-pnpm build:client      # 产 client bundle（tsdown，lib/client.js）—— 有 dsh.client 的包必须跑，否则浏览器报 failed to load
+pnpm build:client      # 产 client bundle（tsdown，lib/client.js）
 pnpm typecheck         # 类型检查
 pnpm test              # 测试
 ```
@@ -77,70 +127,67 @@ pnpm test              # 测试
 > 注意：`pnpm build` 只编译 host 端；client 插件（如 lan-auth 的 `src/client/`）要产 `lib/client.js` 需另跑 `pnpm build:client` 或 `pnpm dev`。换机器/重新 clone 后两个都要跑。
 > `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
 
-新插件用官方脚手架生成，再移入 `packages/`：
+新插件可用官方脚手架生成，再移入 `packages/`：
 
 ```sh
 npx create-dsh-plugin my-plugin -t tool
 ```
 
-## 插件清单
+---
 
-| 包 | 功能 | 状态 |
-| --- | --- | --- |
-| `dsh-kit` | 聚合包（host + 商店服务 + 设置面板） | 已通：host 管理路由 + 设置页「功能商店」面板 |
-| `dsh-kit-notifier` | 桌面通知 | 已实现：监听回合结束，跨平台通知（macOS/Linux/Windows） |
-| `dsh-kit-scheduler` | 定时任务 | 已实现：cron 任务 + 持久化 + 管理路由（支持 shell 命令） |
-| `dsh-kit-lan-auth` | 局域网鉴权网关（HTTPS 反向代理 + token/登录，默认关闭） | 已实现并验证：私有 CA 自动生成 + 登录页 CA 下载引导（.crt）、token 过期（静态 30 天/会话 12h 滑动）、登录爆破限速、登出吊销、远程可用性（标记头剥离 / WS 隧道 / browse 选择器注入） |
-| `dsh-anchored-standard` | 二阶段 agent preset（`bash`/`str_replace_editor` 引导 → Standard 工具目录，社区算法） | 内置为文件安装器，默认开启；随全家桶自动安装 preset 到 `~/.dsh/.agent-presets/anchored-standard` |
+## 🔒 局域网远程访问（dsh-kit-lan-auth）
 
-> 全家桶安装（一条命令带进全部，发布后）：
-> ```sh
-> dsh plugin --profile web add -w dsh-kit
-> ```
-> dsh-kit 声明 4 个功能包为 npm 依赖，聚合 patch 挂载全部 5 个功能行；装 dsh-kit 一个包即全家桶。详见 `docs/ARCHITECTURE.md`。
-> 本地源码（`link:`）调试时需 5 包一起 add（link 不解析依赖），见[快速开始](#快速开始)。
->
-> 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；dsh-kit-lan-auth 会在启用时自动注入 browse 目录选择器（无需改 profile 配置），远程浏览器内弹 web 选择器而非宿主原生窗口。
->
-> 证书（零配置）：首启自动生成私有 CA（`ca.pem` 根 + 叶子 `key.pem`/`cert.pem`，SAN 覆盖本机全部局域网 IP）。设备首次访问在登录页会看到「下载根证书永久免警告」引导（`.crt`），装一次后该设备免警告；不装也能用（浏览器点一次「继续访问」）。管理：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`。
+启用后，局域网设备经 `https://<主机IP>:3443` + token 访问：
 
-## 桌面客户端（开发中）
+## 桌面客户端（桌面软件，`feature/client-wrapper` 分支）
 
-`feature/client-wrapper` 分支：独立桌面软件（Electron 壳 + 内置 dsh-runtime 子模块，用户无需单独装 dsh）。方案见 `docs/DESKTOP.md`。
+独立桌面软件（Electron 壳 + 内置 dsh-runtime 子模块，用户无需单独装 dsh）。方案见 `docs/DESKTOP.md`。
 
-- **M1 已落地**：`apps/dsh-runtime` 可从本机已验证 dsh 构建出独立运行时 zip（`dsh-runtime-<dshVersion>-<platform>-<arch>.zip`，zstd ~32MB，含 dsh 全依赖树），`scripts/smoke.mjs` 冒烟通过（spawn web → ready 行 → GET 200 + `__DSH_BOOT__`）。
+- **M1–M5 已落地并真机验证**（2026-08-16）：
+  - `apps/dsh-runtime`：从本机已验证 dsh 构建独立运行时（自带 Node？当前走 Electron 内置 Node 方案 A；`build.mjs --skip-node-download` 本地用）+ `scripts/smoke.mjs` 冒烟
+  - `apps/desktop`：Electron 壳（electron-vite + electron-builder），spawn/就绪 URL/BrowserWindow/退出清理、托盘、开机自启、错误页、更新链路（feed + sha512 + 原子切换 + 回滚）
   ```sh
   cd apps/dsh-runtime
-  node scripts/build.mjs --skip-node-download   # 构建 zip（官方 Node 二进制下载待接线，见 build.mjs）
+  node scripts/build.mjs --skip-node-download   # 构建 runtime zip（官方 Node 二进制下载待接线，见 build.mjs）
   node scripts/smoke.mjs                        # 冒烟验证
-  node --test 'test/*.test.mjs'                 # 测试
+  cd ../desktop && npm install && npm run dev   # 启动 Electron 壳
   ```
-- **M2（Electron 壳）尚未实现**：spawn / 就绪 URL / BrowserWindow / 退出清理。
+- **证书（零配置，lan-auth）**：首启自动生成私有 CA（根 `ca.pem` + 叶子，SAN 覆盖本机全部局域网 IP）。登录页引导下载 `.crt` 永久免警告。
+- **安全模型**：本机 loopback 免登录直通；局域网需有效 token 或账号密码登录；管理路由仅本机可达。
+- **管理**：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`
 
 ## 发布
 
-- **已发布**（2026-08-15）：5 个包均已发布到 npm registry（`0.1.0`）：
-  - `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-anchored-standard`（均 `license: MIT`）
-  - 根 workspace `private: true`，只承载开发工具链，不发布。
-- **安装（发布后）**：
-  ```sh
-  dsh-kit install            # 一条命令装全家桶（默认 web profile）
-  # 等价于: dsh plugin --profile web add -w dsh-kit（依赖自动带出 4 个功能包）
-  ```
-- **更新发布**：`cd packages/<pkg> && npm publish`（5 包各自发布；已构建 `lib/` 随包带出；改版本号后重发）。
-- **架构说明**：`dsh-kit` 为聚合 bundle（管理 CLI + 功能商店 + 挂载 5 个功能行 + 声明子包依赖）；4 个功能包为**纯库**（不含 patch，行由 dsh-kit 挂载），发布后装 dsh-kit 即全家桶。
+---
+
+## 📤 发布
+
+**已发布**（2026-08-15）：5 个 npm 包（`0.1.0`，均 `license: MIT`）：
+
+- `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history`
+- 满血模式 preset **不是独立 npm 包**，由 `dsh-kit` 内置分发。
+- 根 workspace `private: true`，只承载开发工具链，不发布。
+
+更新某个包：
+
+```sh
+cd packages/<pkg> && npm publish    # 4 包各自发布；已构建 lib/ 随包带出；改版本号后重发
+```
+
+架构详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、开发坑位详见 [`docs/HANDOFF.md`](docs/HANDOFF.md)。
+
+---
+
+## 📚 借鉴与许可
+
+- **满血模式 preset** 的算法与文件集合**借鉴**自社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。dsh-kit 以自研的导入/删除管理器（`src/preset.ts`）内置并注明借鉴。
+- **GitHub 生态目录**的分片抓取 / 缓存思路参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）；dsh-kit 只取展示能力，不做安装。
+  - 简介：首次请求用 Minimal 工具对（`bash` / `str_replace_editor`），首次持久晋升信号后开放完整工具目录。
+  - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除。
 
 ## License
 
-MIT
+本项目遵循 [MIT License](LICENSE)。
 
-## 引用 / 参考（Authors）
-
-本仓库 `refs/` 目录只用于本地参考浏览，不进 git（根 `.gitignore` 已忽略 `refs/`）。
-
-**内置功能包：dsh-anchored-standard**（二阶段 DeepSeek Harness agent preset）
-- 上游仓库：[xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)
-- 简介：首次模型请求使用 Minimal 对齐的 system prompt + Minimal 真实工具对（`bash` / `str_replace_editor`，不注入工作区/技能上下文），首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放 Standard 完整工具目录。
-- 全家桶接入：`packages/dsh-anchored-standard/` 内置文件系统安装器，随全家桶**默认开启**，自动安装 preset 到 `~/.dsh/.agent-presets/anchored-standard`；若需关闭用 `dsh-kit disable dsh-anchored-standard`。
-- 参考副本（本地参考用，不进 git）：`refs/dsh-anchored-standard/`
-- 许可：MIT（含 DeepSeek 的 MIT 声明，详见上游 `LICENSE` / `NOTICE`；本项目以安装器形式内置并注明来源）。
+- Copyright (c) 2026 **Lu Jing**
+- 满血模式 preset 部分借鉴自社区 [dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 声明）。

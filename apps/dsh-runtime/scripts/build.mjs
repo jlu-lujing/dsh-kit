@@ -28,6 +28,9 @@ const require = createRequire(import.meta.url)
 const pkgRoot = fileURLToPath(new URL('..', import.meta.url))
 const outDir = join(pkgRoot, 'out')          // <pkg>/out
 const skipNodeDownload = process.argv.includes('--skip-node-download')
+// 更新发布物格式：默认 zstd-tar（M1，扩展名 .zip）；--tar-gz 额外产出 gzip tar
+// （M4 更新链路使用，壳内置 Node 纯 JS 可解压、零外部二进制）。
+const tarGz = process.argv.includes('--tar-gz')
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                              */
@@ -138,9 +141,8 @@ writeFileSync(join(staging, 'VERSION'), `${dsh.version}\n`)
 
 mkdirSync(outDir, { recursive: true })
 const base = `dsh-runtime-${dsh.version}-${platform}-${arch}`
-const zipPath = join(outDir, `${base}.zip`)
-const tmpZip = join(outDir, `.${base}.tmp-${process.pid}`)
-rmIfExists(tmpZip)
+const tmpTar = join(outDir, `.${base}.tmp-${process.pid}`)
+rmIfExists(tmpTar)
 
 const zstd = hasZstd()
 if (zstd) console.log('[build] using zstd compression')
@@ -148,16 +150,32 @@ const tar = spawnSync('tar', [
   ...(zstd ? ['--use-compress-program=zstd -3 -T0'] : ['-z']),
   '--exclude=**/*.map',
   '--exclude=**/*.tsbuildinfo',
-  '-cf', tmpZip, '-C', staging, '.',
+  '-cf', tmpTar, '-C', staging, '.',
 ], { stdio: 'inherit' })
 if (tar.status !== 0) throw new Error(`tar failed: ${tar.status}`)
 
+// 产出标准发布物：dsh-runtime-<v>-<platform>-<arch>.zip（zstd 或 gzip）
+const zipPath = join(outDir, `${base}.zip`)
 rmIfExists(zipPath)
-cpSync(tmpZip, zipPath)
-rmIfExists(tmpZip)
+cpSync(tmpTar, zipPath)
+
+// --tar-gz：额外产出 gzip tar（M4 更新链路纯 JS 可解，Windows 无需 zstd）。
+let gzPath = null
+if (tarGz) {
+  gzPath = join(outDir, `${base}.tar.gz`)
+  const gz = spawnSync('tar', [
+    '--exclude=**/*.map',
+    '--exclude=**/*.tsbuildinfo',
+    '-czf', gzPath, '-C', staging, '.',
+  ], { stdio: 'inherit' })
+  if (gz.status !== 0) throw new Error(`tar.gz failed: ${gz.status}`)
+}
+
+rmIfExists(tmpTar)
 rmIfExists(staging)
 
 console.log(`[build] done → ${zipPath} (${fmt(statSync(zipPath).size)})`)
+if (gzPath) console.log(`[build] done → ${gzPath} (${fmt(statSync(gzPath).size)})`)
 console.log('[build] runtime.json:', JSON.stringify(runtime))
 
 /* ------------------------------------------------------------------ */

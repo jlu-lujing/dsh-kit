@@ -57,11 +57,13 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 dsh-kit/
 ├── packages/
 │   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI（持有全部功能行 + 子包依赖）
-│   │   ├── package.json         #   dsh.bundle.patch + 4 个功能包 dependencies + bin: dsh-kit
-│   │   ├── cordis.patch.yml     #   insert 全部 5 行（自身 + 4 功能，各带动态 disabled 表达式）+ directory-picker 禁用
+│   │   ├── package.json         #   dsh.bundle.patch + 3 个功能包 dependencies + bin: dsh-kit
+│   │   ├── cordis.patch.yml     #   insert 全部 4 行（自身 + 3 功能，各带动态 disabled 表达式）+ directory-picker 禁用
 │   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable / install
+│   │   ├── preset/              #   内置满血模式 preset 文件（agent.cordis.yml + 各 .mjs + preset.yml）
 │   │   └── src/
-│   │       ├── index.ts         #   host 插件：dshKit.store service + 管理路由
+│   │       ├── index.ts         #   host 插件：dshKit.store service + 管理路由 + preset 自动导入
+│   │       ├── preset.ts        #   自研 preset 导入/删除管理器（import/delete，非破坏性）
 │   │       ├── store.ts         #   功能元数据 + 清单
 │   │       ├── state.ts         #   状态文件读写（~/.dsh/dsh-kit/state.json）
 │   │       └── client/          #   「功能商店」设置面板
@@ -74,7 +76,6 @@ dsh-kit/
 │   │   ├── src/store.ts         #   用户/token 持久化 + TTL 过期 + 爆破限速 + 登出吊销
 │   │   ├── src/cert.ts          #   私有 CA 自动生成（root + leaf，SAN 覆盖本机 IP）+ initPrivateCa
 │   │   └── src/client/          #   webui 设置页（token/用户）+ 远程登出按钮
-    └── dsh-anchored-standard/        # 二阶段 agent preset（bash/str_replace_editor 引导 → Standard 工具目录）—— preset 安装器，行在聚合 patch 里
 └── docs/
     ├── ARCHITECTURE.md          # 本文档
     └── HANDOFF.md               # 交接文档
@@ -85,19 +86,18 @@ dsh-kit/
 ### 5.1 安装
 
 ```sh
-# 发布后：装 dsh-kit 一个包 = 全家桶（它声明 4 个功能包为依赖，聚合 patch 挂载全部 5 行）
+# 发布后：装 dsh-kit 一个包 = 全家桶（它声明 3 个功能包为依赖，聚合 patch 挂载全部 4 行）
 dsh plugin --profile web add -w dsh-kit
 
-# 本地源码（link: 不解析依赖）：5 包一起 link 进 dev profile
+# 本地源码（link: 不解析依赖）：4 包一起 link 进 dev profile
 dsh plugin --profile web add -w \
     ~/workspace/dsh-kit/packages/dsh-kit \
     ~/workspace/dsh-kit/packages/dsh-kit-notifier \
     ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
-    ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
-    ~/workspace/dsh-kit/packages/dsh-anchored-standard
+    ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
 ```
 
-- 发布版 `pnpm add dsh-kit` → pnpm 把 4 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`，全家桶全部加载。
+- 发布版 `pnpm add dsh-kit` → pnpm 把 3 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`，全家桶全部加载。满血模式 preset 由 dsh-kit 内置分发，无需额外包。
 - dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务
 
 ### 5.1.1 关键约束：行的唯一归属（聚合包持有全部行）
@@ -275,26 +275,25 @@ token 通过 webui 设置页（settings.section「局域网鉴权」）或本机
 - 调度：每秒 tick 检查到期任务（含分钟级防重复触发护栏）；任务命令走 `/bin/sh -c`（支持管道/变量）
 
 
-## 12. 二阶段 Agent Preset（dsh-anchored-standard）
+## 12. 二阶段 Agent Preset（满血模式，内置）
 
-> 采纳来源：社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。本地参考副本：`refs/dsh-anchored-standard/`。
+> **借鉴**：本 preset 的算法与文件集合借鉴自社区项目
+> [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)
+> （MIT，含 DeepSeek 声明）。本地参考副本：`refs/dsh-anchored-standard/`。
 
 ### 定位
 
-- 形态是 DSH **agent preset**（`~/.dsh/.agent-presets/anchored-standard`），不是 Cordis bundle 插件；不是 `dsh plugin add` 能装的普通包，需由安装器把 preset 目录复制进用户 preset 根。
-- 二阶段策略：首次模型请求用 Minimal 对齐的 system prompt + Minimal 真实工具对（持久 `bash` + `str_replace_editor`，不含工作区/技能自动上下文）；首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放 Standard 完整工具目录。
+- 形态是 DSH **agent preset**（`~/.dsh/.agent-presets/anchored-standard`），不是 Cordis bundle 插件；不是 `dsh plugin add` 能装的普通包，由 dsh-kit 内置的导入/删除管理器把 preset 文件复制进用户 preset 根。
+- 二阶段策略：首次模型请求用 Minimal 对齐的 system prompt + Minimal 真实工具对（持久 `bash` + `str_replace_editor`，不含工作区/技能自动上下文）；首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放完整工具目录。
 
-### 全家桶接入方式
+### 全家桶接入方式（自研导入/删除管理器，已剥离独立包）
 
-- `dsh-kit` 聚合 patch 新增 `- id: dsh-anchored-standard` 行，以文件系统安装器（`packages/dsh-anchored-standard/index.mjs`）作为 loader entry；可控开关（默认**开启**）与现有全家桶相同：状态文件 + 动态 `disabled` 表达式。
-- `dsh-kit` 声明 `dsh-anchored-standard` 为 npm 依赖，发布后 `dsh plugin add dsh-kit` 仍「一个包全家桶」。
-- 行激活时安装器把自带 preset 文件复制到 `~/.dsh/.agent-presets/anchored-standard`；crash/重启/临时状态均按需幂等重新复制，无副作用。
-- 不碰 dsh 官方 profile/`.agent-presets` 结构；从不导入宿主模块，单文件零依赖，跨平台复制。
-
-### 为何不是“纯库 + 聚合 patch 持有行”
-
-- preset 本体是**文件目录**而不是 npm 可解析的 JS 包：`name: ./xxx.mjs` 的相对行无法跨数组目录解析成聚合包里的文件。
-- 所以采取「文件系统安装器 + bundle 行」的组合：bundle 行只负责开关与生命周期，preset 文件随包分发、由安装器落到 preset 根。
+- **不再有独立的 `dsh-anchored-standard` npm 包**。preset 文件内置在 `packages/dsh-kit/preset/`，随 dsh-kit 包分发。
+- `packages/dsh-kit/src/preset.ts` 是自研的**导入/删除管理器**：`installPreset`（导入，幂等、非破坏性，绝不覆盖已有目标）、`uninstallPreset`（删除）、`isInstalled`（查询）。
+- `dsh-kit` host `apply()` 在功能启用时自动调用 `installPreset` 导入；功能商店的 HTTP 路由提供手动 导入/删除 操作。
+- 可控开关（默认**开启**）沿用状态文件（`dsh-kit disable dsh-anchored-standard` / 商店启停）；但 preset **不再作为 Cordis loader 行**存在（无需可解析 npm 包）。
+- 导入行为幂等：目标已存在时不覆盖（保留用户修改）；全新导入先复制到隐藏 staging 再 rename 落位，崩溃不留半个 preset。
+- 不碰 dsh 官方 profile/`.agent-presets` 结构；从不导入宿主模块，纯文件 I/O。
 
 ## 13. 参考
 
