@@ -8,7 +8,8 @@
  * action in `sidebar.footer.action`. The gateway revokes the session token and
  * clears the cookie, returning the browser to its login page.
  */
-import { createElement, useEffect, useState } from 'react'
+import { Fragment, createElement, useEffect, useState } from 'react'
+import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 
 export const name = 'dsh-kit-lan-auth'
@@ -158,15 +159,19 @@ function LanAuthPage() {
  * 14px label in wide mode and a centered 36px round icon in the collapsed rail.
  * It uses the web app's `--dsw-*` tokens so it re-skins with the theme.
  *
- * Clicking revokes the current session token (the gateway route invalidates
- * it) and clears the session cookie, then walks the browser back to the login
- * page.
+ * Clicking asks for confirmation; on confirm it revokes the current session
+ * token (the gateway route invalidates it) and clears the session cookie,
+ * then walks the browser back to the login page.
  */
 function LogoutButton({ wide }: { wide: boolean }) {
+  const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
-  const onClick = () => {
+
+  /** Actually perform the logout (only after the user confirms). */
+  const runLogout = () => {
     if (busy) return
+    setConfirming(false)
     setBusy(true)
     setFailed(false)
     // Only walk back to the login page when the gateway confirms logout
@@ -183,6 +188,12 @@ function LogoutButton({ wide }: { wide: boolean }) {
       })
       .catch(() => setFailed(true))
       .finally(() => setBusy(false))
+  }
+  const cancel = () => { if (!busy) setConfirming(false) }
+  const onClick = () => {
+    if (busy) return
+    setFailed(false)
+    setConfirming(true)
   }
   const style: Record<string, string> = {
     width: wide ? '100%' : '36px',
@@ -203,16 +214,30 @@ function LogoutButton({ wide }: { wide: boolean }) {
     transition: 'background .15s var(--ds-ease-in-out, ease)',
     opacity: busy ? 0.6 : 1,
   }
-  return createElement('button', {
-    type: 'button',
-    style,
-    onClick,
-    disabled: busy,
-    'aria-label': '退出登录',
-    title: failed ? '退出登录失败，请重试' : '退出登录',
-  },
-    createElement(LogoutIcon, null),
-    wide ? createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, failed ? '退出登录失败' : '退出登录') : null,
+  return createElement(Fragment,
+    null,
+    createElement('button', {
+      type: 'button',
+      style,
+      onClick,
+      disabled: busy,
+      'aria-label': '退出登录',
+      title: failed ? '退出登录失败，请重试' : '退出登录',
+    },
+      createElement(LogoutIcon, null),
+      wide ? createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, failed ? '退出登录失败' : '退出登录') : null,
+    ),
+    createElement(Modal, {
+      open: confirming,
+      onClose: cancel,
+      closeLabel: '关闭',
+      title: '确认退出登录',
+      description: '退出后将返回登录页，需要重新输入账号密码或 Token 才能继续访问。',
+      footer: createElement(Fragment, null,
+        createElement(Button, { variant: 'outline', onClick: cancel }, '取消'),
+        createElement(Button, { variant: 'primary', onClick: runLogout }, '确认退出'),
+      ),
+    }),
   )
 }
 
