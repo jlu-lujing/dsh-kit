@@ -102,7 +102,6 @@ function InputHistoryDock(props: Record<string, unknown>): unknown {
 
   // 当前已按 ↑/↓ 定位到的历史序号（null = 未在浏览历史）。
   const cursorRef = useRef<number | null>(null)
-  const [count, setCount] = useState(0)
 
   // 会话里出现新的用户消息 → 追加进历史（按 session 单独存）。
   useEffect(() => {
@@ -112,17 +111,9 @@ function InputHistoryDock(props: Record<string, unknown>): unknown {
     if (latestUserMessage === last) return
     const next = [...history.filter((h) => h !== latestUserMessage), latestUserMessage]
     saveHistory(sessionId, next.slice(-MAX_HISTORY))
-    setCount(loadHistory(sessionId).length)
     // 新消息送出后重置浏览游标。
     cursorRef.current = null
   }, [sessionId, latestUserMessage])
-
-  // 初次渲染同步一次计数（切会话时更新）。
-  useEffect(() => {
-    if (!sessionId) return
-    setCount(loadHistory(sessionId).length)
-    cursorRef.current = null
-  }, [sessionId])
 
   // 全局 capture 级 keydown：接管输入框中的 ↑/↓ 历史切换。
   useEffect(() => {
@@ -192,12 +183,6 @@ function InputHistoryDock(props: Record<string, unknown>): unknown {
     return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [sessionId, inputActions])
 
-  if (count === 0) return null
-
-  return createElement('div', {
-    style: {
-      fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)',
-      padding: '0 2px 2px', userSelect: 'none',
-    },
-  }, `${count} 条历史 · ↑/↓ 切换`)
+  // 不渲染任何可见 UI：只保留记录与 ↑/↓ 键盘逻辑（纯功能、零侵入）。
+  return null
 }
