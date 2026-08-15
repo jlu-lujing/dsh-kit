@@ -28,21 +28,20 @@ pnpm install
 pnpm build
 
 # 2. 安装全家桶到 dev profile（推荐开发隔离，不污染 web）
-#    发布版：装 dsh-kit 一个包即带出全家桶（它声明 4 个功能包为依赖，聚合 patch 挂载全部 5 行）
-#    本地源码：dsh-kit 用 link: 装入时不解析依赖，需连同 4 个功能包一起 link（见下）
+#    发布版：装 dsh-kit 一个包即带出全家桶（它声明 3 个功能包为依赖，聚合 patch 挂载全部 4 行）
+#    本地源码：dsh-kit 用 link: 装入时不解析依赖，需连同 3 个功能包一起 link（见下）
 dsh plugin --profile dev add -w \
   ~/workspace/dsh-kit/packages/dsh-kit \
   ~/workspace/dsh-kit/packages/dsh-kit-notifier \
   ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
-  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
-  ~/workspace/dsh-kit/packages/dsh-anchored-standard
+  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
 
 # 3. 启动 dsh web
 dsh web
 ```
 
-> **只装 dsh-kit = 全家桶**（发布后）：`dsh plugin add dsh-kit` 即带出全员——pnpm 把 4 个功能包作为依赖 hoist 进 profile 顶层 node_modules，dsh-kit 的聚合 patch 挂载全部 5 个功能行。
-> **本地源码（link:）需 5 包一起 add**：`link:` 协议不解析依赖（HANDOFF #9），所以源码调试 profile 里要像上面那样把 5 个包都 link。发布后无需此步。
+> **只装 dsh-kit = 全家桶**（发布后）：`dsh plugin add dsh-kit` 即带出全员——pnpm 把 3 个功能包作为依赖 hoist 进 profile 顶层 node_modules，dsh-kit 的聚合 patch 挂载全部 4 个功能行（满血模式 preset 由 dsh-kit 内置，无需独立包）。
+> **本地源码（link:）需 4 包一起 add**：`link:` 协议不解析依赖（HANDOFF #9），所以源码调试 profile 里要像上面那样把 4 个包都 link。发布后无需此步。
 
 ## 插件管理
 
@@ -88,14 +87,14 @@ npx create-dsh-plugin my-plugin -t tool
 | `dsh-kit-notifier` | 桌面通知 | 已实现：监听回合结束，跨平台通知（macOS/Linux/Windows） |
 | `dsh-kit-scheduler` | 定时任务 | 已实现：cron 任务 + 持久化 + 管理路由（支持 shell 命令） |
 | `dsh-kit-lan-auth` | 局域网鉴权网关（HTTPS 反向代理 + token/登录，默认关闭） | 已实现并验证：私有 CA 自动生成 + 登录页 CA 下载引导（.crt）、token 过期（静态 30 天/会话 12h 滑动）、登录爆破限速、登出吊销、远程可用性（标记头剥离 / WS 隧道 / browse 选择器注入） |
-| `dsh-anchored-standard` | 二阶段 agent preset（`bash`/`str_replace_editor` 引导 → Standard 工具目录，社区算法） | 内置为文件安装器，默认开启；随全家桶自动安装 preset 到 `~/.dsh/.agent-presets/anchored-standard` |
+| `满血模式`（preset，内置） | 二阶段 agent preset（`bash`/`str_replace_editor` 引导 → 首次晋升后开放完整工具） | dsh-kit 内置的导入/删除管理器，默认开启；随全家桶自动导入 preset 到 `~/.dsh/.agent-presets/anchored-standard` |
 
 > 全家桶安装（一条命令带进全部，发布后）：
 > ```sh
 > dsh plugin --profile web add -w dsh-kit
 > ```
-> dsh-kit 声明 4 个功能包为 npm 依赖，聚合 patch 挂载全部 5 个功能行；装 dsh-kit 一个包即全家桶。详见 `docs/ARCHITECTURE.md`。
-> 本地源码（`link:`）调试时需 5 包一起 add（link 不解析依赖），见[快速开始](#快速开始)。
+> dsh-kit 声明 3 个功能包为 npm 依赖，聚合 patch 挂载全部 4 个功能行；装 dsh-kit 一个包即全家桶（满血模式 preset 由 dsh-kit 内置）。详见 `docs/ARCHITECTURE.md`。
+> 本地源码（`link:`）调试时需 4 包一起 add（link 不解析依赖），见[快速开始](#快速开始)。
 >
 > 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；dsh-kit-lan-auth 会在启用时自动注入 browse 目录选择器（无需改 profile 配置），远程浏览器内弹 web 选择器而非宿主原生窗口。
 >
@@ -103,16 +102,16 @@ npx create-dsh-plugin my-plugin -t tool
 
 ## 发布
 
-- **已发布**（2026-08-15）：5 个包均已发布到 npm registry（`0.1.0`）：
-  - `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-anchored-standard`（均 `license: MIT`）
+- **已发布**（2026-08-15）：4 个 npm 包（`0.1.0`）：`dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth`（均 `license: MIT`）。
+  - 满血模式 preset **不是独立 npm 包**：由 `dsh-kit` 内置打包分发。
   - 根 workspace `private: true`，只承载开发工具链，不发布。
 - **安装（发布后）**：
   ```sh
   dsh-kit install            # 一条命令装全家桶（默认 web profile）
-  # 等价于: dsh plugin --profile web add -w dsh-kit（依赖自动带出 4 个功能包）
+  # 等价于: dsh plugin --profile web add -w dsh-kit（依赖自动带出 3 个功能包；满血模式 preset 由 dsh-kit 内置）
   ```
-- **更新发布**：`cd packages/<pkg> && npm publish`（5 包各自发布；已构建 `lib/` 随包带出；改版本号后重发）。
-- **架构说明**：`dsh-kit` 为聚合 bundle（管理 CLI + 功能商店 + 挂载 5 个功能行 + 声明子包依赖）；4 个功能包为**纯库**（不含 patch，行由 dsh-kit 挂载），发布后装 dsh-kit 即全家桶。
+- **更新发布**：`cd packages/<pkg> && npm publish`（4 包各自发布；已构建 `lib/` 随包带出；改版本号后重发）。
+- **架构说明**：`dsh-kit` 为聚合 bundle（管理 CLI + 功能商店 + 挂载 4 个功能行 + 声明子包依赖）；3 个功能包为**纯库**（不含 patch，行由 dsh-kit 挂载）；满血模式 preset 内置在 dsh-kit 内，发布后装 dsh-kit 即全家桶。
 
 ## License
 
@@ -122,9 +121,8 @@ MIT
 
 本仓库 `refs/` 目录只用于本地参考浏览，不进 git（根 `.gitignore` 已忽略 `refs/`）。
 
-**内置功能包：dsh-anchored-standard**（二阶段 DeepSeek Harness agent preset）
-- 上游仓库：[xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)
-- 简介：首次模型请求使用 Minimal 对齐的 system prompt + Minimal 真实工具对（`bash` / `str_replace_editor`，不注入工作区/技能上下文），首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放 Standard 完整工具目录。
-- 全家桶接入：`packages/dsh-anchored-standard/` 内置文件系统安装器，随全家桶**默认开启**，自动安装 preset 到 `~/.dsh/.agent-presets/anchored-standard`；若需关闭用 `dsh-kit disable dsh-anchored-standard`。
-- 参考副本（本地参考用，不进 git）：`refs/dsh-anchored-standard/`
-- 许可：MIT（含 DeepSeek 的 MIT 声明，详见上游 `LICENSE` / `NOTICE`；本项目以安装器形式内置并注明来源）。
+**内置 preset：满血模式**（二阶段 DeepSeek Harness agent preset）
+- **借鉴**：本 preset 的算法与文件集合借鉴自社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。参考副本（本地参考用，不进 git）：`refs/dsh-anchored-standard/`。
+- 简介：首次模型请求使用 Minimal 对齐的 system prompt + Minimal 真实工具对（`bash` / `str_replace_editor`，不注入工作区/技能上下文），首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放完整工具目录。
+- 全家桶接入：`dsh-kit` 内置 preset（`packages/dsh-kit/preset/`），通过 dsh-kit 自研的**导入/删除管理器**（`src/preset.ts`）管理，随全家桶**默认开启**，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除，或用 `dsh-kit disable dsh-anchored-standard` 关闭。
+- 许可：MIT（含 DeepSeek 的 MIT 声明，详见借鉴来源；本项目以自研导入/删除管理器内置并注明借鉴）。

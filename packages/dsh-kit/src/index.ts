@@ -1,22 +1,15 @@
 /** dsh-kit host plugin: aggregate shell + store state + feature toggling. */
 
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
+import { installPreset, uninstallPreset, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
 
-/** Type-only interface for the dsh-anchored-standard installer (lazy loaded). */
-interface AnchoredInstaller {
-  PRESET_ID: string
-  PACKAGE_SPEC: string
-  isInstalled(options?: { home?: string }): boolean
-  installPreset(options?: { home?: string }): { target: string; installed: boolean }
-  uninstallPreset(options?: { home?: string }): { target: string; removed: boolean }
-}
+/** Feature id of the inline preset feature (matches store.ts / state file). */
+const PRESET_FEATURE_ID = `dsh-${PRESET_ID}` as const
 
 /** Cordis plugin name. */
 export const name = 'dsh-kit'
@@ -65,16 +58,6 @@ function dshHome(): string {
   return process.env.DSH_HOME ?? `${process.env.HOME ?? '.'}/.dsh`
 }
 
-/** Lazily load the anchored-standard installer (it is a dependency of dsh-kit). */
-async function loadAnchoredInstaller(): Promise<AnchoredInstaller | undefined> {
-  try {
-    const mod = await import('dsh-anchored-standard')
-    return mod as unknown as AnchoredInstaller
-  } catch {
-    return undefined
-  }
-}
-
 const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -106,13 +89,20 @@ export function apply(ctx: Context, config: Config = {}): void {
   store.load()
 
   const home = dshHome()
-  // The anchored installer is a dependency of dsh-kit; resolve it lazily only
-  // when the profile actually has it installed (during local dev it may be an
-  // aggregate-patch row only). `installed` reflects the on-disk preset.
-  let anchoredInstaller: AnchoredInstaller | undefined
-  void import('dsh-anchored-standard').then((m) => {
-    anchoredInstaller = m as unknown as AnchoredInstaller
-  }).catch(() => { anchoredInstaller = undefined })
+
+  // The bundled preset feature (previously a separate dsh-anchored-standard
+  // package) is now managed inline by dsh-kit. When enabled, install the
+  // bundled preset files idempotently (non-destructive: never overwrite an
+  // existing target). Disabling does not auto-remove, so user data is kept.
+  const presetFeature = FEATURES.find(f => f.installable === true && f.id === PRESET_FEATURE_ID)
+  if (presetFeature && store.isEnabled(presetFeature.id)) {
+    try {
+      installPreset({ home })
+    } catch {
+      // Non-fatal: installation must not take down host startup; the store
+      // panel lets the user retry manually.
+    }
+  }
 
   const service: DshKitService = {
     list: () => FEATURES.map(f => ({
@@ -120,7 +110,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       enabled: store.isEnabled(f.id),
       installable: f.installable === true,
       installed: f.installable === true
-        ? existsSync(join(home, '.agent-presets', 'anchored-standard'))
+        ? isPresetInstalled({ home })
         : false,
     })),
     featureState: id => store.isEnabled(id),
@@ -194,10 +184,8 @@ export function apply(ctx: Context, config: Config = {}): void {
       const id = installRoute[1]
       const feature = FEATURES.find(f => f.id === id && f.installable === true)
       if (!feature) return sendJson(res, 404, { error: `unknown or non-installable feature "${id}"` })
-      const mod = anchoredInstaller ?? await loadAnchoredInstaller()
-      if (!mod) return sendJson(res, 500, { error: 'dsh-anchored-standard installer unavailable' })
       try {
-        const result = mod.installPreset({ home })
+        const result = installPreset({ home })
         // Installing the artifact implies the feature should be enabled, so it
         // stays installed across restarts.
         service.setEnabled(id, true)
@@ -214,10 +202,8 @@ export function apply(ctx: Context, config: Config = {}): void {
       const id = deleteRoute[1]
       const feature = FEATURES.find(f => f.id === id && f.installable === true)
       if (!feature) return sendJson(res, 404, { error: `unknown or non-installable feature "${id}"` })
-      const mod = anchoredInstaller ?? await loadAnchoredInstaller()
-      if (!mod) return sendJson(res, 500, { error: 'dsh-anchored-standard installer unavailable' })
       try {
-        const result = mod.uninstallPreset({ home })
+        const result = uninstallPreset({ home })
         // Removing the artifact also disables the feature so a later restart
         // does not silently re-install it (apply only installs while enabled).
         service.setEnabled(id, false)

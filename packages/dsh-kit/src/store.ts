@@ -34,8 +34,8 @@ export const FEATURES: readonly Feature[] = [
   },
   {
     id: 'dsh-anchored-standard',
-    name: 'Anchored Standard 二阶段 Agent Preset',
-    description: '社区 Anchored Standard：Minimal 引导（bash/str_replace_editor）→ 首次晋升后开放 Standard 工具；安装 preset 到 ~/.dsh/.agent-presets/anchored-standard',
+    name: '满血模式',
+    description: '满血模式：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/anchored-standard',
     defaultEnabled: true,
     installable: true,
   },

@@ -18,7 +18,41 @@ interface Feature {
   installed: boolean
 }
 
-const T = { bg: 'rgba(128,128,128,0.07)', border: 'rgba(128,128,128,0.35)', radius: 8, muted: 'rgba(128,128,128,0.7)', ok: '#4caf7d', danger: '#e06c75' }
+/* Design-token palette. Consuming --dsw-alias-* matches the host web app's
+ * settings pages & the lan-auth settings.section, so the panel re-skins with
+ * light/dark and stays consistent with every other settings section. */
+const tk = {
+  text: 'var(--dsw-alias-label-primary)',
+  secondary: 'var(--dsw-alias-label-secondary)',
+  tertiary: 'var(--dsw-alias-label-tertiary)',
+  border: 'var(--dsw-alias-border-l2)',
+  cardBg: 'var(--dsw-alias-bg-layer-3)',
+  btnBg: 'var(--dsw-alias-label-primary)',
+  btnText: 'var(--dsw-alias-bg-layer-3)',
+  success: 'var(--dsw-alias-state-success-primary)',
+  successBg: 'var(--dsw-alias-state-success-tertiary)',
+  danger: 'var(--dsw-alias-state-error-primary)',
+  dangerBg: 'var(--dsw-alias-interactive-bg-hover-danger)',
+  radius: 12,
+}
+
+const cardS = { border: '1px solid ' + tk.border, borderRadius: tk.radius, background: tk.cardBg }
+const ghostBtn = {
+  padding: '5px 12px', borderRadius: 8, border: '1px solid ' + tk.border,
+  background: 'transparent', color: tk.secondary, font: 'inherit', fontSize: 13, lineHeight: 1.5,
+  cursor: 'pointer', whiteSpace: 'nowrap',
+}
+const primaryBtn = {
+  padding: '5px 14px', borderRadius: 8, border: '1px solid transparent',
+  background: tk.btnBg, color: tk.btnText, font: 'inherit', fontSize: 13, lineHeight: 1.5,
+  cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 600,
+}
+const badgeS = (on: boolean) => ({
+  flex: 'none', display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px',
+  borderRadius: 999, fontSize: 11, lineHeight: '20px', fontWeight: 500, whiteSpace: 'nowrap',
+  background: on ? tk.successBg : tk.dangerBg,
+  color: on ? tk.success : tk.danger,
+})
 
 function useStore() {
   const [features, setFeatures] = useState<Feature[] | null>(null)
@@ -78,64 +112,50 @@ function StorePanel() {
   const installAll = () => {
     setErr(''); setInstallMsg(null); setInstalling(true)
     api('/dsh-kit/store/install', {})
-      .then(() => setInstallMsg('已安装全家桶，重启 dsh 后全部功能生效。'))
+      .then((r) => setInstallMsg(`已安装到 ${(r as { profile?: string }).profile ?? '当前'} 环境，重启后全部功能生效。`))
       .catch((e) => setInstallMsg(`安装失败：${String((e && e.message) || e)}`))
       .finally(() => setInstalling(false))
   }
 
   const rows = features ?? []
-  return createElement('div', { style: { padding: 12, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 240, maxWidth: 320 } },
-    createElement('div', { style: { fontSize: 13, fontWeight: 700 } }, 'dsh-kit 功能商店'),
-    createElement('div', { style: { fontSize: 11, opacity: 0.7 } }, '启停功能，重启后保留。'),
-    createElement('div', {
-      style: { border: '1px solid ' + T.border, borderRadius: T.radius, background: T.bg, padding: 8, display: 'flex', gap: 8, alignItems: 'center' },
-    },
-      createElement('div', { style: { flex: 1, fontSize: 11, opacity: 0.8 } },
-        installMsg ?? '装一个包，全家桶开箱即用。若功能未装全：'),
+  // Layout mirrors the host settings sections (e.g. lan-auth / plugins): a
+  // max-width column on `bg-layer-1` with heading, intro, and card rows.
+  return createElement('div', { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 760, color: tk.text } },
+    createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, 'dsh-kit 功能商店'),
+    createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '启停功能，重启后保留。'),
+    createElement('div', { style: { ...cardS, padding: 12, display: 'flex', gap: 10, alignItems: 'center' } },
+      createElement('div', { style: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.5, color: tk.secondary } },
+        installMsg ?? '一键将全家桶安装到当前环境，装完即可开箱即用。'),
       createElement('button', {
-        style: {
-          padding: '4px 10px', borderRadius: T.radius, border: '1px solid ' + T.border,
-          background: 'transparent', color: 'inherit', cursor: installing ? 'wait' : 'pointer', fontSize: 12, whiteSpace: 'nowrap',
-        },
+        style: { ...primaryBtn, cursor: installing || busy !== null ? 'wait' : 'pointer' },
         onClick: installAll,
         disabled: busy !== null || installing,
-      }, installing ? '安装中…' : '一键安装全'),
+      }, installing ? '安装中…' : '一键安装'),
     ),
     rows.length === 0 && !err
-      ? createElement('div', { style: { opacity: 0.6, fontSize: 12 } }, '加载中…')
+      ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '加载中…')
       : null,
     rows.map((f) =>
-      createElement('div', { key: f.id, style: { border: '1px solid ' + T.border, borderRadius: T.radius, background: T.bg, padding: 8, display: 'flex', gap: 8, alignItems: 'center' } },
+      createElement('div', { key: f.id, style: { ...cardS, padding: 12, display: 'flex', gap: 12, alignItems: 'center' } },
         createElement('div', { style: { flex: 1, minWidth: 0 } },
-          createElement('div', { style: { fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 } },
+          createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, lineHeight: 1.4, color: tk.text } },
             f.name,
-            createElement('span', {
-              style: {
-                fontSize: 10, padding: '1px 6px', borderRadius: 8,
-                color: '#fff', background: f.enabled ? T.ok : T.danger, opacity: 0.9,
-              },
-            }, f.enabled ? '开' : '关'),
+            createElement('span', { style: badgeS(f.enabled) }, f.enabled ? '开' : '关'),
           ),
-          createElement('div', { style: { fontSize: 11, opacity: 0.7, marginTop: 2 } }, f.description),
+          createElement('div', { style: { fontSize: 13, lineHeight: 1.5, color: tk.tertiary, marginTop: 2 } }, f.description),
           f.installable
-            ? createElement('div', { style: { fontSize: 11, opacity: 0.7, marginTop: 4 } }, f.installed ? '已安装到预设目录' : '未安装')
+            ? createElement('div', { style: { fontSize: 12, lineHeight: 1.5, color: tk.tertiary, marginTop: 4 } }, f.installed ? '已安装到预设目录' : '未安装')
             : null,
         ),
-        createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' } },
+        createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' } },
           createElement('button', {
-            style: {
-              padding: '4px 10px', borderRadius: T.radius, border: '1px solid ' + T.border,
-              background: 'transparent', color: 'inherit', cursor: busy === f.id ? 'wait' : 'pointer', fontSize: 12, whiteSpace: 'nowrap',
-            },
+            style: { ...ghostBtn, cursor: busy === f.id ? 'wait' : 'pointer' },
             onClick: () => toggle(f),
             disabled: busy !== null,
           }, busy === f.id ? '…' : (f.enabled ? '停用' : '启用')),
           f.installable
             ? createElement('button', {
-                style: {
-                  padding: '4px 10px', borderRadius: T.radius, border: '1px solid ' + T.border,
-                  background: 'transparent', color: 'inherit', cursor: busy === f.id ? 'wait' : 'pointer', fontSize: 12, whiteSpace: 'nowrap',
-                },
+                style: { ...ghostBtn, cursor: busy === f.id ? 'wait' : 'pointer' },
                 onClick: () => f.installed ? deleteArtifact(f) : installArtifact(f),
                 disabled: busy !== null,
               }, busy === f.id ? '…' : (f.installed ? '删除' : '安装'))
@@ -143,7 +163,7 @@ function StorePanel() {
         ),
       ),
     ),
-    err ? createElement('div', { style: { color: T.danger, fontSize: 12 } }, err) : null,
+    err ? createElement('div', { style: { color: tk.danger, fontSize: 13 } }, err) : null,
   )
 }
 

@@ -3,7 +3,9 @@
 > 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+
+> **本次重构（2026-08-15）**：**完全剥离独立的 `dsh-anchored-standard` npm 包**，改为 dsh-kit 内置的自研「preset 导入/删除管理器」（`packages/dsh-kit/src/preset.ts` + 内置 `packages/dsh-kit/preset/`），只在 README/ARCHITECTURE 标注「借鉴」自社区项目。功能商店仍显示「满血模式」，可导入/删除。npm 包从 5 个减为 4 个；本地源码 link 从 5 包减为 4 包。
 
 ## 1. 项目目标
 

@@ -1,12 +1,16 @@
 # dsh-kit aggregate patch layer.
 #
-# Installing dsh-kit installs the whole family: it declares the four feature
-# packages (dsh-kit-notifier / dsh-kit-scheduler / dsh-kit-lan-auth /
-# dsh-anchored-standard) as npm dependencies (hoisted into the profile's
-# top-level node_modules), and this patch inserts all five rows below. The
-# mechanism mirrors how the official
+# Installing dsh-kit installs the whole family: it declares the three feature
+# packages (dsh-kit-notifier / dsh-kit-scheduler / dsh-kit-lan-auth) as npm
+# dependencies (hoisted into the profile's top-level node_modules), and this
+# patch inserts all four rows below. The mechanism mirrors how the official
 # dsh-base aggregate works: the bundle's dependencies make the packages
 # resolvable by the Loader, and the bundle's own patch declares the rows.
+#
+# The preset feature (满血模式, formerly the separate dsh-anchored-standard
+# package) is NOT a loader row anymore: dsh-kit bundles the preset files and
+# manages them inline (auto-install on enable + store import/delete routes),
+# so it needs no resolvable npm package and has no row here.
 #
 # Each feature row carries a dynamic `disabled` expression with two conditions:
 #   1. feature state (state file) — `dsh-kit disable X` / store panel, honored
@@ -50,7 +54,3 @@
     - id: dsh-kit-lan-auth
       name: dsh-kit-lan-auth
       disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-lan-auth'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-lan-auth'] !== true; } catch (e) { return true; } })() )"
-
-    - id: dsh-anchored-standard
-      name: dsh-anchored-standard
-      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-anchored-standard'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-anchored-standard'] === false; } catch (e) { return false; } })() )"
