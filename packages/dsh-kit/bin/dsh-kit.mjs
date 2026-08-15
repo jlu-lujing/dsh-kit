@@ -44,7 +44,7 @@ if (cmd === 'install') {
   // PATH) — a brand-new machine must first add dsh-kit itself via:
   //   dsh plugin --profile <name> add -w dsh-kit
   // Under the hood this is exactly that same command: dsh-kit declares the
-  // three feature packages as npm dependencies (hoisted into the profile), and
+  // four feature packages as npm dependencies (hoisted into the profile), and
   // the 满血模式 preset is bundled inside dsh-kit (no separate package).
   //   dsh-kit install [--profile <name>] [extra add flags...]
   const rest = args.slice(1)
@@ -56,7 +56,7 @@ if (cmd === 'install') {
     passthrough.push(a)
   }
   const dshArgs = ['plugin', '--profile', profile, 'add', '-w', ...passthrough, 'dsh-kit']
-  console.log(`dsh-kit: installing family into profile "${profile}": dsh-kit + 3 feature deps`)
+  console.log(`dsh-kit: installing family into profile "${profile}": dsh-kit + 4 feature deps`)
   const res = spawnSync('dsh', dshArgs, { stdio: 'inherit' })
   process.exit(res.status ?? 1)
 }
