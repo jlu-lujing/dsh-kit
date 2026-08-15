@@ -73,18 +73,19 @@ pnpm install
 pnpm build
 pnpm build:client    # 产 client bundle（有 dsh.client 的包必须跑）
 
-# 2. 装进 dev profile（link: 不解析依赖，需 4 包一起 link）
+# 2. 装进 dev profile（link: 不解析依赖，需 5 包一起 link）
 dsh plugin --profile dev add -w \
   ~/workspace/dsh-kit/packages/dsh-kit \
   ~/workspace/dsh-kit/packages/dsh-kit-notifier \
   ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
-  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
+  ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
+  ~/workspace/dsh-kit/packages/dsh-kit-input-history
 
 # 3. 启动 dsh web
 dsh web
 ```
 
-> **本地源码为什么 4 包一起 link？** `link:` 协议不解析依赖（见 `docs/HANDOFF.md`），所以源码调试要显式 link 全部子包；发布版（registry）则一条命令即可。
+> **本地源码为什么 5 包一起 link？** `link:` 协议不解析依赖（见 `docs/HANDOFF.md`），所以源码调试要显式 link 全部子包；发布版（registry）则一条命令即可。
 
 ---
 
@@ -137,28 +138,38 @@ npx create-dsh-plugin my-plugin -t tool
 
 ## 🔒 局域网远程访问（dsh-kit-lan-auth）
 
-启用后，局域网设备经 `https://<主机IP>:3443` + token 访问：
+启用后，局域网设备经 `https://<主机IP>:3443` + token 访问。
 
-## 桌面客户端（桌面软件，`feature/client-wrapper` 分支）
-
-独立桌面软件（Electron 壳 + 内置 dsh-runtime 子模块，用户无需单独装 dsh）。方案见 `docs/DESKTOP.md`。
-
-- **M1–M5 已落地并真机验证**（2026-08-16）：
-  - `apps/dsh-runtime`：从本机已验证 dsh 构建独立运行时（自带 Node？当前走 Electron 内置 Node 方案 A；`build.mjs --skip-node-download` 本地用）+ `scripts/smoke.mjs` 冒烟
-  - `apps/desktop`：Electron 壳（electron-vite + electron-builder），spawn/就绪 URL/BrowserWindow/退出清理、托盘、开机自启、错误页、更新链路（feed + sha512 + 原子切换 + 回滚）
-  ```sh
-  cd apps/dsh-runtime
-  node scripts/build.mjs --skip-node-download   # 构建 runtime zip（官方 Node 二进制下载待接线，见 build.mjs）
-  node scripts/smoke.mjs                        # 冒烟验证
-  cd ../desktop && npm install && npm run dev   # 启动 Electron 壳
-  ```
-- **证书（零配置，lan-auth）**：首启自动生成私有 CA（根 `ca.pem` + 叶子，SAN 覆盖本机全部局域网 IP）。登录页引导下载 `.crt` 永久免警告。
+- **证书（零配置）**：首启自动生成私有 CA（根 `ca.pem` + 叶子，SAN 覆盖本机全部局域网 IP）。登录页引导下载 `.crt` 永久免警告。
 - **安全模型**：本机 loopback 免登录直通；局域网需有效 token 或账号密码登录；管理路由仅本机可达。
 - **管理**：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`
 
-## 发布
+## 🖥️ 桌面客户端（Electron + 内置 dsh-runtime）
 
----
+独立桌面软件（Electron 壳 + 内置 dsh-runtime 子模块，**用户无需单独装 dsh**，已在 main 合入）。方案与演进见 `docs/DESKTOP.md`。
+
+- **M1–M5 已落地并真机验证**（2026-08-16）：
+  - `apps/dsh-runtime`：从本机已验证 dsh 构建独立运行时。自带官方 Node 二进制（方案 B）为目标态；当前 MVP 走 **Electron 内置 Node（方案 A）**，本地构建用 `build.mjs --skip-node-download`（官方 Node 下载待接线，见 `build.mjs`）+ `scripts/smoke.mjs` 冒烟
+  - `apps/desktop`：Electron 壳（electron-vite + electron-builder）——spawn/就绪 URL/BrowserWindow/退出清理、托盘、开机自启、错误页、更新链路（feed + sha512 + 原子切换 + 回滚）
+
+**启动方式**（任选其一）：
+
+```sh
+# 方式一：打包好的 App（本机构建）
+open "apps/desktop/dist/mac-arm64/dsh-kit Desktop.app"
+
+# 方式二：开发模式（electron-vite，热重载）
+cd apps/desktop
+npm install && npm run dev
+```
+
+> 💡 **常见坑**：`npm install` 装了 electron 包但二进制没下载时，`npm run dev` 会报
+> `Error: Electron uninstall`（缺 `node_modules/electron/dist` 与 `path.txt`）。手动跑一次
+> `node node_modules/electron/install.js` 即可补下二进制。
+>
+> 客户端启动时会先探测 `127.0.0.1:3080` 是否已有健康 dsh 实例，有则**直接复用**（不重复
+> spawn）；无则自己拉起 `dsh web --port 0` 并等待就绪 URL。日志在
+> `~/Library/Application Support/@dsh-kit/desktop/desktop.log`。
 
 ## 📤 发布
 
@@ -171,7 +182,7 @@ npx create-dsh-plugin my-plugin -t tool
 更新某个包：
 
 ```sh
-cd packages/<pkg> && npm publish    # 4 包各自发布；已构建 lib/ 随包带出；改版本号后重发
+cd packages/<pkg> && npm publish    # 5 包各自发布；已构建 lib/ 随包带出；改版本号后重发
 ```
 
 架构详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、开发坑位详见 [`docs/HANDOFF.md`](docs/HANDOFF.md)。
