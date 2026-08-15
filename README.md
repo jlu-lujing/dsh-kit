@@ -12,8 +12,10 @@ DeepSeek Harness (DSH) 傻瓜式插件全家桶 —— 装一个包，所有功�
 
 ```
 dsh-kit/
-├── packages/
-│   └── dsh-*            # 各功能插件（dsh 前缀，官方 bundle 规范）
+├── packages/            # 各功能插件（dsh 前缀，官方 bundle 规范，npm 发布线）
+├── apps/
+│   ├── dsh-runtime/     # 桌面端内置 dsh 独立运行时子模块（自带 Node + @deepseek-ai/dsh 全依赖树）
+│   └── desktop/         # Electron 壳（尚未实现，方案见 docs/DESKTOP.md）
 ├── .gitignore
 ├── package.json         # workspace 根
 ├── pnpm-workspace.yaml  # pnpm workspace
@@ -101,6 +103,19 @@ npx create-dsh-plugin my-plugin -t tool
 > 远程访问：启用 `dsh-kit-lan-auth` 后，局域网设备经 `https://<主机IP>:3443` + token 访问；dsh-kit-lan-auth 会在启用时自动注入 browse 目录选择器（无需改 profile 配置），远程浏览器内弹 web 选择器而非宿主原生窗口。
 >
 > 证书（零配置）：首启自动生成私有 CA（`ca.pem` 根 + 叶子 `key.pem`/`cert.pem`，SAN 覆盖本机全部局域网 IP）。设备首次访问在登录页会看到「下载根证书永久免警告」引导（`.crt`），装一次后该设备免警告；不装也能用（浏览器点一次「继续访问」）。管理：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`。
+
+## 桌面客户端（开发中）
+
+`feature/client-wrapper` 分支：独立桌面软件（Electron 壳 + 内置 dsh-runtime 子模块，用户无需单独装 dsh）。方案见 `docs/DESKTOP.md`。
+
+- **M1 已落地**：`apps/dsh-runtime` 可从本机已验证 dsh 构建出独立运行时 zip（`dsh-runtime-<dshVersion>-<platform>-<arch>.zip`，zstd ~32MB，含 dsh 全依赖树），`scripts/smoke.mjs` 冒烟通过（spawn web → ready 行 → GET 200 + `__DSH_BOOT__`）。
+  ```sh
+  cd apps/dsh-runtime
+  node scripts/build.mjs --skip-node-download   # 构建 zip（官方 Node 二进制下载待接线，见 build.mjs）
+  node scripts/smoke.mjs                        # 冒烟验证
+  node --test 'test/*.test.mjs'                 # 测试
+  ```
+- **M2（Electron 壳）尚未实现**：spawn / 就绪 URL / BrowserWindow / 退出清理。
 
 ## 发布
 

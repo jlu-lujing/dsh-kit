@@ -1,0 +1,26 @@
+appId: com.dshkit.desktop
+productName: dsh-kit Desktop
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+# 出厂 dsh-runtime 注入：electron-builder 的 file-copy 会过滤顶层 node_modules，
+# 所以不使用 extraResources，改由 afterPack 钩子（scripts/afterPack.cjs）在 pack
+# 后整体拷贝 resources/dsh-runtime → app Resources/dsh-runtime。
+# 由 src/main/runtime.ts（resolveRuntime）在启动时定位。
+afterPack: scripts/afterPack.cjs
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dir
+win:
+  target:
+    - dir
+linux:
+  target:
+    - dir
+npmRebuild: false
+electronDownload:
+  # 若需镜像（国内网络）取消注释：
+  # mirror: https://npmmirror.com/mirrors/electron/

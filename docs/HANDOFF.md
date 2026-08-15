@@ -3,7 +3,7 @@
 > 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。**桌面客户端开发推进中（`feature/client-wrapper` 分支）**：方案已定稿（`docs/DESKTOP.md`），**M1（dsh-runtime 独立运行时子模块）、M2（Electron 壳 spawn/ready/退出清理）、M3（electron-builder 打包 + 出厂 runtime 注入）均已落地并真机验证**（见 §7）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -129,9 +129,20 @@
 - 确定全家桶功能清单（v2）：5 个功能（dsh-kit / lan-auth / notifier / scheduler / dsh-anchored-standard）全实现并验证（见 §5）
 - **装一个包带全部（A1，二次翻新 + anchored）**：dsh-kit 聚合 patch 持有全部 5 行；4 个功能包去 bundle 变纯库；发布后 `dsh plugin add -w dsh-kit` 即全家桶（registry 依赖解析 + 顶层 hoist 已验证）；本地源码仍 5 包 link：
 
+### 桌面客户端（feature/client-wrapper）
+
+- [x] **方案定稿**：`docs/DESKTOP.md`（Electron 壳 + 内置 dsh-runtime 独立子模块）
+- [x] **M1：dsh-runtime 独立运行时子模块**（2026-08-15 完成并验证）：
+  - `apps/dsh-runtime/`：package.json（pin `@deepseek-ai/dsh` 0.1.0-rc.6）+ `scripts/build.mjs`（从全局已验证 dsh 取材、裁剪、写 runtime.json + VERSION、打 zip）+ `scripts/smoke.mjs`（spawn web --port 0 → 解析 ready 行 → GET 200 + `__DSH_BOOT__`）
+  - **关键发现（重要优化）**：npm 全局安装的 `@deepseek-ai/dsh` 内部有一份完整的**嵌套 node_modules**（约 333M 重复副本）。把 `@deepseek-ai/dsh/node_modules` 删掉、仅用其外层扁平依赖树即可运行——**runtime 从 608M 降到约 220M（未压缩）**，zstd 压缩后 **~32MB zip**。`dsh web` / `web --dump-config` / 页面 GET 全部通过。
+  - 构建默认跳过自动下载官方 Node 二进制（`--skip-node-download`）；MVP 阶段用 Electron 内置 Node（DESKTOP §3.1 方案 A）
+  - 测试：`node --test 'test/*.test.mjs'` 通过（验证产出了符合 `<dshVersion>-<platform>-<arch>` 约定的 zip）
+
 ### 待办
 
 - [x] **发布执行**（2026-08-15 完成）：4 包已发布到 npm registry（0.1.0，npm 账号 `dsh-kit`，token bypass-2FA）。发布后 `dsh plugin add -w dsh-kit ...` 从 registry 安装经临时 profile 实测可用。见 README §发布
+- [x] **M2：apps/desktop 最小 Electron 壳**（2026-08-15 完成并验证）：electron-vite + electron-builder 工作区。全流程实测：壳启动 → `resolveRuntime` 定位出厂/开发 runtime → 探测 3080（无则复用、有则 self-spawn `web --port 0`）→ 解析 ready 行 → BrowserWindow 加载 loopback URL → 退出 SIGINT/SIGKILL 停子进程无残留。`npm run typecheck` / `build` 全绿
+- [x] **M3：electron-builder 打包**（2026-08-15 完成并验证）：`npm run pack` → `dist/mac-arm64/dsh-kit Desktop.app`。**关键坑**：electron-builder 过滤顶层 node_modules，含 dsh 全依赖树的 runtime 无法用 `extraResources` 原样带入（还易误塞进 asar）；改为**把 `@dsh-kit/dsh-runtime` 移出 shell 的 npm 依赖 + afterPack 钩子（`scripts/afterPack.cjs`）整体拷贝**。验证：`app.asar` 仅 ~12KB、`Resources/dsh-runtime` 220MB 完整，打包 .app 离线自启 dsh → ready → 退出无残留
 
 ## 8. 关键命令速查
 

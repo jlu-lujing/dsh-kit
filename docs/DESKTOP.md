@@ -1,7 +1,7 @@
 # dsh-kit Desktop 桌面客户端设计
 
 > 更新日期：2026-08-15
-> 状态：方案已确认，尚未实现
+> 状态：方案已定稿；**M1（dsh-runtime）已落地并通过冒烟验证**，M2（Electron 壳）待实现
 > 分支：`feature/client-wrapper`
 
 ## 1. 定位
@@ -82,13 +82,15 @@ dsh-kit/
 │   │   ├── src/main/            # 运行时发现/启动、单实例锁、托盘、生命周期
 │   │   ├── src/preload/         # 可选：contextBridge 注入 __DSH_DESKTOP__
 │   │   ├── src/renderer/        # 启动页 / 错误页 / 日志页
+│   │   ├── scripts/afterPack.cjs # electron-builder 钩子：注入出厂 runtime（绕开 node_modules 过滤）
 │   │   └── electron-builder.yml
-│   └── dsh-runtime/             # dsh 内置运行时子模块（独立版本、独立更新）
-│       ├── package.json         # pin "@deepseek-ai/dsh": "精确版本"
-│       ├── package-lock.json
-│       └── scripts/             # 构建/打包/裁剪脚本
+│   └── dsh-runtime/             # ✅ M1 已落地（2026-08-15）
+│       ├── package.json         # pin "@deepseek-ai/dsh": "0.1.0-rc.6"（精确版本）
+│       ├── scripts/build.mjs    # 从全局已验证 dsh 取材→裁剪→runtime.json→zip（zstd）
+│       ├── scripts/smoke.mjs    # 冒烟：spawn web --port 0 → ready 行 → GET 200 + __DSH_BOOT__
+│       └── test/                # build.test.mjs（node --test）
 └── scripts/
-    └── build-dsh-runtime.mjs    # 产出 dsh-runtime-<ver>-<platform>-<arch>.zip
+    └── build-dsh-runtime.mjs    # 未来可把 build 上提到这里做多平台矩阵（当前在 apps/dsh-runtime/scripts）
 ```
 
 ## 5. dsh-runtime 子模块规范
@@ -114,6 +116,14 @@ dsh-runtime/
 - 写 `runtime.json`，打包为：
   `dsh-runtime-<dshVersion>-<platform>-<arch>.zip`
 - 该 zip 是 dsh-runtime 的独立发布物，版本号跟随 `@deepseek-ai/dsh`，与桌面壳版本无关。
+
+> **M1 实测的构建取材**（比文档初稿更省）：`scripts/build.mjs` 不重新 `npm ci`，而是从本机**已验证的全局安装**（`npm root -g` 下的 `@deepseek-ai/dsh`）复制其扁平依赖树（平台 prebuild 已在其中），并做了三项关键瘦身：
+> 1. **删掉 `@deepseek-ai/dsh` 包内部那份完整的嵌套 node_modules**（npm 全局安装遗留的重复副本，约 333M）——runtime 由 608M 降到 ~220M，且 `web`/`--dump-config`/GET 均正常；
+> 2. 只保留当前平台的原生 prebuild（node-pty / @img/sharp / @koromix/koffi / node-addon-require-builtin）；
+> 3. 删除 `*.map` / `*.tsbuildinfo`。
+>
+> 结果：darwin-arm64 未压缩 220M → **zstd zip ~32MB**。
+> 官方 Node 二进制下载未接线（需 nodejs.org 镜像/CI 预置产物），本地构建用 `--skip-node-download`，MVP 阶段直接用 Electron 内置 Node（方案 A）。
 
 ### 5.3 安装位置与覆盖规则
 
@@ -142,6 +152,19 @@ dsh-runtime/
 
 已知限制：已有 dsh 实例的探测先覆盖默认 3080；用户在其他端口常驻 dsh 时，本版本
 暂不自动发现，需后续通过进程/端口扫描或手动配置补上。
+
+### 6.1 出厂 runtime 打包（M3 实测）
+
+- electron-builder 的 file-copy 会**过滤顶层 `node_modules`**（它假设那是 app 的依赖
+  树），所以含 dsh 全依赖树的 runtime **不能用 `extraResources` 原样带入**——实测
+  `extraResources` 只复制了 `VERSION`/`runtime.json`，`node_modules` 缺失，且若把
+  `@dsh-kit/dsh-runtime` 作为 shell 的 `file:` 依赖还会把这棵树误塞进 `app.asar`。
+- 正确做法（已落地）：**把 dsh-runtime 从 shell 的 npm 依赖里移除**（主进程不 require
+  它），改由 **`afterPack` 钩子**（`apps/desktop/scripts/afterPack.cjs`）在 pack 后整体
+  `cpSync` `resources/dsh-runtime` → `<app>/Contents/Resources/dsh-runtime`。
+- 产物验证：`app.asar` 仅 ~12KB（干净），`Resources/dsh-runtime` 220MB 完整 runtime；
+  打包 `dist/mac-arm64/dsh-kit Desktop.app` 可离线自启 dsh（`process.resourcesPath` 分支找到
+  出厂 runtime）→ ready URL → 退出无残留。
 
 ## 7. dsh-runtime 独立更新链路
 
@@ -175,9 +198,9 @@ dsh-runtime/
 
 | 阶段 | 内容 | 完成标志 |
 |---|---|---|
-| M1 | `apps/dsh-runtime` 骨架 + pin dsh 版本 + 当前平台 runtime 构建脚本 | 本机产出可运行 runtime + runtime.json |
-| M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | 双击启动即见 dsh web，退出后子进程不残留 |
-| M3 | electron-builder 打包 extraResources + 出厂 runtime | 三平台安装包可构建，离线可用 |
+| M1 | `apps/dsh-runtime` 骨架 + pin dsh 版本 + 当前平台 runtime 构建脚本 | ✅ 本机产出可运行 runtime（`out/dsh-runtime-0.1.0-rc.6-darwin-arm64.zip`，zstd ~32MB）+ runtime.json，冒烟通过 |
+| M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | ✅ self-spawn → ready URL → 窗口加载；退出后子进程无残留（2026-08-15 实测） |
+| M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-kit Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
 | M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | 单独升级 dsh 不需要重新下载壳 |
 | M5 | 签名/公证、托盘、开机自启、错误页打磨 | 可对外发布 |
 | 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
