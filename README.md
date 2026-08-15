@@ -64,7 +64,7 @@ dsh-kit install --profile dev   # 装进指定 profile
 ## 开发
 
 ```sh
-pnpm dev              # client 插件热构建（仿官方 dev-web.ts，改面板即时生效，常驻 watch）
+pnpm dev              # 双 watch：client 热构建（改面板即时生效）+ host tsc watch（自动重编译，重启 dsh 生效）
 
 pnpm build             # 全量构建（tsc，host 端）
 pnpm build:client      # 产 client bundle（tsdown，lib/client.js）—— 有 dsh.client 的包必须跑，否则浏览器报 failed to load
@@ -73,6 +73,7 @@ pnpm test              # 测试
 ```
 
 > 注意：`pnpm build` 只编译 host 端；client 插件（如 lan-auth 的 `src/client/`）要产 `lib/client.js` 需另跑 `pnpm build:client` 或 `pnpm dev`。换机器/重新 clone 后两个都要跑。
+> `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
 
 新插件用官方脚手架生成，再移入 `packages/`：
 

@@ -9,7 +9,7 @@
     "build:client": "node scripts/build-client-once.mjs",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "dev": "tsx scripts/dev-web.ts --poll",
+    "dev": "tsx scripts/dev.ts",
     "add": "dsh plugin --profile web add -w"
   },
   "devDependencies": {

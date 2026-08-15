@@ -22,7 +22,7 @@ test('installs the complete preset into a fresh DSH home', (t) => {
   assert.ok(existsSync(join(result.target, 'agent.cordis.yml')))
   assert.ok(existsSync(join(result.target, 'preset.yml')))
   assert.ok(existsSync(join(result.target, 'tool-bootstrap.mjs')))
-  assert.match(readFileSync(join(result.target, 'preset.yml'), 'utf8'), /Anchored Standard/)
+  assert.match(readFileSync(join(result.target, 'preset.yml'), 'utf8'), /name: 锚定标准/)
 })
 
 test('second install is idempotent and preserves an existing target verbatim', (t) => {

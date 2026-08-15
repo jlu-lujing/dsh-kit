@@ -158,12 +158,12 @@ dsh 原生热更新分两层，**对插件代码的边界不同**：
 |---|---|---|
 | **patch 层** | `cordis.patch.yml`（插件启停/配置） | ❌ 即时生效（HMR `watchUserPatches`） |
 | **client 插件**（webui/面板） | `lib/client.js` 构建产物 | ❌ 自动热更新（SSE `rebuilt` 帧） |
-| **host 插件**（服务端逻辑） | `lib/*.js` 模块 | ✅ 需重启（web bundle 禁模块级 HMR） |
+| **host 插件**（服务端逻辑） | `lib/index.js` 模块 | ✅ 需重启（web bundle 禁模块级 HMR；`pnpm dev` 会先自动重编译） |
 
 ### 7.2 client 热更新链路（官方机制，直接复用）
 
 ```
-pnpm dev（仿 scripts/dev-web.ts）       dsh web（常驻）
+pnpm dev（scripts/dev.ts 编排）        dsh web（常驻）
 ┌─────────────────────────┐     ┌──────────────────────────────┐
 │ tsdown watch 所有        │     │ client-hmr 插件（500ms 轮询）  │
 │ dsh.client.web 包        │ ──► │ stat-poll lib/client.js       │
@@ -173,13 +173,13 @@ pnpm dev（仿 scripts/dev-web.ts）       dsh web（常驻）
 ```
 
 - 官方实现：`scripts/dev-web.ts` + `packages/client/hmr`（host 端轮询 + `/plugins/events` SSE + 浏览器端换 fiber）
-- 我们的 `pnpm dev`：复制 `dev-web.ts` 逻辑，workspace 只扫 `packages/dsh-kit*`（含聚合包本体），无需改动 dsh 本体
+- 我们的 `pnpm dev`：`scripts/dev.ts` 同时启动 `dev-web.ts`（client watch）与 `dev-host-watch.ts`（host `tsc -b --watch`）；workspace 只扫 `packages/dsh-kit*`（含聚合包本体），无需改动 dsh 本体
 
 ### 7.3 host 插件开发流程
 
 host 逻辑改动少（我们的 host 层很薄）：
 ```
-改 src/host/*.ts → pnpm build → 重启 dsh web
+改 src/host/*.ts → pnpm dev 自动重编译 lib/ → 重启 dsh web
 ```
 
 ### 7.4 多 profile 隔离（推荐）
@@ -191,7 +191,7 @@ host 逻辑改动少（我们的 host 层很薄）：
 ### 7.5 开发工具链
 
 - **构建**：tsdown（官方同款），host 产 `lib/index.js`，client 产 `lib/client.js`（closure-factory 形态）
-- **热重载**：`pnpm dev` = 官方 `dev-web.ts` 的简化版（只 watch 我们的包）
+- **热重载**：`pnpm dev` = 官方 `dev-web.ts` 的简化版（只 watch 我们的包）+ host `tsc -b --watch`（只自动重编译，加载仍需重启）
 - **类型**：tsc `--build`（host 产 `lib/types`，供 client 注入）
 - **冒烟**：`dsh --profile dev "任务"` 或 `dsh web --dump-config`
 
@@ -201,11 +201,10 @@ host 逻辑改动少（我们的 host 层很薄）：
 # 终端 1：dsh 主程序常驻
 dsh web --port 3080
 
-# 终端 2：client UI 热构建（改面板即时生效）
+# 终端 2：client 热构建 + host 自动重编译
 pnpm dev
 
-# 终端 3：改 host 逻辑
-pnpm build   # 然后重启 dsh web
+# host 逻辑改完后（lib/ 已被 pnpm dev 自动重编译）：重启 dsh web
 ```
 
 ## 8. 局域网鉴权网关（dsh-kit-lan-auth）

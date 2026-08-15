@@ -19,7 +19,7 @@
   - `packages/dsh-kit-notifier/` 桌面通知（监听 `session/event` 的 `turn/end`，跨平台通知）——**纯库，行由 dsh-kit 挂载**
   - `packages/dsh-kit-scheduler/` 定时任务（cron + 持久化 + 管理路由）——**纯库，行由 dsh-kit 挂载**
   - `packages/dsh-anchored-standard/` 二阶段 agent preset 安装器（上游 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)）——**预设安装器，行由 dsh-kit 挂载，默认开启**
-  - 根 workspace：`pnpm build` / `pnpm build:client` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
+  - 根 workspace：`pnpm build` / `pnpm build:client` / `pnpm dev`（client 热构建 + host `tsc -b --watch`，host 加载仍须重启）/ typecheck
 - **插件管理机制已验证（核心成果）**：
   - dsh-kit 聚合 patch 里每个功能行的 `disabled` 用自包含 `!!js` 表达式直接读状态文件（`process.getBuiltinModule('fs')` + `dshHomePath`）
   - 双向开关 + 重启保留全通过：`dsh-kit disable dsh-kit-notifier` → 重启 → notifier 不加载；enable 后加载

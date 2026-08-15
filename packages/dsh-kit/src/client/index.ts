@@ -14,6 +14,8 @@ interface Feature {
   enabled: boolean
   /** Whether this feature can be installed/removed directly from the store. */
   installable: boolean
+  /** Whether the store offers an enable/disable toggle (false for preset installers). */
+  togglable: boolean
   /** Whether the on-disk artifact is currently installed (installable only). */
   installed: boolean
 }
@@ -122,14 +124,16 @@ function StorePanel() {
             : null,
         ),
         createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' } },
-          createElement('button', {
-            style: {
-              padding: '4px 10px', borderRadius: T.radius, border: '1px solid ' + T.border,
-              background: 'transparent', color: 'inherit', cursor: busy === f.id ? 'wait' : 'pointer', fontSize: 12, whiteSpace: 'nowrap',
-            },
-            onClick: () => toggle(f),
-            disabled: busy !== null,
-          }, busy === f.id ? '…' : (f.enabled ? '停用' : '启用')),
+          f.togglable
+            ? createElement('button', {
+                style: {
+                  padding: '4px 10px', borderRadius: T.radius, border: '1px solid ' + T.border,
+                  background: 'transparent', color: 'inherit', cursor: busy === f.id ? 'wait' : 'pointer', fontSize: 12, whiteSpace: 'nowrap',
+                },
+                onClick: () => toggle(f),
+                disabled: busy !== null,
+              }, busy === f.id ? '…' : (f.enabled ? '停用' : '启用'))
+            : null,
           f.installable
             ? createElement('button', {
                 style: {

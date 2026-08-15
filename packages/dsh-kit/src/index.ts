@@ -47,6 +47,8 @@ export interface StoreRow {
   enabled: boolean
   /** Only the anchored-standard preset feature exposes install/delete actions. */
   installable: boolean
+  /** Whether the store offers an enable/disable toggle (false for preset installers). */
+  togglable: boolean
   /** Whether the preset directory is currently on disk (installable features only). */
   installed: boolean
 }
@@ -119,6 +121,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       ...f,
       enabled: store.isEnabled(f.id),
       installable: f.installable === true,
+      togglable: f.togglable !== false,
       installed: f.installable === true
         ? existsSync(join(home, '.agent-presets', 'anchored-standard'))
         : false,

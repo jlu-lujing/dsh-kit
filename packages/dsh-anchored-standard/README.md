@@ -12,7 +12,7 @@ ${DSH_HOME:-~/.dsh}/.agent-presets/anchored-standard
 ```
 
 安装后**完整重启 DeepSeek Harness**，在**新建的空白会话**里选择
-**Anchored Standard (experimental)** 即可使用（不要在已产生内容的会话中途切换 preset）。
+**锚定标准** 即可使用（不要在已产生内容的会话中途切换 preset）。
 
 ## 这是什么
 

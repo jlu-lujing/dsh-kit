@@ -11,6 +11,13 @@ export interface Feature {
   defaultEnabled?: boolean
   /** Whether the store offers an install/delete action for this feature. */
   installable?: boolean
+  /**
+   * Whether the store offers an enable/disable toggle button for this feature.
+   * Defaults to true. Set to false for features whose on/off is driven purely
+   * by an on-disk artifact (e.g. the anchored-standard preset installer), which
+   * should only offer install/delete.
+   */
+  togglable?: boolean
 }
 
 export type FeatureId = Feature['id']
@@ -34,9 +41,10 @@ export const FEATURES: readonly Feature[] = [
   },
   {
     id: 'dsh-anchored-standard',
-    name: 'Anchored Standard 二阶段 Agent Preset',
-    description: '社区 Anchored Standard：Minimal 引导（bash/str_replace_editor）→ 首次晋升后开放 Standard 工具；安装 preset 到 ~/.dsh/.agent-presets/anchored-standard',
+    name: '锚定标准',
+    description: '二阶段 Agent Preset：Minimal 引导（bash/str_replace_editor）→ 首次晋升后开放 Standard 工具；安装 preset 到 ~/.dsh/.agent-presets/anchored-standard',
     defaultEnabled: true,
     installable: true,
+    togglable: false,
   },
 ]
