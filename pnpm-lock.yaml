@@ -24,16 +24,16 @@ importers:
   packages/dsh-kit:
     dependencies:
       dsh-kit-input-history:
-        specifier: ^0.1.0
+        specifier: ^0.2.0
         version: link:../dsh-kit-input-history
       dsh-kit-lan-auth:
-        specifier: ^0.1.0
+        specifier: ^0.2.0
         version: link:../dsh-kit-lan-auth
       dsh-kit-notifier:
-        specifier: ^0.1.0
+        specifier: ^0.2.0
         version: link:../dsh-kit-notifier
       dsh-kit-scheduler:
-        specifier: ^0.1.0
+        specifier: ^0.2.0
         version: link:../dsh-kit-scheduler
     devDependencies:
       '@deepseek-ai/cordis':

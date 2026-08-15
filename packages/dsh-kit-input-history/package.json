@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit-input-history",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH 输入历史（dsh-kit 全家桶功能包，由 dsh-kit 聚合包挂载）——记录当前会话发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填",
   "type": "module",
   "main": "lib/index.js",

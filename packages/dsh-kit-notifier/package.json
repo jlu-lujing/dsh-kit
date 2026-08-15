@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit-notifier",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH 桌面通知（dsh-kit 全家桶功能包，由 dsh-kit 聚合包挂载）",
   "type": "module",
   "main": "lib/index.js",

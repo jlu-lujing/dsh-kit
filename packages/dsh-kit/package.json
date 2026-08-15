@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH 傻瓜式插件全家桶聚合包 - 装一个包，所有功能开箱即用",
   "type": "module",
   "main": "lib/index.js",
@@ -31,10 +31,10 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
-    "dsh-kit-input-history": "^0.1.0",
-    "dsh-kit-lan-auth": "^0.1.0",
-    "dsh-kit-notifier": "^0.1.0",
-    "dsh-kit-scheduler": "^0.1.0"
+    "dsh-kit-input-history": "^0.2.0",
+    "dsh-kit-lan-auth": "^0.2.0",
+    "dsh-kit-notifier": "^0.2.0",
+    "dsh-kit-scheduler": "^0.2.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

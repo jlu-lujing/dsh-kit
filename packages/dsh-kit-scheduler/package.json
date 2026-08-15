@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit-scheduler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH 定时任务（dsh-kit 全家桶功能包，由 dsh-kit 聚合包挂载）",
   "type": "module",
   "main": "lib/index.js",
