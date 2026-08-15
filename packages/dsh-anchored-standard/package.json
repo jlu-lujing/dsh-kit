@@ -1,0 +1,29 @@
+{
+  "name": "dsh-anchored-standard",
+  "version": "0.1.0",
+  "description": "DSH 二阶段 agent preset 安装器（dsh-kit 全家桶第 5 个功能包）——anchored-standard：Minimal 工具对引导，首次晋升后开放 Standard 工具目录",
+  "type": "module",
+  "main": "index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "preset/**/*",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node --check index.mjs",
+    "typecheck": "node --check index.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT"
+}

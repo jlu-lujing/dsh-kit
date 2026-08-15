@@ -9,6 +9,8 @@ export interface Feature {
   description: string
   /** Default on/off when no explicit state is recorded (default true). */
   defaultEnabled?: boolean
+  /** Whether the store offers an install/delete action for this feature. */
+  installable?: boolean
 }
 
 export type FeatureId = Feature['id']
@@ -29,5 +31,12 @@ export const FEATURES: readonly Feature[] = [
     name: '局域网鉴权网关',
     description: '自签名 HTTPS 网关：本机免登录，局域网 token/登录访问',
     defaultEnabled: false,
+  },
+  {
+    id: 'dsh-anchored-standard',
+    name: 'Anchored Standard 二阶段 Agent Preset',
+    description: '社区 Anchored Standard：Minimal 引导（bash/str_replace_editor）→ 首次晋升后开放 Standard 工具；安装 preset 到 ~/.dsh/.agent-presets/anchored-standard',
+    defaultEnabled: true,
+    installable: true,
   },
 ]

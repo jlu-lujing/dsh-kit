@@ -1,17 +1,56 @@
 # dsh-kit aggregate patch layer.
 #
-# dsh-kit provides the store host (its own row below) and the management CLI.
-# Each feature (dsh-kit-*) is its own bundle that inserts its own row with its
-# own dynamic `disabled` expression; install them alongside via:
+# Installing dsh-kit installs the whole family: it declares the four feature
+# packages (dsh-kit-notifier / dsh-kit-scheduler / dsh-kit-lan-auth /
+# dsh-anchored-standard) as npm dependencies (hoisted into the profile's
+# top-level node_modules), and this patch inserts all five rows below. The
+# mechanism mirrors how the official
+# dsh-base aggregate works: the bundle's dependencies make the packages
+# resolvable by the Loader, and the bundle's own patch declares the rows.
 #
-#   dsh plugin --profile <p> add -w <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
+# Each feature row carries a dynamic `disabled` expression with two conditions:
+#   1. feature state (state file) — `dsh-kit disable X` / store panel, honored
+#      on the next load without editing any patch;
+#   2. RESOLVABILITY GUARD — if the feature package is not resolvable from the
+#      profile (e.g. only dsh-kit was installed so far), the row is disabled so
+#      a bare `dsh-kit` install boots clean; the store panel then offers the
+#      one-click install for the missing family.
+# The expressions are self-contained (Node builtins `fs`/`module` via
+# process.getBuiltinModule, path via `dshHomePath` / `ctx.baseUrl`) so they
+# are correct from the first loader pass, before the dsh-kit host plugin
+# applies.
 #
-# The aggregate patch does NOT re-insert feature rows: cordis rejects duplicate
-# loader entry ids within one update, and the feature's own bundle already
-# declares it. Toggling a feature = writing the dsh-kit state file (via the
-# `dsh-kit` CLI or the store panel); the feature row's `disabled` expression
-# reads it live and on every restart.
+# The feature packages no longer insert themselves (cordis rejects duplicate
+# loader entry ids within one update); dsh-kit owns every row here. A feature
+# disabled via its row above simply does not load, while its package stays
+# installed — the store panel / CLI can re-enable it any time.
+
+# Remote access needs the in-app (browse) directory picker — the native picker
+# opens only on the host display, invisible to a LAN browser. directory-picker
+# (auto) resolves `native` because the gateway keeps webServer loopback-bound,
+# so always disable it; the lan-auth apply dynamically injects the browse pair
+# when the gateway loads. The local+remote both use the web picker (accepted
+# cost). When lan-auth is off, dsh-kit still claims the row so a remote-only
+# plan has a stable selector.
+- id: directory-picker
+  disabled: true
 
 - insert:
     - id: dsh-kit
       name: dsh-kit
+
+    - id: dsh-kit-notifier
+      name: dsh-kit-notifier
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-notifier'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-notifier'] === false; } catch (e) { return false; } })() )"
+
+    - id: dsh-kit-scheduler
+      name: dsh-kit-scheduler
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-scheduler'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-scheduler'] === false; } catch (e) { return false; } })() )"
+
+    - id: dsh-kit-lan-auth
+      name: dsh-kit-lan-auth
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-lan-auth'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-lan-auth'] !== true; } catch (e) { return true; } })() )"
+
+    - id: dsh-anchored-standard
+      name: dsh-anchored-standard
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-anchored-standard'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-anchored-standard'] === false; } catch (e) { return false; } })() )"

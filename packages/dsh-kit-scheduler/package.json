@@ -1,7 +1,7 @@
 {
   "name": "dsh-kit-scheduler",
   "version": "0.1.0",
-  "description": "DSH 定时任务插件（dsh-kit 全家桶成员，可独立安装）",
+  "description": "DSH 定时任务（dsh-kit 全家桶功能包，由 dsh-kit 聚合包挂载）",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -10,12 +10,10 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "cordis.patch.yml",
     "lib/types/**/*.d.ts"
   ],
   "scripts": {
@@ -31,11 +29,6 @@
     "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
     "@types/node": "^26.2.0",
     "typescript": "^5.6.0"
-  },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
   },
   "license": "MIT"
 }

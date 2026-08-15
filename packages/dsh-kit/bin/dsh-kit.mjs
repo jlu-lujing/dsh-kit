@@ -6,9 +6,6 @@ import { spawnSync } from 'node:child_process'
 import { createStore } from '../lib/state.js'
 import { FEATURES } from '../lib/store.js'
 
-/** The whole dsh-kit family, installed together on the `install` command. */
-const FAMILY = ['dsh-kit', 'dsh-kit-notifier', 'dsh-kit-scheduler', 'dsh-kit-lan-auth']
-
 const args = process.argv.slice(2)
 const [cmd] = args
 
@@ -42,10 +39,11 @@ if (cmd === 'enable' || cmd === 'disable') {
 }
 
 if (cmd === 'install') {
-  // One command brings the whole family into a profile:
+  // One command brings the whole family into a profile. dsh-kit is the only
+  // install target: it declares the four feature packages as npm
+  // dependencies, so `dsh plugin add dsh-kit` installs them (hoisted into the
+  // profile root node_modules) and its own patch mounts all five rows.
   //   dsh-kit install [--profile <name>] [extra add flags...]
-  // Published packages are installed by name; before publishing, install the
-  // family by path instead (see README 快速开始).
   const rest = args.slice(1)
   let profile = 'web'
   const passthrough = []
@@ -54,8 +52,8 @@ if (cmd === 'install') {
     if (a === '--profile') { profile = rest[++i]; continue }
     passthrough.push(a)
   }
-  const dshArgs = ['plugin', '--profile', profile, 'add', '-w', ...passthrough, ...FAMILY]
-  console.log(`dsh-kit: installing family into profile "${profile}": ${FAMILY.join(', ')}`)
+  const dshArgs = ['plugin', '--profile', profile, 'add', '-w', ...passthrough, 'dsh-kit']
+  console.log(`dsh-kit: installing family into profile "${profile}": dsh-kit + 4 feature deps`)
   const res = spawnSync('dsh', dshArgs, { stdio: 'inherit' })
   process.exit(res.status ?? 1)
 }

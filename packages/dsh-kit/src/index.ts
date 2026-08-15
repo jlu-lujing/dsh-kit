@@ -1,10 +1,22 @@
 /** dsh-kit host plugin: aggregate shell + store state + feature toggling. */
 
+import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
+
+/** Type-only interface for the dsh-anchored-standard installer (lazy loaded). */
+interface AnchoredInstaller {
+  PRESET_ID: string
+  PACKAGE_SPEC: string
+  isInstalled(options?: { home?: string }): boolean
+  installPreset(options?: { home?: string }): { target: string; installed: boolean }
+  uninstallPreset(options?: { home?: string }): { target: string; removed: boolean }
+}
 
 /** Cordis plugin name. */
 export const name = 'dsh-kit'
@@ -12,9 +24,14 @@ export const name = 'dsh-kit'
 /** Required services: the web server hosts the store panel's management routes. */
 export const inject = ['webServer']
 
+/** The single install target of the one-click install: its npm dependencies bring the rest. */
+const INSTALL_PACKAGE = 'dsh-kit'
+
 export interface Config {
   /** Directory holding the dsh-kit state file. Defaults to dsh home. */
   stateDir?: string
+  /** Profile the store panel's one-click install targets (default `web`). */
+  installProfile?: string
 }
 
 /**
@@ -23,13 +40,39 @@ export interface Config {
  * (self-contained, no service dependency), so the two stay consistent by
  * sharing the same state file path.
  */
+export interface StoreRow {
+  id: FeatureId
+  name: string
+  description: string
+  enabled: boolean
+  /** Only the anchored-standard preset feature exposes install/delete actions. */
+  installable: boolean
+  /** Whether the preset directory is currently on disk (installable features only). */
+  installed: boolean
+}
+
 export interface DshKitService {
   /** Every known feature with its current on/off state. */
-  list(): Array<{ id: FeatureId; name: string; description: string; enabled: boolean }>
+  list(): StoreRow[]
   /** Resolve whether a feature is currently enabled (missing entry = enabled). */
   featureState(id: FeatureId): boolean
   /** Persist a feature's on/off state. */
   setEnabled(id: FeatureId, enabled: boolean): void
+}
+
+/** Resolve the DSH home used by installer-aware features (mirrors upstream installer). */
+function dshHome(): string {
+  return process.env.DSH_HOME ?? `${process.env.HOME ?? '.'}/.dsh`
+}
+
+/** Lazily load the anchored-standard installer (it is a dependency of dsh-kit). */
+async function loadAnchoredInstaller(): Promise<AnchoredInstaller | undefined> {
+  try {
+    const mod = await import('dsh-anchored-standard')
+    return mod as unknown as AnchoredInstaller
+  } catch {
+    return undefined
+  }
 }
 
 const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
@@ -62,10 +105,23 @@ export function apply(ctx: Context, config: Config = {}): void {
   const store = createStore(config.stateDir, defaults)
   store.load()
 
+  const home = dshHome()
+  // The anchored installer is a dependency of dsh-kit; resolve it lazily only
+  // when the profile actually has it installed (during local dev it may be an
+  // aggregate-patch row only). `installed` reflects the on-disk preset.
+  let anchoredInstaller: AnchoredInstaller | undefined
+  void import('dsh-anchored-standard').then((m) => {
+    anchoredInstaller = m as unknown as AnchoredInstaller
+  }).catch(() => { anchoredInstaller = undefined })
+
   const service: DshKitService = {
     list: () => FEATURES.map(f => ({
       ...f,
       enabled: store.isEnabled(f.id),
+      installable: f.installable === true,
+      installed: f.installable === true
+        ? existsSync(join(home, '.agent-presets', 'anchored-standard'))
+        : false,
     })),
     featureState: id => store.isEnabled(id),
     setEnabled: (id, enabled) => {
@@ -90,6 +146,87 @@ export function apply(ctx: Context, config: Config = {}): void {
         return sendJson(res, 200, { features: service.list() })
       }
     }
+
+    // POST /dsh-kit/store/install  — one-click install the whole family.
+    // Mirrors the `dsh-kit install` CLI: the only install target is dsh-kit.
+    // dsh-kit declares the four feature packages as npm dependencies, so
+    // `dsh plugin --profile <p> add -w dsh-kit` installs them through the
+    // profile's dependency tree and the aggregate patch mounts all five rows.
+    // The feature packages are plain libraries (no dsh.bundle layer is added).
+    // Requires the `dsh` CLI on PATH; applies to the configured installProfile
+    // (default `web`), or a `{ profile }` request body override.
+    if (req.method === 'POST' && pathname === `${PREFIX}/install`) {
+      const installProfile = config.installProfile ?? 'web'
+      const [contentType] = (req.headers['content-type'] ?? '').split(';')
+      if (contentType !== 'application/json') {
+        return sendJson(res, 415, { error: 'content-type must be application/json' })
+      }
+      try {
+        const body = JSON.parse(await readBody(req)) as { profile?: unknown }
+        const profile = typeof body.profile === 'string' && body.profile.trim()
+          ? body.profile.trim()
+          : installProfile
+        const dshArgs = ['plugin', '--profile', profile, 'add', '-w', INSTALL_PACKAGE]
+        const result = await new Promise<{ ok: boolean; code: string | number | null; stderr: string }>((resolve) => {
+          execFile('dsh', dshArgs, { timeout: 180_000 }, (error, _stdout, stderr) => {
+            const raw = (error as { code?: unknown } | null)?.code
+            const code = typeof raw === 'string' || typeof raw === 'number' ? raw : null
+            const detail = code === 'ENOENT'
+              ? 'dsh CLI not found on PATH'
+              : (stderr ?? '').slice(-2000)
+            resolve({ ok: error === null, code, stderr: detail })
+          })
+        })
+        // Pass through the profile so the panel can tell the user what to restart.
+        return sendJson(res, result.ok ? 200 : 500, {
+          ok: result.ok,
+          ...(result.ok ? { installed: true, profile } : { error: 'install failed', detail: result.stderr, code: result.code, profile }),
+        })
+      } catch {
+        return sendJson(res, 400, { error: 'bad request' })
+      }
+    }
+    // POST /dsh-kit/store/{id}/install  — install an installable feature's
+    // on-disk artifact (only dsh-anchored-standard currently): copies the
+    // bundled preset into ~/.dsh/.agent-presets/anchored-standard.
+    const installRoute = /^\/dsh-kit\/store\/([A-Za-z0-9._-]+)\/install$/.exec(pathname)
+    if (req.method === 'POST' && installRoute !== null) {
+      const id = installRoute[1]
+      const feature = FEATURES.find(f => f.id === id && f.installable === true)
+      if (!feature) return sendJson(res, 404, { error: `unknown or non-installable feature "${id}"` })
+      const mod = anchoredInstaller ?? await loadAnchoredInstaller()
+      if (!mod) return sendJson(res, 500, { error: 'dsh-anchored-standard installer unavailable' })
+      try {
+        const result = mod.installPreset({ home })
+        // Installing the artifact implies the feature should be enabled, so it
+        // stays installed across restarts.
+        service.setEnabled(id, true)
+        return sendJson(res, 200, { ok: true, id, installed: result.installed, target: result.target })
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+
+    // POST /dsh-kit/store/{id}/delete  — remove the feature's installed
+    // artifact from disk (only installable features).
+    const deleteRoute = /^\/dsh-kit\/store\/([A-Za-z0-9._-]+)\/delete$/.exec(pathname)
+    if (req.method === 'POST' && deleteRoute !== null) {
+      const id = deleteRoute[1]
+      const feature = FEATURES.find(f => f.id === id && f.installable === true)
+      if (!feature) return sendJson(res, 404, { error: `unknown or non-installable feature "${id}"` })
+      const mod = anchoredInstaller ?? await loadAnchoredInstaller()
+      if (!mod) return sendJson(res, 500, { error: 'dsh-anchored-standard installer unavailable' })
+      try {
+        const result = mod.uninstallPreset({ home })
+        // Removing the artifact also disables the feature so a later restart
+        // does not silently re-install it (apply only installs while enabled).
+        service.setEnabled(id, false)
+        return sendJson(res, 200, { ok: true, id, removed: result.removed, target: result.target })
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+
     // POST /dsh-kit/store/{id} { enabled }
     const idMatch = /^\/dsh-kit\/store\/([A-Za-z0-9._-]+)$/.exec(pathname)
     if (req.method === 'POST' && idMatch !== null) {

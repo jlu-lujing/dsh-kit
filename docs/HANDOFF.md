@@ -3,7 +3,7 @@
 > 更新日期：2026-08-15
 > 项目：dsh-kit —— DeepSeek Harness (DSH) 傻瓜式插件全家桶
 
-> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交。browse 选择器已插件化（零 profile 配置）。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
+> **当前状态（2026-08-15）**：全家桶 v1 已发布到 npm（4 包 0.1.0）——dsh-kit（管理+商店）、lan-auth（远程访问）、notifier（桌面通知）、scheduler（定时任务），均已验证并提交；**新增 v2 功能：dsh-anchored-standard**（二阶段 agent preset，默认开启，内置安装器，见 §5）。browse 选择器已插件化（零 profile 配置）。发布后**装 dsh-kit 一个包即全家桶**（聚合 patch 挂载全部功能行 + 声明子包依赖）；本地源码仍 5 包一起 link。已无待办（发布流程已完成）。详见 [§2](#2-当前状态) 与 [§7](#7-近期待办)。
 
 ## 1. 项目目标
 
@@ -13,20 +13,22 @@
 ## 2. 当前状态
 
 - **架构方案已定稿并全部实现**：见 `docs/ARCHITECTURE.md`（含开发架构：pnpm dev 热重载 / 多 profile / 热开关）
-- **4 个插件全部落地**：
-  - `packages/dsh-kit/` 聚合 bundle（host 提供 `dshKit.store` service + **CLI 管理命令** `dsh-kit list/enable/disable` + 设置页「功能商店」面板）
-  - `packages/dsh-kit-lan-auth/` 局域网远程访问网关（HTTPS 反向代理 + token/登录认证 + 登出 + browse 选择器注入 + 管理路由 + 设置页）
-  - `packages/dsh-kit-notifier/` 桌面通知（监听 `session/event` 的 `turn/end`，跨平台通知）
-  - `packages/dsh-kit-scheduler/` 定时任务（cron + 持久化 + 管理路由）
+- **5 个插件全部落地**：
+  - `packages/dsh-kit/` 聚合 bundle（host 提供 `dshKit.store` service + **CLI 管理命令** `dsh-kit list/enable/disable/install` + **聚合 patch 持有全部 5 个功能行** + 声明 4 个功能包依赖 + 设置页「功能商店」面板）
+  - `packages/dsh-kit-lan-auth/` 局域网远程访问网关（HTTPS 反向代理 + token/登录认证 + 登出 + browse 选择器注入 + 管理路由 + 设置页）——**纯库 + dsh.client，行由 dsh-kit 挂载**
+  - `packages/dsh-kit-notifier/` 桌面通知（监听 `session/event` 的 `turn/end`，跨平台通知）——**纯库，行由 dsh-kit 挂载**
+  - `packages/dsh-kit-scheduler/` 定时任务（cron + 持久化 + 管理路由）——**纯库，行由 dsh-kit 挂载**
+  - `packages/dsh-anchored-standard/` 二阶段 agent preset 安装器（上游 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)）——**预设安装器，行由 dsh-kit 挂载，默认开启**
   - 根 workspace：`pnpm build` / `pnpm build:client` / `pnpm dev`（仿官方 dev-web.ts，client 热构建）/ typecheck
 - **插件管理机制已验证（核心成果）**：
-  - 子包 patch 的 `disabled` 用自包含 `!!js` 表达式直接读状态文件（`process.getBuiltinModule('fs')` + `dshHomePath`）
+  - dsh-kit 聚合 patch 里每个功能行的 `disabled` 用自包含 `!!js` 表达式直接读状态文件（`process.getBuiltinModule('fs')` + `dshHomePath`）
   - 双向开关 + 重启保留全通过：`dsh-kit disable dsh-kit-notifier` → 重启 → notifier 不加载；enable 后加载
 - **验证通过**：
   - `pnpm install && pnpm -r build` 全绿
-  - `dsh plugin --profile dev add -w <paths>` 四个包装入 dev profile
+  - `dsh plugin --profile dev add -w <paths>` 五个包 link 进 dev profile
   - `dsh --profile dev --dump-config` 三层 patch 正确展开、无重复 id
   - `dsh --profile dev --port <p>` 启动，动态 disabled 生效（off 不加载 / on 加载）
+  - **发布后 `dsh plugin add -w dsh-kit`（registry 版）**：pnpm 把 4 个功能包作为依赖 hoist 进 profile 顶层 node_modules，聚合 patch 挂载全部行 → 全家桶加载（干净 profile 模拟验证，见 §6 更新）
 - GitHub 仓库：**https://github.com/jlu-lujing/dsh-kit**（**PRIVATE**，账号 jlu-lujing）
 - 本地路径：`~/workspace/dsh-kit`
 - dsh 源码已 clone 到 `refs/`：`refs/deepseek-harness/`
@@ -64,14 +66,15 @@
 
 ## 5. 全家桶功能清单（v1 已定稿，2026-08-15）
 
-全家桶 v1 共 4 个插件，全部为自研（**不收录他人插件**，仅参考其功能方向）：
+全家桶 v1 共 4 个插件（自研）+ v2 新增 dsh-anchored-standard（收录社区 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)）：
 
 | 插件 | 功能 | 说明 |
 |---|---|---|
-| `dsh-kit` | 插件管理 + 功能商店设置面板 | 底座：host 管理路由 + CLI + 设置页 |
-| `dsh-kit-lan-auth` | 局域网远程访问网关 | 认证/登出/browse 选择器注入，默认关闭 |
-| `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知 |
-| `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由 |
+| `dsh-kit` | 插件管理 + 功能商店设置面板（**聚合持有全部功能行**） | 底座：host 管理路由 + CLI + 设置页 + 子包依赖 |
+| `dsh-kit-lan-auth` | 局域网远程访问网关 | 认证/登出/browse 选择器注入，默认关闭；**纯库**（行由 dsh-kit 挂载） |
+| `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知；**纯库** |
+| `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由；**纯库** |
+| `dsh-anchored-standard` | 二阶段 agent preset（社区算法） | 文件安装器（装 preset 到 `~/.dsh/.agent-presets/anchored-standard`）；默认开启 |
 
 > 决策规则：只做「自己写、开箱即用、与现有插件互补」的功能。v2 候选方向与可参考的社区插件蓝本：见 `docs/research/dsh-plugin-ecosystem.md`（GitHub `dsh-plugin` topic 调研，2303 仓库）。
 
@@ -87,11 +90,8 @@
 5. **dsh-ssh 导入 bug**：ssh config 里没有 IdentityFile 的主机被误判为 password 认证导致全部失败；改为默认走 key 认证（空 keyPath 让 ssh2 用默认密钥）
 6. **环境变量**：DEEPSEEK_API_KEY / OPENCODE_API_KEY（opencode.ai 网关，模型 deepseek-v4-pro，baseURL https://opencode.ai/zen/go/v1）
 7. **之前改过 dsh 全局包的源码**：`dsh-client-connection/lib/index.js`（放开特权方法）、`dsh-web-frontend/dist/index.html`（randomUUID polyfill）——升级 dsh 后需重打补丁
-8. **聚合包 + 子包的重复 id 冲突（实测）**：cordis loader 在同一次 update 里拒绝重复 loader entry id（`duplicate loader entry id`）。聚合包 patch **不能**重复 insert 子包行。正确结构：子包 patch 各 insert 自己，聚合包只 insert 自身行。全家桶通过**一条多参数 add** 装入：
-   ```sh
-   dsh plugin --profile <p> add -w <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler>
-   ```
-9. **pnpm `link:` 装聚合包不传递依赖**：`link:` 协议的包跳过其 dependencies 解析，file: 子依赖也不会 hoist 到 profile 根 node_modules（`nodeLinker: hoisted` 只提升直接依赖）。cordis loader 从 profile 根按包名解析 → 子包不可达。**必须在 profile 根直接安装子包**（如上一条的多参数 add，或独立 add 子包）。
+8. **聚合包 + 子包的重复 id 冲突（实测）**：cordis loader 在同一次 update 里拒绝重复 loader entry id（`duplicate loader entry id`，`vendor/loader/src/config/group.ts:64`）。**v1 结构曾为避免它让「子包各自 insert 自己 + 聚合包只 insert 自身」；v2（A1）改为「聚合包一次 insert 全部 5 行，功能包全部去 bundle（纯库）」**——从根上消除重复 id，换来「装 dsh-kit = 全家桶」。
+9. **pnpm `link:` / `file:` 装聚合包不传递依赖（本地开发关键）**：`link:` 协议的包**跳过其 dependencies 解析**（`file:` 会解析但子包进 `.pnpm/` 而非顶层 hoist，也不满足 loader 顶层解析）。所以**本地源码调试必须 5 包一起 `add`（都是 link:）**；而**发布版（registry）`add dsh-kit` 时 pnpm 从 registry 正常解析依赖树，4 个功能包 hoist 进 profile 顶层 node_modules**（已用干净 profile 模拟验证：`require.resolve('dsh-kit-notifier')` 从 profile 根成功）。这是「发布版一条命令装全家桶、本地 5 包 link」差异的根本原因。
 10. **cordis host 插件 apply**：`config` 参数需默认值 `config: Config = {}`；`ctx.set('x.y', v)` 前必须 `ctx.provide('x.y')`，否则 `cannot set property without provide`。
 11. **`!!js` 表达式求值环境（插件管理核心）**：`with (ctx) { eval(expr) }`。可用：`process`、`process.env`、`ctx`、根 ctx service（如 `dshHomePath`）。**不可用**：`require`（`ReferenceError: require is not defined`）。同步读文件用 `process.getBuiltinModule('fs')`（Node 22.3+，Eval 里可用）。
 12. **`disabled` 表达式时序坑**：patch 的 `disabled` **首次求值发生在 dsh-kit 插件 apply 之前**（loader 并行加载），所以表达式**不能依赖** `dshKit.featureState` service（首轮返回 undefined → guard 短路 false → 不禁用 → 插件仍 init）。**解法**：表达式自给自足（`getBuiltinModule` + `dshHomePath` 直接读状态文件），首次求值即正确。
@@ -101,7 +101,7 @@
 16. **lan-auth 路径重复拼接（真实 bug，2026-08-14 已修复）**：`$DSH_HOME` 已是 `~/.dsh`，旧代码又在 `index.ts` 里 `path.join(home, '.dsh')` 二次拼接，导致 token/用户落到 `~/.dsh/.dsh/dsh-kit-lan-auth/`，LAN 带 token 也 401（token 不在运行进程读取的文件里）。已统一为 `store.ts` 的 `lanAuthRoot()`（直接返回 `$DSH_HOME`），`index.ts` 不再重复拼接；升级前嵌套目录里的旧数据需合并回顶层 `~/.dsh/dsh-kit-lan-auth/state.json`。
 17. **网关转发必须剥掉浏览器标记头（真实 bug，2026-08-14 已修复）**：DSH 的 `/api` 路由有**同源信任栅栏**（`client-connection/src/api-request-trust.ts`）：请求带 `Origin` 时要求 `Origin.host === Host.host`。网关原样透传浏览器 `Origin: https://<lan>:3443`、只改写 `Host → 127.0.0.1:3080`，导致所有 `/api` POST（pickDirectory/openPath/settings/credentials/llm.discoverModels）和 WebSocket 升级被 DSH 判 403。修复：`gateway.ts` 的 `outboundHeaders()` 在 LAN 转发时删除 `origin`/`sec-fetch-*`/`referer`/`referrer-policy`，只留 `x-dsh-kit-lan-auth-proxy` 标记 + 重写 Host。**网关就是认证边界**，转发到 loopback 的请求必须让 DSH 视为干净的 loopback 调用者（全权限面）。
 18. **网关 WebSocket 升级不能用 httpRequest 转发（真实 bug，2026-08-14 已修复）**：DSH 的 `WebUpgradeRoute` 把**原始 TCP socket + head 字节**交给 `ws.handleUpgrade` 完成握手；网关原先用 `httpRequest().on('upgrade')` 转发，第二条 HTTP 连接无法把客户端 socket 交接回去，导致 WS 握手永不完成（curl/WS 客户端都挂起）。修复：`gateway.ts` upgrade 分支改为**原生 TCP 隧道**——`tcpConnect(target)` 后重写请求行 + 剥离标记的头部 + 写回 `head` 字节，再双向 pipe socket。
-19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复，08-15 升级为插件化）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。**当前做法（已插件化）**：`dsh-kit-lan-auth` 的 `cordis.patch.yml` 禁用 `directory-picker`(auto) 行；lan-auth `apply()` 用 `ctx.loader.create` 动态注入 browse pair（`@deepseek-ai/dsh-host-directory-picker-browse` + `@deepseek-ai/dsh-client-ui-directory-picker-browse`），teardown 时 remove——**无需任何 profile 配置**（`~/.dsh/profiles/web/cordis.patch.yml` 已清空为 `[]`）。早期曾用 profile 配置固定 browse，现已废弃。代价：**本机和远程都用** web 选择器。验证：`host.pickDirectory` → `directory-picker-unavailable`、`host.listDirectory` 正常（本机 + 经网关 LAN 均 200）、browse client surface 在 boot graph。
+19. **远程访问必须用 browse 选择器而非 native（2026-08-14 修复，08-15 升级为插件化）**：`directory-picker-auto` 在**启动时**凭 `webServer.bindHost === '127.0.0.1'` 解析为 `native`（在**宿主机器**弹 OS 选择器）——网关保持 DSH 绑定 loopback，所以远程用户点「添加工作区」时选择器弹在宿主机器上、远程浏览器「没反应」；官方 0.0.0.0 时解析为 `browse`（webui 内 HTML 选择器，远程可见）。**当前做法（已插件化）**：dsh-kit 聚合 patch 禁用 `directory-picker`(auto) 行（该行原在 lan-auth 的 `cordis.patch.yml`，A1 翻新后随 lan-auth 去 bundle 而并入 dsh-kit 的聚合 patch）；lan-auth `apply()` 用 `ctx.loader.create` 动态注入 browse pair（`@deepseek-ai/dsh-host-directory-picker-browse` + `@deepseek-ai/dsh-client-ui-directory-picker-browse`），teardown 时 remove——**无需任何 profile 配置**（`~/.dsh/profiles/web/cordis.patch.yml` 已清空为 `[]`）。早期曾用 profile 配置固定 browse，现已废弃。代价：**本机和远程都用** web 选择器。验证：`host.pickDirectory` → `directory-picker-unavailable`、`host.listDirectory` 正常（本机 + 经网关 LAN 均 200）、browse client surface 在 boot graph。
 20. **client bundle（`lib/client.js`）不会随 `pnpm build` 生成（2026-08-14 排查/修复）**：`dsh.client` 包（如 lan-auth 的 `src/client/index.ts`）需要 **tsdown** 产出 `lib/client.js`，而根 `pnpm build` 只跑 `tsc -b`（不产 client bundle）。症状：DSH 把 entry 插进 boot graph，但 `/plugins/<id>/client.js` 404 → 浏览器 `client-modules: bundle script ... failed to load`，**非本机远程访问也报同样错**。修复：新增 `scripts/build-client-once.mjs`（tsdown workspace 单次构建，仿 `scripts/dev-web.ts` 去 watch）；`pnpm dev`（watch）常驻产出亦可。**换机器/重新 clone 后必须跑一次**该脚本（或 `pnpm dev`）再启动 dsh，才有客户端面板。
 21. **动态 loader 注入的插件必须是 profile 已解析的依赖（2026-08-15）**：`ctx.loader.create({ name })` 只能装 profile node_modules 里**可解析**的包。browse pair 是 `@deepseek-ai` 官方包（web-app 已依赖），所以 lan-auth 动态注入可用；若是自研子包需确保在 profile dependencies。`ctx.loader` 类型来自 `@deepseek-ai/cordis-plugin-loader`（devDep，故 lan-auth 补了 `cordis-plugin-loader: 1.0.2`）。
 22. **JSDoc 注释里的 `*/` 会提前闭合块注释（2026-08-15 踩坑）**：写 `cron 表达式 '*/s'` 这类注释时 `*/` 被 TS 当注释终止符，后续内容变成代码 → `TS1005/TS1002`（"Unterminated string/template literal"）。规避：注释里用转义 `*\/` 或改写措辞避开 `*/` 序列。**顺带**：scheduler 任务命令一开始用 `execFile`（无 shell，`$()` 原样），用户期望 shell → 已改 `exec`（`/bin/sh -c`），支持管道/变量（命令来自本地可信配置面，风险可控）。
@@ -126,7 +126,8 @@
   - 配套：lan-auth 登出（`__dsh_kit_lan_logout` + `revokeToken` + LogoutButton）
 - `dsh-kit-notifier` 桌面通知：监听 `session/event` 的 `turn/end`，按 reason 发跨平台桌面通知——macOS `osascript` / Linux `notify-send` / Windows PowerShell toast，零 npm 依赖（dep: `@deepseek-ai/dsh-session` 取类型）
 - `dsh-kit-scheduler` 定时任务：用户级 cron（5 字段）+ 持久化 `~/.dsh/dsh-kit-scheduler/tasks.json` + 管理路由 `/dsh-kit-scheduler/tasks`（GET/POST/DELETE/PATCH）+ 每秒 tick 触发；命令走 `/bin/sh -c`（支持管道/变量，用户配置的本地信任面）
-- 确定全家桶功能清单（v1 定稿）：4 个功能（dsh-kit / lan-auth / notifier / scheduler）全实现并验证（见 §5）
+- 确定全家桶功能清单（v2）：5 个功能（dsh-kit / lan-auth / notifier / scheduler / dsh-anchored-standard）全实现并验证（见 §5）
+- **装一个包带全部（A1，二次翻新 + anchored）**：dsh-kit 聚合 patch 持有全部 5 行；4 个功能包去 bundle 变纯库；发布后 `dsh plugin add -w dsh-kit` 即全家桶（registry 依赖解析 + 顶层 hoist 已验证）；本地源码仍 5 包 link：
 
 ### 待办
 
@@ -142,9 +143,12 @@ dsh web --port 3080
 dsh plugin --profile web add -w <path|pkg>
 dsh plugin --profile web remove <name>
 
-# dsh-kit 全家桶安装（一条命令）
+# dsh-kit 全家桶安装（一条命令，发布后 = 装 dsh-kit 即全家桶）
+dsh plugin --profile <p> add -w dsh-kit
+
+# 本地源码（link: 不解析依赖，5 包一起 link）
 dsh plugin --profile <p> add -w \
-  <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler> <dsh-kit-lan-auth>
+  <dsh-kit> <dsh-kit-notifier> <dsh-kit-scheduler> <dsh-kit-lan-auth> <dsh-anchored-standard>
 
 # dsh-kit 插件管理 CLI（读写 ~/.dsh/dsh-kit/state.json）
 dsh-kit list | status | ls
@@ -152,7 +156,7 @@ dsh-kit enable <feature>
 dsh-kit disable <feature>
 dsh-kit install [--profile <p>]    # 一条命令装全家桶（发布后）
 
-# 发布（4 包各自）
+# 发布（5 包各自）
 cd packages/<pkg> && npm publish
 
 # 配置查看

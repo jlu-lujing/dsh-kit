@@ -56,24 +56,25 @@ dsh-kit 是一个 DSH「傻瓜式插件全家桶」：
 ```
 dsh-kit/
 ├── packages/
-│   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI
-│   │   ├── package.json         #   dsh.bundle.patch + bin: dsh-kit
-│   │   ├── cordis.patch.yml     #   insert 自身行（host service）
-│   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable
+│   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI（持有全部功能行 + 子包依赖）
+│   │   ├── package.json         #   dsh.bundle.patch + 4 个功能包 dependencies + bin: dsh-kit
+│   │   ├── cordis.patch.yml     #   insert 全部 5 行（自身 + 4 功能，各带动态 disabled 表达式）+ directory-picker 禁用
+│   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable / install
 │   │   └── src/
 │   │       ├── index.ts         #   host 插件：dshKit.store service + 管理路由
 │   │       ├── store.ts         #   功能元数据 + 清单
 │   │       ├── state.ts         #   状态文件读写（~/.dsh/dsh-kit/state.json）
 │   │       └── client/          #   「功能商店」设置面板
-│   ├── dsh-kit-notifier/        # 桌面通知（监听 turn/end，跨平台通知）
-│   ├── dsh-kit-scheduler/       # 定时任务（cron + 持久化 + 管理路由）
-│   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（HTTPS 反向代理，默认关闭）
+│   ├── dsh-kit-notifier/        # 桌面通知（监听 turn/end，跨平台通知）——纯库，行由 dsh-kit 挂载
+│   ├── dsh-kit-scheduler/       # 定时任务（cron + 持久化 + 管理路由）——纯库，行由 dsh-kit 挂载
+│   ├── dsh-kit-lan-auth/        # 局域网鉴权网关（HTTPS 反向代理，默认关闭）——纯库 + dsh.client，行由 dsh-kit 挂载
 │   │   ├── bin/dsh-kit-lan-auth.mjs # CLI：init-ca / status（私有 CA 管理）
 │   │   ├── src/index.ts         #   host：起网关 + 管理路由 + browse 注入
 │   │   ├── src/gateway.ts       #   HTTPS 代理（本机免登 + token/登录 + 代理标记 + WS 隧道 + 静态放行 + CA/登出端点 + 登录限速）
 │   │   ├── src/store.ts         #   用户/token 持久化 + TTL 过期 + 爆破限速 + 登出吊销
 │   │   ├── src/cert.ts          #   私有 CA 自动生成（root + leaf，SAN 覆盖本机 IP）+ initPrivateCa
 │   │   └── src/client/          #   webui 设置页（token/用户）+ 远程登出按钮
+    └── dsh-anchored-standard/        # 二阶段 agent preset（bash/str_replace_editor 引导 → Standard 工具目录）—— preset 安装器，行在聚合 patch 里
 └── docs/
     ├── ARCHITECTURE.md          # 本文档
     └── HANDOFF.md               # 交接文档
@@ -84,25 +85,30 @@ dsh-kit/
 ### 5.1 安装
 
 ```sh
-dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
+# 发布后：装 dsh-kit 一个包 = 全家桶（它声明 4 个功能包为依赖，聚合 patch 挂载全部 5 行）
+dsh plugin --profile web add -w dsh-kit
+
+# 本地源码（link: 不解析依赖）：5 包一起 link 进 dev profile
+dsh plugin --profile web add -w \
+    ~/workspace/dsh-kit/packages/dsh-kit \
     ~/workspace/dsh-kit/packages/dsh-kit-notifier \
     ~/workspace/dsh-kit/packages/dsh-kit-scheduler \
-    ~/workspace/dsh-kit/packages/dsh-kit-lan-auth
+    ~/workspace/dsh-kit/packages/dsh-kit-lan-auth \
+    ~/workspace/dsh-kit/packages/dsh-anchored-standard
 ```
 
-- 聚合包 dsh-kit + 各功能子包一次装入（一条命令带进全家桶）
-- pnpm 装入并 reconcile 进 `dsh.profile.bundles`
+- 发布版 `pnpm add dsh-kit` → pnpm 把 4 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`，全家桶全部加载。
 - dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务
 
-### 5.1.1 关键约束：聚合包不重复 insert 子包行
+### 5.1.1 关键约束：行的唯一归属（聚合包持有全部行）
 
-**实测发现**（dev profile 验证）：cordis loader 在同一层栈的**同一次 update 内拒绝重复 id**（`duplicate loader entry id`）。因此：
+**实测发现**：cordis loader 在**同一次 update 内拒绝重复 id**（`duplicate loader entry id`，`vendor/loader/src/config/group.ts:64`）。A1 化之后：
 
-- ✅ **子包各自 patch 只 insert 自己**（`- id: dsh-kit-notifier`）
-- ✅ **聚合包 dsh-kit 只 insert 自身行**（host + 面板），**不重复 insert 子包行**
-- 各子包声明独立 `dsh.bundle.patch`（可单装），聚合包依赖它们（`file:` 或 registry）
+- ✅ **聚合包 dsh-kit 的 patch insert 全部 5 行**（自身 + notifier + scheduler + lan-auth + anchored），每行带动态 `disabled` 表达式
+- ✅ **4 个功能包不再声明 `dsh.bundle`**（改为纯库，仅提供 host/client 代码，行由 dsh-kit 挂载）——彻底避免重复 id
+- lan-auth 的 client 面板仍正常：`dsh.client` 注入只要求 loader 里有 `name === 'dsh-kit-lan-auth'` 且未 disabled 的 entry（`client/modules/src/index.ts:386` processOne），与「该包是否是 bundle」无关
 
-**装机命令是一条多参数 add**（见上），四个都进 bundles 栈，patch 各自展开、无重复。
+> 代价（v1 已接受）：功能包不再可**单独**作为 bundle 去 add/remove；想移除某个功能用 `dsh-kit disable <feature>`（行 disabled），保留物理安装（方便随时恢复）。
 
 ### 5.2 用户开关（CLI / 面板 → 状态文件）
 
@@ -113,9 +119,9 @@ dsh plugin --profile web add -w ~/workspace/dsh-kit/packages/dsh-kit \
   → 下次加载（或 HMR 重求值）时生效
 ```
 
-### 5.3 生效机制：子包 patch 动态 disabled 表达式（已验证）
+### 5.3 生效机制：聚合 patch 动态 disabled 表达式（已验证）
 
-每个功能子包的 patch 里，行带一个**自包含的 `!!js` 表达式**直接读状态文件：
+每个功能行由 dsh-kit 聚合 patch 声明，行带一个**自包含的 `!!js` 表达式**直接读状态文件：
 
 ```yaml
 - id: dsh-kit-notifier
@@ -269,6 +275,28 @@ token 通过 webui 设置页（settings.section「局域网鉴权」）或本机
 - 管理路由：`GET/POST /dsh-kit-scheduler/tasks`，`PATCH/DELETE /dsh-kit-scheduler/tasks/:id`
 - 调度：每秒 tick 检查到期任务（含分钟级防重复触发护栏）；任务命令走 `/bin/sh -c`（支持管道/变量）
 
-## 11. 参考
+
+## 12. 二阶段 Agent Preset（dsh-anchored-standard）
+
+> 采纳来源：社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。本地参考副本：`refs/dsh-anchored-standard/`。
+
+### 定位
+
+- 形态是 DSH **agent preset**（`~/.dsh/.agent-presets/anchored-standard`），不是 Cordis bundle 插件；不是 `dsh plugin add` 能装的普通包，需由安装器把 preset 目录复制进用户 preset 根。
+- 二阶段策略：首次模型请求用 Minimal 对齐的 system prompt + Minimal 真实工具对（持久 `bash` + `str_replace_editor`，不含工作区/技能自动上下文）；首次持久晋升信号（`tool/call` 或首次 `assistant/message`）后开放 Standard 完整工具目录。
+
+### 全家桶接入方式
+
+- `dsh-kit` 聚合 patch 新增 `- id: dsh-anchored-standard` 行，以文件系统安装器（`packages/dsh-anchored-standard/index.mjs`）作为 loader entry；可控开关（默认**开启**）与现有全家桶相同：状态文件 + 动态 `disabled` 表达式。
+- `dsh-kit` 声明 `dsh-anchored-standard` 为 npm 依赖，发布后 `dsh plugin add dsh-kit` 仍「一个包全家桶」。
+- 行激活时安装器把自带 preset 文件复制到 `~/.dsh/.agent-presets/anchored-standard`；crash/重启/临时状态均按需幂等重新复制，无副作用。
+- 不碰 dsh 官方 profile/`.agent-presets` 结构；从不导入宿主模块，单文件零依赖，跨平台复制。
+
+### 为何不是“纯库 + 聚合 patch 持有行”
+
+- preset 本体是**文件目录**而不是 npm 可解析的 JS 包：`name: ./xxx.mjs` 的相对行无法跨数组目录解析成聚合包里的文件。
+- 所以采取「文件系统安装器 + bundle 行」的组合：bundle 行只负责开关与生命周期，preset 文件随包分发、由安装器落到 preset 根。
+
+## 13. 参考
 
 - dsh 源码：`refs/deepseek-harness/`（apps/cli/src/plugin.ts、packages/boot/app-boot、packages/extensions/ui-cordis、packages/extensions/cordis-host-runner）
