@@ -1,0 +1,191 @@
+# dsh-kit Desktop 桌面客户端设计
+
+> 更新日期：2026-08-15
+> 状态：方案已确认，尚未实现
+> 分支：`feature/client-wrapper`
+
+## 1. 定位
+
+dsh-kit Desktop 是一个**独立桌面软件**：
+
+- 用户**不需要单独安装 dsh**（dsh 内置在应用里）；
+- dsh 作为**独立子模块（dsh-runtime）**随应用发布，并拥有自己的版本号与更新通道，可脱离 Electron 壳单独更新；
+- Electron 壳只负责窗口、进程生命周期、托盘、更新，不 fork、不修改、不侵入 dsh 代码；
+- dsh-kit 插件包继续保持 npm 发布线与 dsh 的插件机制，桌面端不是插件的替代形态。
+
+## 2. 硬约束与已验证事实（dsh 0.1.0-rc.6 + Electron 43.4.0）
+
+1. **dsh web 前端不能离线打包**：`index.html` 由运行中的 dsh 通过 index taps 注入
+   `window.__DSH_BOOT__`（当前 profile 的 boot manifest）。把 dist 拷进应用用 `file://`
+   打开无法启动。因此桌面壳必须加载 dsh 实时提供的 loopback HTTP 服务。
+2. **dsh web 是纯 loopback 服务**：默认 `127.0.0.1:3080`；`--host 0.0.0.0` 被 dsh
+   主动拒绝。壳只加载 `http://127.0.0.1:<port>`。
+3. **`--port 0` 可用**：dsh 会在 loader 落定后打印就绪行
+   `dsh web: http://127.0.0.1:<port>`。这行 stdout 是壳的就绪信号和真实端口来源。
+4. **空 `~/.dsh` 可自举**：首次执行 `dsh web` 会自动初始化 `web` profile
+   （`@deepseek-ai/dsh-base` + `@deepseek-ai/dsh-web-app`），无需用户预装任何东西。
+5. **Electron 内置 Node 可运行 dsh，但需要 `--expose-internals`**：
+   - Electron 43.4.0 内置 Node 24.18.1，满足 dsh 要求；
+   - `ELECTRON_RUN_AS_NODE=1` 直接运行 dsh 会在 HMR 服务处失败，因为
+     `node-addon-require-builtin` 在 Electron-as-Node 下不可用（缺少
+     `GetAlignedPointerFromEmbedderData` symbol）；
+   - 加上 `--expose-internals` 后完整跑通：`dsh web --port 0` 启动成功，
+     `GET /` 返回 200 且页面包含 `__DSH_BOOT__`；
+   - `node-pty` / `sharp` / `koffi` 原生依赖在该模式下均可加载。
+6. **launcher flags 必须在 app flags 之前**：
+   `dsh web --port 0 --patch x.yml` 会报 `unknown option '--patch'`；
+   正确顺序是 `dsh web --patch x.yml --port 0`。
+7. **单实例约束**：同一 profile 下 `dsh-kit-lan-auth` 网关固定监听 3443，
+   第二个 dsh 实例会 EADDRINUSE。壳必须做单实例锁与“已有 dsh 实例复用”。
+8. **dsh 本身没有 git worktree 功能**：CLI 只有 `profile` / `web` / `plugin` /
+   `--dump-config`；`@deepseek-ai/dsh-workspace` 是 workspace 记录注册表，不是 git
+   worktree；workflow 的 `isolation: 'worktree'` 明确 deferred；hooks 兼容层不支持
+   `WorktreeCreate` / `WorktreeRemove`。未来的多 worktree 工作区能力需要我们自己
+   封装 git 命令，不能依赖 dsh。
+
+## 3. 架构决策
+
+| 决策点 | 结论 |
+|---|---|
+| 壳技术 | Electron |
+| dsh 形态 | 内置 `dsh-runtime` 独立子模块（自带 Node + `@deepseek-ai/dsh` 全依赖树） |
+| 渲染方式 | BrowserWindow 加载 dsh 实时 loopback URL，不打 dist、不启 file:// |
+| DSH_HOME | 默认 `~/.dsh`，与现有 CLI 共享 profile、插件、会话 |
+| 端口 | spawn 使用 `dsh web --port 0`，解析 stdout 就绪 URL |
+| 单实例 | 应用单实例锁；优先探测并复用已有健康 dsh 实例 |
+| dsh 更新 | dsh-runtime 独立版本与发布物，用户数据目录原子切换，不随壳强制升级 |
+| 壳更新 | electron-updater 等常规渠道，与 dsh-runtime 完全解耦 |
+
+### 3.1 为什么 dsh-runtime 自带 Node，而不是用 Electron 内置 Node
+
+`ELECTRON_RUN_AS_NODE` 已验证可用（见 §2.5），但它把 dsh 的 Node 版本锁死在
+Electron 壳上：未来 dsh 要求更高 Node 时，单独更新 dsh-runtime 会失效，必须同时
+升级整个壳，违背独立更新的目标。
+
+因此目标态（方案 B）：
+
+- dsh-runtime 内含官方 Node 二进制，版本写入 `runtime.json`；
+- 启动命令固定为：
+  `<runtime>/node/bin/node --expose-internals <runtime>/node_modules/@deepseek-ai/dsh/lib/bin.js web --port 0`
+- dsh 需要新 Node 时，只需发布新的 dsh-runtime zip，壳无需改动。
+
+MVP 阶段允许先用 Electron 内置 Node（方案 A）跑通壳与更新链路，但 spawn 逻辑必须
+抽象为 `DshRuntime`，切换方案只换运行时路径，不改壳代码。
+
+## 4. 仓库结构
+
+```
+dsh-kit/
+├── packages/                    # 现有 dsh-kit 插件（npm 包，发布线不变）
+├── apps/
+│   ├── desktop/                 # Electron 壳（独立版本线）
+│   │   ├── src/main/            # 运行时发现/启动、单实例锁、托盘、生命周期
+│   │   ├── src/preload/         # 可选：contextBridge 注入 __DSH_DESKTOP__
+│   │   ├── src/renderer/        # 启动页 / 错误页 / 日志页
+│   │   └── electron-builder.yml
+│   └── dsh-runtime/             # dsh 内置运行时子模块（独立版本、独立更新）
+│       ├── package.json         # pin "@deepseek-ai/dsh": "精确版本"
+│       ├── package-lock.json
+│       └── scripts/             # 构建/打包/裁剪脚本
+└── scripts/
+    └── build-dsh-runtime.mjs    # 产出 dsh-runtime-<ver>-<platform>-<arch>.zip
+```
+
+## 5. dsh-runtime 子模块规范
+
+### 5.1 目录内容
+
+```
+dsh-runtime/
+├── runtime.json          # schemaVersion / dshVersion / nodeVersion / platform / arch / builtAt
+├── node/
+│   └── bin/node          # 官方 Node（当前目标：24.x LTS）
+├── node_modules/
+│   ├── @deepseek-ai/dsh/ # 含 lib/bin.js，全部 dependencies 已安装
+│   └── ...               # node-pty / sharp / koffi 等平台原生 prebuild
+└── VERSION               # 冗余文本版本，便于排障
+```
+
+### 5.2 构建与发布
+
+- 在 `apps/dsh-runtime` 中 `npm ci --omit=dev`（每个目标平台各跑一次，平台矩阵在 CI）；
+- 下载对应平台/架构的官方 Node 二进制到 `node/`；
+- 裁剪非目标平台的 prebuild（例如 node-pty 包内约 62MB 的多平台 `.node`）；
+- 写 `runtime.json`，打包为：
+  `dsh-runtime-<dshVersion>-<platform>-<arch>.zip`
+- 该 zip 是 dsh-runtime 的独立发布物，版本号跟随 `@deepseek-ai/dsh`，与桌面壳版本无关。
+
+### 5.3 安装位置与覆盖规则
+
+- 出厂版本：随安装包进入 `resources/dsh-runtime/`（只读、随壳签名）；
+- 更新版本：进入用户数据目录 `<userData>/dsh-runtime/current/`；
+- 启动选择：用户数据目录存在且校验通过 → 用它；否则回退出厂版本；
+- 这样更新 dsh 不需要改写已签名 App 包，也不会破坏 macOS notarization。
+
+## 6. 壳运行流程
+
+```
+应用启动
+  → 单实例锁（已有壳实例则聚焦退出）
+  → 读取 runtime.json，校验 dsh CLI：--version + web --dump-config
+  → 探测 127.0.0.1:3080 是否已有健康 dsh 实例
+      ├─ 有：复用（标记 external，壳退出时不杀）
+      └─ 无：spawn 自己的 dsh 子进程（--port 0）
+  → 等待 stdout 出现 "dsh web: http://127.0.0.1:<port>"（超时进错误页）
+  → BrowserWindow.loadURL(该 URL)
+  → 运行期：
+      · will-navigate / setWindowOpenHandler 仅放行同 origin
+      · nodeIntegration 关闭、contextIsolation 开启
+      · dsh 日志写应用日志文件
+  → 退出：SIGINT → 5s → SIGKILL（external 实例除外）
+```
+
+已知限制：已有 dsh 实例的探测先覆盖默认 3080；用户在其他端口常驻 dsh 时，本版本
+暂不自动发现，需后续通过进程/端口扫描或手动配置补上。
+
+## 7. dsh-runtime 独立更新链路
+
+```
+更新 feed（版本 + 平台 + 架构 + url + sha512 + 最小壳版本）
+  → 后台下载 zip
+  → 校验 sha512
+  → 解压到 <userData>/dsh-runtime/next/
+  → 冒烟验证：node --expose-internals bin.js --version && web --dump-config
+  → 停止当前 dsh 子进程
+  → 原子切换 current ↔ previous
+  → 重启 dsh 并等待就绪 URL
+  → 失败：自动回滚 previous，错误页提示
+```
+
+原则：
+
+- dsh-runtime 更新不强制用户重启壳（切换后重启 dsh 子进程即可）；
+- 壳只要求 `runtime.json` 的 schemaVersion 兼容；
+- dsh 与 Node 在同一个运行时发布物里一起更新，避免版本错配。
+
+## 8. 与 dsh-kit 插件的关系
+
+- 桌面壳默认使用 `~/.dsh`，因此用户已装的 dsh-kit 全家桶、状态文件、lan-auth 网关
+  配置全部自然可见；
+- dsh-kit 插件继续走 `dsh plugin add` / npm 发布，桌面端 v1 不重新实现插件安装；
+- 后续可在壳里做“插件管理”页：自己封装 `dsh plugin --profile web ...`，并考虑把
+  pnpm 纳入 dsh-runtime（v1 不做）。
+
+## 9. 阶段计划
+
+| 阶段 | 内容 | 完成标志 |
+|---|---|---|
+| M1 | `apps/dsh-runtime` 骨架 + pin dsh 版本 + 当前平台 runtime 构建脚本 | 本机产出可运行 runtime + runtime.json |
+| M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | 双击启动即见 dsh web，退出后子进程不残留 |
+| M3 | electron-builder 打包 extraResources + 出厂 runtime | 三平台安装包可构建，离线可用 |
+| M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | 单独升级 dsh 不需要重新下载壳 |
+| M5 | 签名/公证、托盘、开机自启、错误页打磨 | 可对外发布 |
+| 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
+
+## 10. 不侵入 dsh 的边界
+
+- 不修改 `@deepseek-ai/*` 源码或构建产物；
+- 不复制 dsh 前端 dist，不用 `file://` 打开；
+- 不写用户的 `cordis.patch.yml`，不改 dsh profile 结构；
+- 与 dsh 只通过 CLI（spawn）和 loopback HTTP（WebView）交互；
+- dsh-runtime 与壳之间只有 `runtime.json` + spawn 契约 + stdout 就绪行。
