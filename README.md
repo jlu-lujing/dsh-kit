@@ -29,6 +29,7 @@ dsh-kit/
 ├── apps/
 │   ├── dsh-runtime/     # 桌面端内置 dsh 独立运行时子模块（自带 Node + @deepseek-ai/dsh 全依赖树）
 │   └── desktop/         # Electron 壳（桌面客户端，见 docs/DESKTOP.md）
+├── .github/workflows/   # CI（build/typecheck/test）+ npm 发布 workflow
 ├── .gitignore
 ├── package.json         # workspace 根
 ├── pnpm-workspace.yaml  # pnpm workspace
@@ -39,13 +40,14 @@ dsh-kit/
 
 | 组件 | 功能 | 说明 |
 | --- | --- | --- |
-| `dsh-kit` | 聚合底座 | host 管理 CLI + 设置页「功能商店」+ 内置 preset 管理器 |
+| `dsh-kit` | 聚合底座 | host 管理 CLI + 设置页「功能商店」+「归档会话」管理 + 内置 preset 管理器 |
 | `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知（macOS/Linux/Windows），零 npm 依赖 |
 | `dsh-kit-scheduler` | 定时任务 | cron 定时任务 + 持久化 + 管理路由（支持 shell 命令） |
 | `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
 | `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
 | `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
+| 归档会话管理（内置） | 归档会话恢复 / 删除 | 官方「归档」只隐藏不删；设置页可恢复或彻底删除（含日志文件） |
 
 > 💡 满血模式不是独立 npm 包，由 `dsh-kit` 内置打包分发（详见下方「借鉴」）。
 
