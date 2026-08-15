@@ -24,6 +24,7 @@ import {
   type UpdateListener,
 } from './updater'
 import { applyAutostart, createTray, windowIconPath, appVersion } from './app-features'
+import { ensureFamilyInstalled } from './plugins'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -175,6 +176,16 @@ async function boot(): Promise<void> {
     dshUrl = url
     appendLog(`boot: dsh ready at ${url}`)
     log.forEach((l) => appendLog(`dsh: ${l.trim()}`))
+
+    // 自管实例就绪后，后台保证 web profile 里已装 dsh-kit 全家桶（开箱即用）。
+    // 仅自管实例触发：复用外部 3080 时不干预用户已有实例。
+    ensureFamilyInstalled(spawnBase.nodeBin, spawnBase.dshBin, {
+      profile: 'web',
+      dshHome: dshHome(),
+      profilesDir: join(dshHome(), 'profiles'),
+      log: (l) => appendLog(l),
+    })
+
     createWindow(url)
     // 启动成功后后台非阻塞检查更新（失败只记录，不影响使用）
     checkForUpdates()
