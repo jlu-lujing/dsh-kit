@@ -8,6 +8,7 @@ import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
 import { installPreset, uninstallPreset, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
 import { createEcosystemController } from './ecosystem.ts'
+import { listArchived, restoreSession, deleteSession } from './archive.ts'
 
 /** Feature id of the inline preset feature (matches store.ts / state file). */
 const PRESET_FEATURE_ID = `dsh-${PRESET_ID}` as const
@@ -250,4 +251,46 @@ export function apply(ctx: Context, config: Config = {}): void {
   }
   const dispose = webServer.register({ kind: 'prefix', path: PREFIX, handler })
   ctx.effect(() => () => dispose?.(), 'dsh-kit.store.http-routes')
+
+  // ── 归档会话管理路由 ─────────────────────────────────────────────
+  //   GET  /dsh-kit/archive/sessions          → { items, count }
+  //   POST /dsh-kit/archive/{id}/restore      → 从归档集移除（恢复）
+  //   POST /dsh-kit/archive/{id}/delete       → 移出归档 + 从 workspace 摘除 + 删磁盘目录
+  // 直接读写 ~/.dsh/storages/workspace.json；操作后需重启 dsh 生效（内存权威）。
+  const ARCHIVE_PREFIX = '/dsh-kit/archive'
+  const archiveHandler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    const pathname = (req.url ?? '/').split('?')[0]
+    if (req.method === 'GET' && (pathname === `${ARCHIVE_PREFIX}/sessions` || pathname === `${ARCHIVE_PREFIX}/sessions/`)) {
+      try {
+        return sendJson(res, 200, { ok: true, ...listArchived(dshHome()) })
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+    // POST /dsh-kit/archive/{sessionId}/restore
+    const restoreRoute = /^\/dsh-kit\/archive\/([A-Za-z0-9._-]+)\/restore$/.exec(pathname)
+    if (req.method === 'POST' && restoreRoute !== null) {
+      try {
+        const sessionId = restoreRoute[1]
+        const result = restoreSession(dshHome(), sessionId)
+        return sendJson(res, 200, { ok: true, sessionId, restored: result.restored })
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+    // POST /dsh-kit/archive/{sessionId}/delete
+    const deleteRoute = /^\/dsh-kit\/archive\/([A-Za-z0-9._-]+)\/delete$/.exec(pathname)
+    if (req.method === 'POST' && deleteRoute !== null) {
+      try {
+        const sessionId = deleteRoute[1]
+        const result = deleteSession(dshHome(), sessionId)
+        return sendJson(res, result.ok ? 200 : 500, result)
+      } catch (error) {
+        return sendJson(res, 500, { error: String((error as Error).message ?? error) })
+      }
+    }
+    sendJson(res, 404, { error: 'not found' })
+  }
+  const archiveDispose = webServer.register({ kind: 'prefix', path: ARCHIVE_PREFIX, handler: archiveHandler })
+  ctx.effect(() => () => archiveDispose?.(), 'dsh-kit.archive.http-routes')
 }

@@ -119,13 +119,13 @@ dsh-kit install [--profile <p>]                     # 把全家桶装进指定 p
 
 ```sh
 pnpm dev              # 双 watch：client 热构建（改面板即时生效）+ host tsc watch（自动重编译，重启 dsh 生效）
-pnpm build             # 全量构建（tsc，host 端）
-pnpm build:client      # 产 client bundle（tsdown，lib/client.js）
+pnpm build             # 全量构建：各包跑自己的 build（host tsc；lan-auth / input-history 含 client tsdown）
+pnpm build:client      # 统一补齐所有 dsh.client 包的 lib/client.js（含聚合包 dsh-kit）
 pnpm typecheck         # 类型检查
 pnpm test              # 测试
 ```
 
-> 注意：`pnpm build` 只编译 host 端；client 插件（如 lan-auth 的 `src/client/`）要产 `lib/client.js` 需另跑 `pnpm build:client` 或 `pnpm dev`。换机器/重新 clone 后两个都要跑。
+> 注意：`pnpm build` 已包含 lan-auth / input-history 的 client bundle；聚合包 `dsh-kit` 的 `lib/client.js` 仍需 `pnpm build:client`（或 `pnpm dev`）产出。换机器/重新 clone 后建议两个都跑一遍。
 > `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
 
 新插件可用官方脚手架生成，再移入 `packages/`：
@@ -142,6 +142,7 @@ npx create-dsh-plugin my-plugin -t tool
 
 - **证书（零配置）**：首启自动生成私有 CA（根 `ca.pem` + 叶子，SAN 覆盖本机全部局域网 IP）。登录页引导下载 `.crt` 永久免警告。
 - **安全模型**：本机 loopback 免登录直通；局域网需有效 token 或账号密码登录；管理路由仅本机可达。
+- **登出**：远程会话登出按钮带二次确认，防误触；登出即吊销会话 token 并清 cookie。
 - **管理**：`dsh-kit-lan-auth init-ca [--ip ...]` / `dsh-kit-lan-auth status`
 
 ## 🖥️ 桌面客户端（Electron + 内置 dsh-runtime）
@@ -151,6 +152,7 @@ npx create-dsh-plugin my-plugin -t tool
 - **M1–M5 已落地并真机验证**（2026-08-16）：
   - `apps/dsh-runtime`：从本机已验证 dsh 构建独立运行时。自带官方 Node 二进制（方案 B）为目标态；当前 MVP 走 **Electron 内置 Node（方案 A）**，本地构建用 `build.mjs --skip-node-download`（官方 Node 下载待接线，见 `build.mjs`）+ `scripts/smoke.mjs` 冒烟
   - `apps/desktop`：Electron 壳（electron-vite + electron-builder）——spawn/就绪 URL/BrowserWindow/退出清理、托盘、开机自启、错误页、更新链路（feed + sha512 + 原子切换 + 回滚）
+  - **开箱即用**：自管 dsh 实例就绪后，后台检测 web profile 并自动装 dsh-kit 全家桶（`dsh plugin --profile web add -w dsh-kit`）；仅对自管实例执行，复用外部 `3080` 实例时不干预用户已有配置
 
 **启动方式**（任选其一）：
 
@@ -173,16 +175,25 @@ npm install && npm run dev
 
 ## 📤 发布
 
-**已发布**（2026-08-15）：5 个 npm 包（`0.1.0`，均 `license: MIT`）：
+**当前版本 `0.2.0`**（2026-08-16）：5 个 npm 包（均 `license: MIT`）：
 
 - `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history`
 - 满血模式 preset **不是独立 npm 包**，由 `dsh-kit` 内置分发。
 - 根 workspace `private: true`，只承载开发工具链，不发布。
 
-更新某个包：
+### GitHub Actions
+
+- **`ci.yml`**：push / PR 自动跑 `pnpm -r build` → `typecheck` → `test`。
+- **`release.yml`**：`workflow_dispatch` 手动触发，默认 **dry-run**（只打包校验，不上传 npm）；把输入改为 `false` 才用 `NPM_TOKEN` 真实发布。发布前会自动校验 5 包版本一致、聚合包依赖指向同版本 `^0.x.0`。
+
+本地手动发布（仅备选；日常推荐走 CI）：
 
 ```sh
-cd packages/<pkg> && npm publish    # 5 包各自发布；已构建 lib/ 随包带出；改版本号后重发
+pnpm -r build && pnpm -r typecheck && pnpm -r test
+
+# 先 dry-run 校验打包内容，再真实发布
+pnpm -r publish --access public --no-git-checks --dry-run
+pnpm -r publish --access public --no-git-checks
 ```
 
 架构详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、开发坑位详见 [`docs/HANDOFF.md`](docs/HANDOFF.md)。

@@ -328,11 +328,97 @@ function StorePanel() {
   )
 }
 
+/* ── 归档会话管理面板 ─────────────────────────────────────────────── */
+
+interface ArchivedItem {
+  sessionId: string
+  workspaceTitle?: string
+  workspacePath?: string
+  onDisk: boolean
+  mtimeMs: number
+}
+
+function fmtTime(ms: number): string {
+  if (!ms) return '—'
+  const d = new Date(ms)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+function useArchived() {
+  const [items, setItems] = useState<ArchivedItem[] | null>(null)
+  const [err, setErr] = useState('')
+  const [note, setNote] = useState('')
+  const refresh = () => {
+    fetch('/dsh-kit/archive/sessions')
+      .then((r) => r.json())
+      .then((d) => setItems(((d as { items?: ArchivedItem[] }).items) ?? []))
+      .catch((e) => setErr(String((e && e.message) || e)))
+  }
+  useEffect(refresh, [])
+  return { items, err, setErr, note, setNote, refresh }
+}
+
+function ArchivePanel() {
+  const { items, err, setErr, note, setNote, refresh } = useArchived()
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const act = (id: string, action: 'restore' | 'delete', label: string) => {
+    if (action === 'delete' && !window.confirm(`确定删除归档会话 ${id} 吗？该操作会删除 ~/.dsh/sessions 下的对应日志，不可恢复。`)) return
+    setErr(''); setNote(''); setBusy(id)
+    api(`/dsh-kit/archive/${id}/${action}`, {})
+      .then(() => { setNote(`${label}成功，重启 dsh 后列表与侧边栏生效。`); refresh() })
+      .catch((e) => setErr(String((e && e.message) || e)))
+      .finally(() => setBusy(null))
+  }
+
+  const rows = items ?? []
+  return createElement('div', { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 760, color: tk.text } },
+    createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, '归档会话'),
+    createElement('div', { style: { fontSize: 12, color: tk.tertiary } },
+      '官方「归档」隐藏会话（日志保留）；这里可恢复或彻底删除。操作后需重启 dsh 生效。'),
+    rows.length === 0 && !err
+      ? createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '加载中…')
+      : null,
+    rows.length === 0 && err === '' && items !== null
+      ? createElement('div', { style: { ...cardS, padding: 16, fontSize: 13, color: tk.secondary } }, '暂无归档会话。')
+      : null,
+    rows.map((it) =>
+      createElement('div', { key: it.sessionId, style: { ...cardS, padding: 12, display: 'flex', gap: 12, alignItems: 'center' } },
+        createElement('div', { style: { flex: 1, minWidth: 0 } },
+          createElement('div', { style: { fontFamily: 'monospace', fontSize: 12, color: tk.text, lineHeight: 1.4, wordBreak: 'break-all' } }, it.sessionId),
+          createElement('div', { style: { fontSize: 12, color: tk.tertiary, marginTop: 3 } },
+            `${it.workspaceTitle ? it.workspaceTitle + ' · ' : ''}${it.workspacePath ?? '未关联工作区'} · ${fmtTime(it.mtimeMs)}`),
+          createElement('div', { style: { fontSize: 11, color: it.onDisk ? tk.tertiary : tk.danger, marginTop: 2 } },
+            it.onDisk ? '日志在磁盘' : '日志已缺失'),
+        ),
+        createElement('div', { style: { display: 'flex', gap: 8 } },
+          createElement('button', {
+            style: { ...ghostBtn, cursor: busy === it.sessionId ? 'wait' : 'pointer' },
+            onClick: () => act(it.sessionId, 'restore', '恢复'),
+            disabled: busy !== null,
+          }, busy === it.sessionId ? '…' : '恢复'),
+          createElement('button', {
+            style: { ...ghostBtn, cursor: busy === it.sessionId ? 'wait' : 'pointer', color: tk.danger, borderColor: tk.danger },
+            onClick: () => act(it.sessionId, 'delete', '删除'),
+            disabled: busy !== null,
+          }, busy === it.sessionId ? '…' : '删除'),
+        ),
+      ),
+    ),
+    note ? createElement('div', { style: { color: tk.success, fontSize: 13 } }, note) : null,
+    err ? createElement('div', { style: { color: tk.danger, fontSize: 13 } }, err) : null,
+  )
+}
+
 /** Registration through the slot system; the shell provides the `settings.section` hole. */
 export function apply(ctx: { get(name: string): unknown }): void {
   const slots = ctx.get('slots') as { inject(name: string, fn: () => unknown): unknown; register(...a: unknown[]): unknown } | undefined
   if (slots === undefined) return
   slots.inject('settings.section', () =>
     slots.register({ name: 'settings.section', id: 'dsh-kit-store', priority: 40, label: () => '功能商店' }, () => createElement(StorePanel, null)),
+  )
+  slots.inject('settings.section', () =>
+    slots.register({ name: 'settings.section', id: 'dsh-kit-archive', priority: 41, label: () => '归档会话' }, () => createElement(ArchivePanel, null)),
   )
 }
