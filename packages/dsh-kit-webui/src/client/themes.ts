@@ -48,25 +48,230 @@ export interface WebUITheme {
   tokens: Record<string, string>
 }
 
-/** 可定制的语义 token 字段（取自官方 BUILTIN_INSPECT_TOKENS 的子集）。 */
+/** 可定制的语义 token 字段。
+ *
+ * 字段目录从官方 design-platform.css 实际消费的 CSS 变量中挑选，
+ * 按「窗口 / 按钮与输入 / Markdown 与代码 / 状态」四组编排：
+ *  - 窗口与基础：应用外壳（背景层级、边框、文字、侧边栏、滚动条）
+ *  - 按钮与输入：按钮体系、输入框、交互态
+ *  - Markdown 与代码：消息气泡、引用标注、代码块、语法高亮
+ *  - 状态：错误 / 成功 / 警告 / 业务强调
+ *
+ * ThemePresenter 会把任意 token 写为 body 内联 CSS 变量，因此除
+ * 官方 inspect 目录里的 alias token 外，--dsw-specific-* 与 --shiki-*
+ * 同样可被主题覆盖（shiki 色板见官方 styles/shiki.css）。
+ */
 export interface TokenField {
   name: string
   label: string
 }
 
-export const TOKEN_FIELDS: TokenField[] = [
-  { name: '--dsw-alias-bg-base', label: '背景 · 基础' },
-  { name: '--dsw-alias-bg-layer-1', label: '背景 · 面板' },
-  { name: '--dsw-alias-bg-layer-2', label: '背景 · 嵌套' },
-  { name: '--dsw-alias-border-l2', label: '边框' },
-  { name: '--dsw-alias-label-primary', label: '文字 · 主' },
-  { name: '--dsw-alias-label-secondary', label: '文字 · 次' },
-  { name: '--dsw-alias-brand-primary', label: '品牌强调' },
-  { name: '--dsw-alias-state-success-primary', label: '成功色' },
-  { name: '--dsw-alias-state-error-primary', label: '错误色' },
-  { name: '--dsw-alias-state-warn-primary', label: '警告色' },
-  { name: '--dsw-specific-sidebar-fill', label: '侧边栏' },
+export type TokenGroupId = 'window' | 'controls' | 'markdown' | 'status'
+
+export interface TokenGroup {
+  id: TokenGroupId
+  label: string
+  description: string
+  fields: TokenField[]
+}
+
+export const TOKEN_GROUPS: TokenGroup[] = [
+  {
+    id: 'window',
+    label: '窗口与基础',
+    description: '应用外壳：背景层级、边框、文字、侧边栏与滚动条。可独立于内容区设置。',
+    fields: [
+      { name: '--dsw-alias-bg-base', label: '窗口背景' },
+      { name: '--dsw-alias-bg-layer-1', label: '主面板' },
+      { name: '--dsw-alias-bg-layer-2', label: '嵌套面板' },
+      { name: '--dsw-alias-bg-layer-3', label: '卡片 / 浮层' },
+      { name: '--dsw-alias-bg-overlay', label: '弹窗背景' },
+      { name: '--dsw-alias-border-l1', label: '边框 · 细' },
+      { name: '--dsw-alias-border-l2', label: '边框 · 常规' },
+      { name: '--dsw-alias-border-l3', label: '边框 · 强调' },
+      { name: '--dsw-alias-label-primary', label: '文字 · 主' },
+      { name: '--dsw-alias-label-secondary', label: '文字 · 次' },
+      { name: '--dsw-alias-label-tertiary', label: '文字 · 弱' },
+      { name: '--dsw-alias-brand-primary', label: '品牌强调' },
+      { name: '--dsw-specific-sidebar-fill', label: '侧边栏背景' },
+      { name: '--dsw-specific-sidebar-nav-item-hover', label: '侧边栏 · 悬停' },
+      { name: '--dsw-specific-sidebar-nav-item-active', label: '侧边栏 · 选中' },
+      { name: '--dsw-specific-sidebar-nav-item-active-accent', label: '侧边栏 · 选中强调' },
+      { name: '--dsw-alias-scrollbar-bg-l1', label: '滚动条' },
+      { name: '--dsw-alias-scrollbar-hover-l1', label: '滚动条 · 悬停' },
+    ],
+  },
+  {
+    id: 'controls',
+    label: '按钮与输入',
+    description: '按钮体系、输入框与通用交互态。',
+    fields: [
+      { name: '--dsw-specific-input-major', label: '主输入框' },
+      { name: '--dsw-specific-login-input', label: '登录输入框' },
+      { name: '--dsw-alias-button-primary-fill', label: '主按钮' },
+      { name: '--dsw-alias-button-primary-hover', label: '主按钮 · 悬停' },
+      { name: '--dsw-alias-button-primary-dimmed', label: '主按钮 · 弱化' },
+      { name: '--dsw-alias-button-ghost-active-fill', label: '幽灵按钮 · 选中' },
+      { name: '--dsw-alias-button-ghost-active-hover', label: '幽灵按钮 · 悬停' },
+      { name: '--dsw-alias-button-ghost-active-border', label: '幽灵按钮 · 边框' },
+      { name: '--dsw-alias-button-info-fill', label: '信息按钮' },
+      { name: '--dsw-alias-button-info-hover', label: '信息按钮 · 悬停' },
+      { name: '--dsw-alias-interactive-bg-hover', label: '交互元素 · 悬停' },
+      { name: '--dsw-alias-interactive-bg-active', label: '交互元素 · 按下' },
+      { name: '--dsw-alias-interactive-bg-hover-danger', label: '交互元素 · 危险悬停' },
+    ],
+  },
+  {
+    id: 'markdown',
+    label: 'Markdown 与代码',
+    description: '消息气泡、Markdown 标注与代码块 / 语法高亮。可与窗口主题分开设置。',
+    fields: [
+      { name: '--dsw-specific-bubble', label: '消息气泡' },
+      { name: '--dsw-specific-bubble-highlight', label: '气泡 · 高亮 / 引用' },
+      { name: '--dsw-alias-markdown-code-block', label: '代码块背景' },
+      { name: '--dsw-alias-markdown-code-block-banner', label: '代码块标题栏' },
+      { name: '--dsw-alias-markdown-inline-code', label: '行内代码' },
+      { name: '--dsw-alias-markdown-citation', label: '引用标注' },
+      { name: '--dsw-alias-markdown-tag', label: '标签高亮' },
+      { name: '--dsw-alias-markdown-placeholder', label: '占位文字' },
+      { name: '--dsw-alias-markdown-code-segment-selected', label: '代码段 · 选中' },
+      { name: '--dsw-alias-markdown-code-segment-unselected', label: '代码段 · 未选中' },
+      { name: '--shiki-foreground', label: '语法 · 前景' },
+      { name: '--shiki-background', label: '语法 · 背景' },
+      { name: '--shiki-token-comment', label: '语法 · 注释' },
+      { name: '--shiki-token-keyword', label: '语法 · 关键字' },
+      { name: '--shiki-token-string', label: '语法 · 字符串' },
+      { name: '--shiki-token-function', label: '语法 · 函数' },
+      { name: '--shiki-token-constant', label: '语法 · 常量' },
+      { name: '--shiki-token-parameter', label: '语法 · 参数' },
+      { name: '--shiki-token-punctuation', label: '语法 · 标点' },
+      { name: '--shiki-token-link', label: '语法 · 链接' },
+      { name: '--shiki-token-string-expression', label: '语法 · 表达式' },
+    ],
+  },
+  {
+    id: 'status',
+    label: '状态色',
+    description: '错误 / 成功 / 警告 / 业务强调，供状态条、徽标与反馈使用。',
+    fields: [
+      { name: '--dsw-alias-state-error-primary', label: '错误色' },
+      { name: '--dsw-alias-state-success-primary', label: '成功色' },
+      { name: '--dsw-alias-state-warn-primary', label: '警告色' },
+      { name: '--dsw-alias-state-business-primary', label: '业务强调色' },
+    ],
+  },
 ]
+
+/** 全部可编辑字段（跨组拍平，保持既有 isDefaultField / 卡片预览兼容）。 */
+export const TOKEN_FIELDS: TokenField[] = TOKEN_GROUPS.flatMap((g) => g.fields)
+
+/*────────────────────────────── 颜色派生工具 ──────────────────────────────*/
+
+interface Rgb { r: number; g: number; b: number }
+
+function parseHex(hex: string): Rgb {
+  let h = hex.replace('#', '').trim()
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  const n = Number.parseInt(h.slice(0, 6), 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}
+
+function toHex({ r, g, b }: Rgb): string {
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+  return `#${c(r)}${c(g)}${c(b)}`
+}
+
+/** 两个十六进制色线性混合（t=0 取 a，t=1 取 b）。 */
+export function mixHex(a: string, b: string, t: number): string {
+  const x = parseHex(a)
+  const y = parseHex(b)
+  return toHex({ r: x.r + (y.r - x.r) * t, g: x.g + (y.g - x.g) * t, b: x.b + (y.b - x.b) * t })
+}
+
+/** 十六进制色转 rgba() 字符串（用于边框 / hover 等半透明层级）。 */
+export function alphaHex(hex: string, alpha: number): string {
+  const { r, g, b } = parseHex(hex)
+  const a = Math.max(0, Math.min(1, alpha)).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}
+
+/*────────────────────────────── 全量 token 派生 ──────────────────────────────*/
+/* 预设只维护 11 个核心种子色；其余按钮 / 输入框 / Markdown / 代码 / 侧边栏
+ * token 由核心色派生，保证同一家族内所有部件色彩一致。 */
+
+function deriveThemeTokens(
+  base: Record<string, string>,
+  scheme: 'light' | 'dark',
+): Record<string, string> {
+  const bgBase = base['--dsw-alias-bg-base']
+  const bgLayer1 = base['--dsw-alias-bg-layer-1']
+  const bgLayer2 = base['--dsw-alias-bg-layer-2']
+  const labelPrimary = base['--dsw-alias-label-primary']
+  const labelSecondary = base['--dsw-alias-label-secondary']
+  const brand = base['--dsw-alias-brand-primary']
+  const error = base['--dsw-alias-state-error-primary']
+  const success = base['--dsw-alias-state-success-primary']
+  const warn = base['--dsw-alias-state-warn-primary']
+
+  const dark = scheme === 'dark'
+  const bgLayer3 = dark ? mixHex(bgLayer2, labelPrimary, 0.08) : mixHex(bgLayer2, bgLayer1, 0.55)
+  const bgOverlay = dark ? mixHex(bgLayer2, labelPrimary, 0.14) : mixHex(bgLayer2, bgLayer1, 0.35)
+  const inputMajor = dark ? mixHex(bgLayer1, bgBase, 0.45) : bgLayer1
+  const codeBlock = dark ? mixHex(bgBase, labelPrimary, 0.06) : mixHex(bgBase, labelPrimary, 0.04)
+  const codeBanner = mixHex(codeBlock, bgLayer1, 0.5)
+  const shikiKeyword = mixHex(brand, error, 0.55)
+  const shikiFunction = mixHex(brand, success, 0.55)
+  const shikiConstant = mixHex(brand, success, 0.35)
+
+  return {
+    ...base,
+    '--dsw-alias-bg-layer-3': bgLayer3,
+    '--dsw-alias-bg-overlay': bgOverlay,
+    '--dsw-alias-border-l1': alphaHex(labelPrimary, dark ? 0.08 : 0.06),
+    '--dsw-alias-border-l3': alphaHex(labelPrimary, dark ? 0.22 : 0.16),
+    '--dsw-alias-label-tertiary': mixHex(labelSecondary, bgBase, 0.35),
+    '--dsw-specific-sidebar-nav-item-hover': alphaHex(labelPrimary, dark ? 0.08 : 0.06),
+    '--dsw-specific-sidebar-nav-item-active': alphaHex(brand, dark ? 0.16 : 0.12),
+    '--dsw-specific-sidebar-nav-item-active-accent': alphaHex(brand, dark ? 0.20 : 0.16),
+    '--dsw-alias-scrollbar-bg-l1': alphaHex(labelSecondary, 0.35),
+    '--dsw-alias-scrollbar-hover-l1': alphaHex(labelSecondary, 0.55),
+    '--dsw-specific-input-major': inputMajor,
+    '--dsw-specific-login-input': mixHex(inputMajor, bgBase, 0.5),
+    '--dsw-alias-button-primary-fill': brand,
+    '--dsw-alias-button-primary-hover': mixHex(brand, labelPrimary, 0.15),
+    '--dsw-alias-button-primary-dimmed': mixHex(brand, bgLayer1, 0.55),
+    '--dsw-alias-button-ghost-active-fill': alphaHex(brand, 0.14),
+    '--dsw-alias-button-ghost-active-hover': alphaHex(brand, 0.22),
+    '--dsw-alias-button-ghost-active-border': mixHex(brand, labelSecondary, 0.35),
+    '--dsw-alias-button-info-fill': brand,
+    '--dsw-alias-button-info-hover': mixHex(brand, labelPrimary, 0.15),
+    '--dsw-alias-interactive-bg-hover': alphaHex(brand, 0.10),
+    '--dsw-alias-interactive-bg-active': alphaHex(brand, 0.16),
+    '--dsw-alias-interactive-bg-hover-danger': alphaHex(error, 0.12),
+    '--dsw-specific-bubble': alphaHex(brand, 0.08),
+    '--dsw-specific-bubble-highlight': alphaHex(brand, 0.16),
+    '--dsw-alias-markdown-code-block': codeBlock,
+    '--dsw-alias-markdown-code-block-banner': codeBanner,
+    '--dsw-alias-markdown-inline-code': alphaHex(brand, 0.12),
+    '--dsw-alias-markdown-citation': alphaHex(brand, 0.08),
+    '--dsw-alias-markdown-tag': alphaHex(brand, 0.16),
+    '--dsw-alias-markdown-placeholder': mixHex(labelSecondary, bgBase, 0.45),
+    '--dsw-alias-markdown-code-segment-selected': bgLayer2,
+    '--dsw-alias-markdown-code-segment-unselected': codeBlock,
+    '--shiki-foreground': labelPrimary,
+    '--shiki-background': codeBlock,
+    '--shiki-token-comment': labelSecondary,
+    '--shiki-token-keyword': shikiKeyword,
+    '--shiki-token-string': success,
+    '--shiki-token-function': shikiFunction,
+    '--shiki-token-constant': shikiConstant,
+    '--shiki-token-parameter': warn,
+    '--shiki-token-punctuation': labelSecondary,
+    '--shiki-token-link': brand,
+    '--shiki-token-string-expression': mixHex(success, warn, 0.5),
+    '--dsw-alias-state-business-primary': mixHex(brand, success, 0.25),
+  }
+}
 
 /*────────────────────────────── 预设主题 ──────────────────────────────*/
 /* 每个家族提供 dark + light 两个变体，保证同一风格适配深浅色。 */
@@ -84,7 +289,7 @@ function family(
       description: `${name} 风格的深色版`,
       colorScheme: 'dark' as const,
       builtin: true,
-      tokens: { ...darkTokens },
+      tokens: deriveThemeTokens(darkTokens, 'dark'),
     },
     {
       id: `${key}-light`,
@@ -92,7 +297,7 @@ function family(
       description: `${name} 风格的浅色版`,
       colorScheme: 'light' as const,
       builtin: true,
-      tokens: { ...lightTokens },
+      tokens: deriveThemeTokens(lightTokens, 'light'),
     },
   ]
 }
@@ -189,6 +394,43 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
     },
   ),
 ])
+
+/*────────────────────────────── 编辑器默认配色 ──────────────────────────────*/
+/* 新建 / 切换深浅底时的默认主题 token（与官方 design-platform 的明暗基调一致）。 */
+
+const BASE_DARK_DEFAULTS: Record<string, string> = {
+  '--dsw-alias-bg-base': '#16181d',
+  '--dsw-alias-bg-layer-1': '#1e2128',
+  '--dsw-alias-bg-layer-2': '#272b33',
+  '--dsw-alias-border-l2': '#3a3f4b',
+  '--dsw-alias-label-primary': '#e6e8ee',
+  '--dsw-alias-label-secondary': '#9aa1ae',
+  '--dsw-alias-brand-primary': '#3b82f6',
+  '--dsw-alias-state-success-primary': '#22c55e',
+  '--dsw-alias-state-error-primary': '#ef4444',
+  '--dsw-alias-state-warn-primary': '#eab308',
+  '--dsw-specific-sidebar-fill': '#1a1d24',
+}
+
+const BASE_LIGHT_DEFAULTS: Record<string, string> = {
+  '--dsw-alias-bg-base': '#f5f5f5',
+  '--dsw-alias-bg-layer-1': '#ffffff',
+  '--dsw-alias-bg-layer-2': '#eef0f2',
+  '--dsw-alias-border-l2': '#d9dde3',
+  '--dsw-alias-label-primary': '#1b1f27',
+  '--dsw-alias-label-secondary': '#5b626d',
+  '--dsw-alias-brand-primary': '#2563eb',
+  '--dsw-alias-state-success-primary': '#16a34a',
+  '--dsw-alias-state-error-primary': '#dc2626',
+  '--dsw-alias-state-warn-primary': '#ca8a04',
+  '--dsw-specific-sidebar-fill': '#e7e9ee',
+}
+
+export const DEFAULT_DARK_THEME_TOKENS: Record<string, string> =
+  deriveThemeTokens(BASE_DARK_DEFAULTS, 'dark')
+
+export const DEFAULT_LIGHT_THEME_TOKENS: Record<string, string> =
+  deriveThemeTokens(BASE_LIGHT_DEFAULTS, 'light')
 
 /*────────────────────────────── 持久化 ──────────────────────────────*/
 

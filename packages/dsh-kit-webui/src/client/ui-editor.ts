@@ -1,7 +1,10 @@
 /** 主题编辑器（主题自己风格）+ 全局界面调整编辑器。 */
 import { createElement, useState } from 'react'
 import type { TokenModes, WebUITheme } from './themes.ts'
-import { TOKEN_FIELDS, setTokenMode } from './themes.ts'
+import {
+  TOKEN_FIELDS, TOKEN_GROUPS, setTokenMode,
+  DEFAULT_DARK_THEME_TOKENS, DEFAULT_LIGHT_THEME_TOKENS,
+} from './themes.ts'
 import {
   EXTRA_TOKEN_PREFIX, splitExtraTokens, mergeExtraTokens,
   splitExtraTokenModes, mergeExtraTokenModes,
@@ -14,38 +17,22 @@ const colorInputS = { width: 34, height: 26, padding: 0, border: 'none', backgro
 /*────────────────────────────── 主题编辑器 ──────────────────────────────*/
 /* 编辑一个主题自己的风格：colorScheme 决定基础深浅模式，tokens 是单值（官方 ThemeDefinition 形状）。 */
 
-/** 深色底主题的默认配色（切换/新建深色主题时载入，保证默认就适配深色）。 */
-const DARK_THEME_DEFAULTS: Record<string, string> = {
-  '--dsw-alias-bg-base': '#16181d',
-  '--dsw-alias-bg-layer-1': '#1e2128',
-  '--dsw-alias-bg-layer-2': '#272b33',
-  '--dsw-alias-border-l2': '#3a3f4b',
-  '--dsw-alias-label-primary': '#e6e8ee',
-  '--dsw-alias-label-secondary': '#9aa1ae',
-  '--dsw-alias-brand-primary': '#3b82f6',
-  '--dsw-alias-state-success-primary': '#22c55e',
-  '--dsw-alias-state-error-primary': '#ef4444',
-  '--dsw-alias-state-warn-primary': '#eab308',
-  '--dsw-specific-sidebar-fill': '#1a1d24',
-}
-
-/** 浅色底主题的默认配色。 */
-const LIGHT_THEME_DEFAULTS: Record<string, string> = {
-  '--dsw-alias-bg-base': '#f5f5f5',
-  '--dsw-alias-bg-layer-1': '#ffffff',
-  '--dsw-alias-bg-layer-2': '#eef0f2',
-  '--dsw-alias-border-l2': '#d9dde3',
-  '--dsw-alias-label-primary': '#1b1f27',
-  '--dsw-alias-label-secondary': '#5b626d',
-  '--dsw-alias-brand-primary': '#2563eb',
-  '--dsw-alias-state-success-primary': '#16a34a',
-  '--dsw-alias-state-error-primary': '#dc2626',
-  '--dsw-alias-state-warn-primary': '#ca8a04',
-  '--dsw-specific-sidebar-fill': '#e7e9ee',
-}
-
 function defaultsFor(scheme: 'light' | 'dark'): Record<string, string> {
-  return { ...(scheme === 'dark' ? DARK_THEME_DEFAULTS : LIGHT_THEME_DEFAULTS) }
+  return { ...(scheme === 'dark' ? DEFAULT_DARK_THEME_TOKENS : DEFAULT_LIGHT_THEME_TOKENS) }
+}
+
+/** 分组标题：窗口 / 按钮与输入 / Markdown 与代码 / 状态 可分开设置。 */
+function groupHeading(
+  group: { label: string; description: string; fields: unknown[] },
+  children: unknown,
+  open = false,
+) {
+  return createElement('details', { open, style: { borderTop: '1px solid ' + tk.border, paddingTop: 10 } },
+    createElement('summary', { style: { cursor: 'pointer', fontSize: 13, fontWeight: 600, color: tk.text } },
+      group.label + '（' + group.fields.length + '）'),
+    createElement('div', { style: { fontSize: 11, color: tk.tertiary, marginTop: 2 } }, group.description),
+    createElement('div', { style: { marginTop: 8 } }, children),
+  )
 }
 
 export function ThemeEditor(props: {
@@ -116,17 +103,25 @@ export function ThemeEditor(props: {
         createElement('option', { value: 'light' }, '浅色底'),
       ),
     ),
-    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-      TOKEN_FIELDS.map((f) =>
-        createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-          createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
-          createElement('input', {
-            type: 'color', value: tokens[f.name] ?? '#888888',
-            onChange: (e: { target: { value: string } }) => setTokens((prev) => ({ ...prev, [f.name]: e.target.value })),
-            title: f.name, style: colorInputS,
-          }),
-          createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, tokens[f.name] ?? ''),
-          createElement('span', { style: { flex: 1, fontSize: 10, color: tk.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+      TOKEN_GROUPS.map((g, gi) =>
+        groupHeading(
+          g,
+          createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+            g.fields.map((f) =>
+              createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
+                createElement('input', {
+                  type: 'color', value: tokens[f.name] ?? '#888888',
+                  onChange: (e: { target: { value: string } }) => setTokens((prev) => ({ ...prev, [f.name]: e.target.value })),
+                  title: f.name, style: colorInputS,
+                }),
+                createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, tokens[f.name] ?? ''),
+                createElement('span', { style: { flex: 1, fontSize: 10, color: tk.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+              ),
+            ),
+          ),
+          gi === 0,
         ),
       ),
     ),
@@ -224,23 +219,31 @@ export function GlobalAdjuster(props: {
       ),
       createElement('button', { style: ghostBtn, onClick: onReset }, '清空调整'),
     ),
-    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-      TOKEN_FIELDS.map((f) =>
-        createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-          createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
-          createElement('input', {
-            type: 'color', value: tokens[f.name]?.light ?? '',
-            onChange: (e: { target: { value: string } }) => setOne(f.name, 'light', e.target.value),
-            title: '浅色模式取值', style: colorInputS,
-          }),
-          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '浅'),
-          createElement('input', {
-            type: 'color', value: tokens[f.name]?.dark ?? '',
-            onChange: (e: { target: { value: string } }) => setOne(f.name, 'dark', e.target.value),
-            title: '深色模式取值', style: colorInputS,
-          }),
-          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '深'),
-          createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, f.name),
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+      TOKEN_GROUPS.map((g, gi) =>
+        groupHeading(
+          g,
+          createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+            g.fields.map((f) =>
+              createElement('div', { key: f.name, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                createElement('label', { style: { width: 130, flex: 'none', fontSize: 12, color: tk.secondary } }, f.label),
+                createElement('input', {
+                  type: 'color', value: tokens[f.name]?.light ?? '',
+                  onChange: (e: { target: { value: string } }) => setOne(f.name, 'light', e.target.value),
+                  title: '浅色模式取值', style: colorInputS,
+                }),
+                createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '浅'),
+                createElement('input', {
+                  type: 'color', value: tokens[f.name]?.dark ?? '',
+                  onChange: (e: { target: { value: string } }) => setOne(f.name, 'dark', e.target.value),
+                  title: '深色模式取值', style: colorInputS,
+                }),
+                createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '深'),
+                createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, f.name),
+              ),
+            ),
+          ),
+          gi === 0,
         ),
       ),
     ),
