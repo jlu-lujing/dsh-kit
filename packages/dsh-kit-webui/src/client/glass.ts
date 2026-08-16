@@ -84,7 +84,9 @@ export function installSidebarGlass(): void {
     const frame = col.parentElement
     if (frame === null) return
     const w = Math.round(col.getBoundingClientRect().width)
-    frame.style.setProperty(WIDTH_VAR, `${Math.max(0, w)}px`)
+    const px = `${Math.max(0, w)}px`
+    frame.style.setProperty(WIDTH_VAR, px)
+    root.style.setProperty(WIDTH_VAR, px)
   }
   const ro = new ResizeObserver(sync)
   ro.observe(col)

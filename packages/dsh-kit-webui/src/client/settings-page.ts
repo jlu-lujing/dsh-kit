@@ -89,12 +89,18 @@ export function SettingsPageOverlay(): unknown {
           '主题商店插件：全局界面调整 + 每主题独立风格。\n本设置页以整页替换对话区，避免官方弹窗层级问题。）'),
       )
 
+  /** 全屏设置页覆盖层（渲染在 shell.overlay）。关闭时返回 null。
+   *  只覆盖右侧内容区（左侧栏保留），替代对话内容。 */
   return createElement('div', {
     style: {
-      position: 'fixed', inset: 0, zIndex: 1500,
+      position: 'fixed',
+      top: 0, right: 0, bottom: 0,
+      left: 'var(--dsh-kit-sidebar-width, 280px)',
+      zIndex: 1500,
       background: 'var(--dsw-alias-bg-base)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
+      borderLeft: '1px solid var(--dsw-alias-border-l2)',
     },
   },
     /* 顶部栏 */
