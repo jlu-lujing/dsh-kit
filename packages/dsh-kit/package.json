@@ -35,7 +35,8 @@
     "dsh-kit-lan-auth": "^0.2.1",
     "dsh-kit-notifier": "^0.2.1",
     "dsh-kit-scheduler": "^0.2.1",
-    "dsh-kit-webui": "^0.2.1"
+    "dsh-kit-webui": "^0.2.1",
+    "dsh-kit-worktree": "^0.2.1"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

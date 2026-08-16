@@ -50,6 +50,11 @@ export const FEATURES: readonly Feature[] = [
     description: '全局界面调整（对所有主题生效）+ 各主题独立风格；内置海洋/樱/森林三套深浅色预设，支持自定义主题',
   },
   {
+    id: 'dsh-kit-worktree',
+    name: 'git Worktree',
+    description: '会话 worktree 归属：新建会话页选择 main 或 .dsh/worktree/<branch>（可新建），对话顶部显示归属徽标',
+  },
+  {
     id: 'dsh-anchored-standard',
     name: '满血模式',
     description: '满血模式：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/anchored-standard',
