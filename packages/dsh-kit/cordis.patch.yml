@@ -30,16 +30,15 @@
 # disabled via its row above simply does not load, while its package stays
 # installed — the store panel / CLI can re-enable it any time.
 
-# Remote access needs the in-app (browse) directory picker — the native picker
-# opens only on the host display, invisible to a LAN browser. directory-picker
-# (auto) resolves `native` because the gateway keeps webServer loopback-bound,
-# so disable it **only while the lan-auth feature is enabled**; in that case
-# lan-auth's apply dynamically injects the browse pair. When lan-auth is off
-# the official auto picker stays mounted, so a fresh `dsh web` profile boots
-# without a directoryPicker gap (native picker for loopback users). The
-# self-contained expression reads the same state file as every feature row.
+# The in-app (browse) directory picker is used everywhere — including local
+# loopback — because the native picker is unreliable on some platforms
+# (Windows: "win32 folder dialog worker exited before reporting a result")
+# and invisible to LAN browsers. We therefore always disable the official
+# `directory-picker` auto row; dsh-kit's host apply mounts the browse pair
+# (backend + client surface) for every boot, so both local and remote users
+# get a web picker with no profile edits.
 - id: directory-picker
-  disabled: !!js "( (function () { try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-lan-auth'] === true; } catch (e) { return false; } })() )"
+  disabled: true
 
 - insert:
     - id: dsh-kit

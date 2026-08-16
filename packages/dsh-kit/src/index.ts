@@ -17,10 +17,16 @@ const PRESET_FEATURE_ID = `dsh-${PRESET_ID}` as const
 export const name = 'dsh-kit'
 
 /** Required services: the web server hosts the store panel's management routes. */
-export const inject = ['webServer']
+export const inject = ['webServer', 'loader']
 
 /** The single install target of the one-click install: its npm dependencies bring the rest. */
 const INSTALL_PACKAGE = 'dsh-kit'
+
+/** Browse interaction pair, mirroring directory-picker-auto's composition vocabulary. */
+const BROWSE_PAIR = [
+  '@deepseek-ai/dsh-host-directory-picker-browse',
+  '@deepseek-ai/dsh-client-ui-directory-picker-browse',
+] as const
 
 export interface Config {
   /** Directory holding the dsh-kit state file. Defaults to dsh home. */
@@ -129,6 +135,34 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.set('dshKit.store', service)
   ctx.provide('dshKit.featureState', service.featureState)
   ctx.set('dshKit.featureState', service.featureState)
+
+  // Always mount the in-app (browse) directory-picker pair. The official
+  // `directory-picker` auto row is disabled in our aggregate patch (native is
+  // unreliable on Windows and invisible to LAN browsers), so this provides the
+  // picker for every boot — local loopback and remote through lan-auth alike.
+  const loader = ctx.get('loader') as {
+    store: Record<string, unknown>
+    create(opts: { name: string }): Promise<string>
+    remove(id: string): Promise<void>
+  } | undefined
+  if (loader !== undefined) {
+    ctx.effect(async () => {
+      const ids: string[] = []
+      const unmount = async () => {
+        for (const id of [...ids].reverse()) {
+          if (loader.store[id] === undefined) continue
+          await loader.remove(id)
+        }
+      }
+      try {
+        for (const pkg of BROWSE_PAIR) ids.push(await loader.create({ name: pkg }))
+      } catch (cause) {
+        await unmount()
+        throw cause
+      }
+      return unmount
+    }, 'dsh-kit.browse-picker')
+  }
 
   const webServer = ctx.get('webServer')
   if (webServer === undefined) return

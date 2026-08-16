@@ -2,7 +2,7 @@
 
 > 更新日期：2026-08-16
 > 状态：M1–M5 已落地并联调（dsh-runtime 子模块 / Electron 壳 / 打包注入 / 更新链路 / 托盘·自启·错误页），见 §9；签名/公证待证书
-> 分支：`feature/client-wrapper`
+> 分支：`main`（已合入）
 
 ## 1. 定位
 
@@ -80,6 +80,9 @@ dsh-kit/
 ├── apps/
 │   ├── desktop/                 # Electron 壳（独立版本线）
 │   │   ├── src/main/            # 运行时发现/启动、单实例锁、托盘、生命周期
+│   │   │   ├── plugins.ts       # 首启自动装 dsh-kit 全家桶（自管实例）
+│   │   │   ├── updater.ts       # dsh-runtime 更新链路
+│   │   │   └── app-features.ts  # 托盘 / 开机自启 / 图标
 │   │   ├── src/preload/         # 可选：contextBridge 注入 __DSH_DESKTOP__
 │   │   ├── src/renderer/        # 启动页 / 错误页 / 日志页
 │   │   ├── scripts/afterPack.cjs # electron-builder 钩子：注入出厂 runtime（绕开 node_modules 过滤）
@@ -203,9 +206,9 @@ dsh-runtime/
 
 - 桌面壳默认使用 `~/.dsh`，因此用户已装的 dsh-kit 全家桶、状态文件、lan-auth 网关
   配置全部自然可见；
-- dsh-kit 插件继续走 `dsh plugin add` / npm 发布，桌面端 v1 不重新实现插件安装；
-- 后续可在壳里做“插件管理”页：自己封装 `dsh plugin --profile web ...`，并考虑把
-  pnpm 纳入 dsh-runtime（v1 不做）。
+- dsh-kit 插件继续走 `dsh plugin add` / npm 发布，桌面端不重新实现插件安装；
+- **首启自动装全家桶（已实现）**：`src/main/plugins.ts`（FamilyPlugins）在**自管 dsh 实例**就绪后，后台检测 web profile 的 dependencies 是否含 `dsh-kit`；未装则执行 `dsh plugin --profile web add -w dsh-kit`，失败仅记录日志、不阻塞启动。**复用外部 3080 实例时不干预**用户已有配置。
+- 后续可在壳里做更完整的“插件管理”页：自己封装 `dsh plugin --profile web ...`，并考虑把 pnpm 纳入 dsh-runtime（当前自动装依赖系统 pnpm 在 PATH）。
 
 ### 8.1 M5 实现（托盘 / 开机自启 / 错误页 / 窗口图标，2026-08-16）
 
@@ -231,6 +234,7 @@ dsh-runtime/
 | M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-kit Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
 | M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | ✅ `src/main/updater.ts` 全链路（feed→下载+sha512→纯 JS 解压→冒烟→原子切换→重启→回滚）Node E2E 实测通过（2026-08-16）；发布物 tar.gz 无外部二进制依赖 |
 | M5 | 签名/公证、托盘、开机自启、错误页打磨 | ✅ 托盘/开机自启/错误页/窗口图标已实现并验证（2026-08-16，见 §8.1）；签名/公证待 Apple Developer ID 证书 |
+| 开箱即用 | 首启自动装 dsh-kit 全家桶 | ✅ `src/main/plugins.ts` 自管实例就绪后自动 `dsh plugin --profile web add -w dsh-kit`（2026-08-16，见 §8） |
 | 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
 
 ## 10. 不侵入 dsh 的边界

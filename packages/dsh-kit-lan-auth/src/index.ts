@@ -3,8 +3,6 @@
 import path from 'node:path'
 
 import type { Context } from '@deepseek-ai/cordis'
-// Type-only: pulls the `loader` Context merge used for dynamic entry mounting.
-import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { ensureCertBundle } from './cert.ts'
@@ -15,18 +13,12 @@ import { createStore, lanAuthRoot } from './store.ts'
 export const name = 'dsh-kit-lan-auth'
 
 /**
- * Services required: webServer hosts the admin routes; loader mounts the
- * browse directory-picker pair (backend + client surface) so a remote browser
- * through the gateway gets an in-app picker instead of a host-display native
- * dialog it cannot see.
+ * Services required: webServer hosts the admin routes. The browse
+ * directory-picker pair is mounted centrally by the dsh-kit aggregate (so it
+ * also works for local loopback without lan-auth), so this plugin no longer
+ * injects loader entries itself.
  */
-export const inject = ['webServer', 'loader']
-
-/** Browse interaction pair, mirroring directory-picker-auto's composition vocabulary. */
-const BROWSE_PAIR = [
-  '@deepseek-ai/dsh-host-directory-picker-browse',
-  '@deepseek-ai/dsh-client-ui-directory-picker-browse',
-] as const
+export const inject = ['webServer']
 
 export interface Config {
   /** Gateway bind host (all-interfaces). */
@@ -172,30 +164,4 @@ export function apply(ctx: Context, config: Config = {}): void {
   const disposers = routes.map((r) => webServer.register(r))
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-kit-lan-auth.admin-routes')
   ctx.effect(() => () => { gateway.close().catch(() => undefined) }, 'dsh-kit-lan-auth.gateway')
-
-  // Remote access needs the browse directory picker: the native picker opens
-  // only on the host display, invisible to a LAN browser, and directory-picker
-  // (auto) resolves `native` because the gateway keeps webServer loopback-bound
-  // (its own patch row disables auto). Mount the browse pair dynamically (root
-  // tree, in-memory — never persisted to a config file), and remove it on
-  // teardown exactly like directory-picker-auto's unmount.
-  const loader = ctx.get('loader')
-  if (loader !== undefined) {
-    ctx.effect(async () => {
-      const ids: string[] = []
-      const unmount = async () => {
-        for (const id of [...ids].reverse()) {
-          if (loader.store[id] === undefined) continue
-          await loader.remove(id)
-        }
-      }
-      try {
-        for (const pkg of BROWSE_PAIR) ids.push(await loader.create({ name: pkg }))
-      } catch (cause) {
-        await unmount()
-        throw cause
-      }
-      return unmount
-    }, 'dsh-kit-lan-auth.browse-picker')
-  }
 }

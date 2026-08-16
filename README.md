@@ -199,7 +199,7 @@ npm install && npm run dev
 
 ## 📤 发布
 
-**当前版本 `0.2.0`**（2026-08-16）：6 个 npm 包（均 `license: MIT`）：
+**当前版本 `0.2.1`**（2026-08-16）：6 个 npm 包（均 `license: MIT`）：
 
 - `dsh-kit` / `dsh-kit-notifier` / `dsh-kit-scheduler` / `dsh-kit-lan-auth` / `dsh-kit-input-history` / `dsh-kit-webui`
 - 满血模式 preset **不是独立 npm 包**，由 `dsh-kit` 内置分发。

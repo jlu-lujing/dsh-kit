@@ -17,7 +17,8 @@
 ```sh
 cd apps/dsh-runtime
 npm ci --omit=dev     # 按 package.json 解析 @deepseek-ai/dsh 精确版本
-node scripts/build.mjs   # 裁剪 + 写 runtime.json + 打 zip (dsh-runtime-<ver>-<platform>-<arch>.zip)
+node scripts/build.mjs            # 裁剪 + 写 runtime.json + 打 zip（zstd，M1）
+node scripts/build.mjs --tar-gz   # 额外产出 tar.gz（M4 更新链路，纯 JS 可解）
 ```
 
 构建脚本从**本机已验证的 dsh 安装**（`npm root -g` 下的 `@deepseek-ai/dsh`）取材，而不是重新 `npm install`：

@@ -1,7 +1,7 @@
 # dsh-kit 架构设计
 
 > 更新日期：2026-08-16
-> 状态：v0.2.0 已全部实现并验证
+> 状态：v0.2.1 已全部实现并验证
 
 ## 1. 定位
 
@@ -60,7 +60,7 @@ dsh-kit/
 ├── packages/
 │   ├── dsh-kit/                 # 傻瓜包本体 = 聚合 bundle + 管理 CLI + 内置能力
 │   │   ├── package.json         #   dsh.bundle.patch + 5 个功能包 dependencies + bin: dsh-kit
-│   │   ├── cordis.patch.yml     #   insert 全部 6 行（自身 + 5 功能）；lan-auth 开启时禁用 directory-picker(auto)
+│   │   ├── cordis.patch.yml     #   insert 全部 6 行（自身 + 5 功能）；始终禁用 directory-picker(auto)
 │   │   ├── bin/dsh-kit.mjs      #   CLI：list / enable / disable / install
 │   │   ├── preset/              #   内置满血模式 preset（agent.cordis.yml + 各 .mjs + preset.yml）
 │   │   ├── ecosystem-fallback.json # GitHub 生态目录内置快照（网络失败/无缓存时回退）

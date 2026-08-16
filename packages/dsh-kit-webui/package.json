@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit-webui",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSH WebUI 主题商店（dsh-kit 全家桶功能包，由 dsh-kit 聚合包挂载）——全局界面调整（对所有主题生效）+ 各主题独立风格（预设/自定义），内置多套深浅色预设",
   "type": "module",
   "main": "lib/index.js",
