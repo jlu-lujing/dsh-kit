@@ -573,6 +573,13 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     try { localStorage.setItem(RIGHT_WIDTH_KEY, String(w)) } catch { /* ignore */ }
   }
 
+  // 右侧栏展开/收起状态：持久化，切换对话/刷新都不自动折叠。
+  const OPEN_KEY = 'dsh-kit:right-panel-open'
+  const readOpen = (): boolean => localStorage.getItem(OPEN_KEY) === '1'
+  const saveOpen = (open: boolean) => {
+    try { localStorage.setItem(OPEN_KEY, open ? '1' : '0') } catch { /* ignore */ }
+  }
+
   // 挂拖拽边缘：按住面板左缘左右拖动调整宽度。
   const mountResizer = (panel: HTMLElement) => {
     if (panel.querySelector('.dsh-kit-right-resizer') !== null) return
@@ -709,11 +716,26 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     } else {
       apply()
     }
+    saveOpen(open)
   }
   const toggle = () => {
     const contentRoot = document.querySelector('.wSkVaW_root')
     const open = contentRoot?.classList.contains('dsh-kit-right-open') ?? false
     setOpen(!open)
+  }
+
+  // 按存储恢复展开/收起状态（每个面板实例只恢复一次）：
+  //  - 面板被 React 重建（切换对话/刷新）后是新节点，标记丢失 → 重新应用存储状态；
+  //  - 同一面板实例内只恢复一次，避免 observer 高频触发反复调用。
+  const restoreOpenOnce = () => {
+    const panel = document.querySelector('.dsh-kit-right-panel') as (HTMLElement & { ___dshkitOpenRestored?: boolean }) | null
+    const contentRoot = document.querySelector('.wSkVaW_root')
+    if (panel === null || contentRoot === null) return
+    if (panel.___dshkitOpenRestored === true) return
+    panel.___dshkitOpenRestored = true
+    const wantOpen = readOpen()
+    const isOpen = contentRoot.classList.contains('dsh-kit-right-open')
+    if (wantOpen !== isOpen) setOpen(wantOpen)
   }
 
   // 标题栏右侧折叠按钮。
@@ -775,6 +797,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const mo = new MutationObserver(() => {
     mountToggle()
     mountLeftToggle()
+    restoreOpenOnce()
   })
   mo.observe(document.body, { childList: true, subtree: true })
 }
