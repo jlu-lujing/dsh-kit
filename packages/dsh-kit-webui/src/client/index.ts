@@ -11,6 +11,7 @@ import { createElement } from 'react'
 import type { ThemeService } from './themes.ts'
 import { ThemeStoreController } from './controller.ts'
 import { ThemeStorePanel } from './panel.ts'
+import { installLayoutTweaks } from './layout.ts'
 
 export const name = 'dsh-kit-webui'
 
@@ -29,6 +30,9 @@ export function apply(ctx: { get(name: string): unknown }): void {
   // 控制器在插件 apply 作用域存活，不随设置页开合而注销主题/全局层。
   const controller = new ThemeStoreController(theme)
   void controller.init()
+
+  // 布局微调：去掉左栏与内容区分割线颜色。
+  installLayoutTweaks()
 
   // 官方设置页「主题商店」面板（id 专属 → 官方设置页多一项）。
   slots.inject('settings.section', () =>
