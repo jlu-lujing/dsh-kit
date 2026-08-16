@@ -7,7 +7,8 @@
  *   → 运行期仅放行同 origin → 退出时优雅停掉自管 dsh 子进程（external 实例不杀）。
  */
 
-import { app, BrowserWindow, shell, dialog, Tray, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, dialog, Tray, ipcMain, screen } from 'electron'
+import type { Rectangle } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -38,6 +39,16 @@ let managed: DshProcess | null = null
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let dshUrl: string | null = null
+
+/** 手动维护的最大化状态（transparent frameless 下 win.isMaximized() 不可靠） */
+let manualMaximized = false
+/** 最大化前的正常窗口 bounds（手动恢复用） */
+let normalBounds: Rectangle | null = null
+
+function sendMaximizedState(win: BrowserWindow, isMax: boolean): void {
+  manualMaximized = isMax
+  if (!win.isDestroyed()) win.webContents.send('window:maximized-changed', isMax)
+}
 
 /** 用户数据目录（默认 ~/.dsh，与 CLI 共享 profile/插件/会话） */
 function dshHome(): string {
@@ -79,12 +90,15 @@ function createWindow(url: string): void {
     },
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  mainWindow.once('ready-to-show', () => {
+    normalBounds = mainWindow?.getBounds() ?? null
+    mainWindow?.show()
+  })
   void mainWindow.loadURL(url)
 
   // 窗口最大化状态变化 → 通知 renderer（切换按钮图标 / 取消圆角）
-  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximized-changed', true))
-  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximized-changed', false))
+  mainWindow.on('maximize', () => { if (mainWindow) sendMaximizedState(mainWindow, true) })
+  mainWindow.on('unmaximize', () => { if (mainWindow) sendMaximizedState(mainWindow, false) })
 
   // 导航仅放行同 origin；外部链接交给系统浏览器。
   mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
@@ -128,15 +142,25 @@ function registerWindowControls(): void {
   ipcMain.handle('window:toggle-maximize', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) return false
-    if (win.isMaximized()) win.unmaximize()
-    else win.maximize()
-    return win.isMaximized()
+    // Windows transparent frameless 窗口：win.isMaximized() 恒为 false、
+    // win.unmaximize() 无效。改为手动保存/恢复 bounds（标准 workaround）。
+    if (manualMaximized) {
+      const target = normalBounds ?? { x: 100, y: 100, width: 1280, height: 820 }
+      win.setBounds(target)
+      sendMaximizedState(win, false)
+      return false
+    }
+    normalBounds = win.getBounds()
+    const display = screen.getDisplayMatching(normalBounds)
+    win.setBounds(display.workArea)
+    sendMaximizedState(win, true)
+    return true
   })
   ipcMain.handle('window:close', (e) => {
     BrowserWindow.fromWebContents(e.sender)?.close()
   })
-  ipcMain.handle('window:is-maximized', (e) => {
-    return BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
+  ipcMain.handle('window:is-maximized', () => {
+    return manualMaximized
   })
 }
 
