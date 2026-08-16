@@ -32,7 +32,7 @@ export function apply(ctx: { get(name: string): unknown }): void {
   void controller.init()
 
   // 布局微调：去掉分割线颜色 + 右侧标题栏 + 右侧边栏折叠/展开按钮。
-  installLayoutTweaks()
+  installLayoutTweaks(ctx.get('layout') as { toggleSidebar: () => void } | undefined)
 
   // 官方设置页「主题商店」面板（id 专属 → 官方设置页多一项）。
   slots.inject('settings.section', () =>
