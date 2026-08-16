@@ -44,6 +44,10 @@
         -webkit-app-region: drag;
         z-index: 1000;
       }
+      /* 非 mac：右侧让出右上角按钮，避免 drag/no-drag 重叠挡点击 */
+      body:not([data-dsh-platform="darwin"]) .dshkit-dragbar { right: 165px; }
+      /* mac：左侧让出信号灯 */
+      body[data-dsh-platform="darwin"] .dshkit-dragbar { left: 90px; }
       .dshkit-winctl {
         position: fixed;
         top: 20px; right: 20px;
