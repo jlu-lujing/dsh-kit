@@ -72,7 +72,7 @@ function createWindow(url: string): void {
     title: `DeepSeek Harness App v${appVersion()}`,
     icon: windowIconPath(), // 非 darwin 平台窗口图标
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -261,7 +261,7 @@ function showErrorPage(message: string): void {
         title: 'DeepSeek Harness App — 启动失败',
         icon: windowIconPath(),
         webPreferences: {
-          preload: join(__dirname, '../preload/index.mjs'),
+          preload: join(__dirname, '../preload/index.cjs'),
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,

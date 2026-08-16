@@ -19,6 +19,12 @@ export default defineConfig({
       outDir: 'out/preload',
       rollupOptions: {
         input: resolve(__dirname, 'src/preload/index.ts'),
+        // sandbox:true 的 preload 只支持 CommonJS（ESM preload 会被静默跳过），
+        // 因此强制输出 .cjs；主进程 preload 路径也指向 index.cjs。
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+        },
       },
     },
   },

@@ -3,14 +3,34 @@
  * （__dshDesktop.windowControl + __waitDshDesktop 就绪等待）。
  *
  * 上下文隔离开启，renderer 拿不到 Node；仅暴露只读元信息 + 窗口控制 IPC。
+ *
+ * 注意：sandbox preload 的 process polyfill 可能不完整，所有 process.* 访问
+ * 必须 try/catch，否则一旦抛错会导致 contextBridge 后续全部不暴露
+ * （表现为 dsh 页面里 __dshDesktop 为 undefined）。
  */
 import { contextBridge, ipcRenderer } from 'electron'
 
+function safeEnv(key: string): string {
+  try {
+    void process.env
+    return (process.env[key] as string | undefined) ?? ''
+  } catch {
+    return ''
+  }
+}
+function safePlatform(): string {
+  try {
+    return process.platform
+  } catch {
+    return ''
+  }
+}
+
 contextBridge.exposeInMainWorld('__DSH_DESKTOP__', {
-  version: process.env.DSH_DESKTOP_VERSION ?? '0.0.0',
-  platform: process.platform,
-  dshUrl: process.env.DSH_WEB_URL ?? '',
-  runtimeVersion: process.env.DSH_RUNTIME_VERSION ?? '',
+  version: safeEnv('DSH_DESKTOP_VERSION') || '0.0.0',
+  platform: safePlatform(),
+  dshUrl: safeEnv('DSH_WEB_URL'),
+  runtimeVersion: safeEnv('DSH_RUNTIME_VERSION'),
 })
 
 // 无边框窗口控制桥（供注入的桌面 chrome 脚本调用）
