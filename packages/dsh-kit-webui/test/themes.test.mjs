@@ -101,6 +101,15 @@ test('预设已覆盖按钮 / 输入框 / Markdown / 代码：派生值与种子
   }
 })
 
+test('侧边栏毛玻璃：预设与默认配色使用半透明 sidebar fill', () => {
+  for (const t of BUILTIN_THEMES) {
+    const v = t.tokens['--dsw-specific-sidebar-fill']
+    assert.match(v, /^rgba\(\d+, \d+, \d+, 0\.(55|6)\)$/, `${t.id} sidebar fill 应为半透明 rgba: ${v}`)
+  }
+  assert.match(DEFAULT_DARK_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^rgba\(/)
+  assert.match(DEFAULT_LIGHT_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^rgba\(/)
+})
+
 test('编辑器默认配色覆盖全量字段（深色 / 浅色）', () => {
   for (const f of TOKEN_FIELDS) {
     assert.equal(typeof DEFAULT_DARK_THEME_TOKENS[f.name], 'string', `dark 缺 ${f.name}`)

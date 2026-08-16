@@ -11,6 +11,7 @@ import { createElement } from 'react'
 import type { ThemeService } from './themes.ts'
 import { ThemeStoreController } from './controller.ts'
 import { ThemeStorePanel } from './panel.ts'
+import { installSidebarGlass } from './glass.ts'
 
 export const name = 'dsh-kit-webui'
 
@@ -29,6 +30,9 @@ export function apply(ctx: { get(name: string): unknown }): void {
   // 控制器在插件 apply 作用域存活，不随设置页开合而注销主题/全局层。
   const controller = new ThemeStoreController(theme)
   void controller.init()
+
+  // 左侧栏毛玻璃：半透明 sidebar token + 官方布局列 backdrop-filter。
+  installSidebarGlass()
 
   // 设置页「主题商店」页面（id 专属 → 官方设置页旁边多一项）
   slots.inject('settings.section', () =>
