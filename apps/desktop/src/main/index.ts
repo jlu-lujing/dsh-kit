@@ -44,6 +44,8 @@ let dshUrl: string | null = null
 let manualMaximized = false
 /** 最大化前的正常窗口 bounds（手动恢复用） */
 let normalBounds: Rectangle | null = null
+/** 手动拖动状态（记录起始窗口位置 + 起始光标位置） */
+let dragState: { winX: number; winY: number; cursorX: number; cursorY: number } | null = null
 
 function sendMaximizedState(win: BrowserWindow, isMax: boolean): void {
   manualMaximized = isMax
@@ -164,6 +166,24 @@ function registerWindowControls(): void {
   })
   ipcMain.handle('window:is-maximized', () => {
     return manualMaximized
+  })
+
+  // 手动拖动窗口（替代 -webkit-app-region: drag，避免吞掉 DOM 事件导致双击失效）
+  ipcMain.on('window:drag-start', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win || manualMaximized) return
+    const p = win.getPosition()
+    const c = screen.getCursorScreenPoint()
+    dragState = { winX: p[0], winY: p[1], cursorX: c.x, cursorY: c.y }
+  })
+  ipcMain.on('window:drag-move', (e, _dx, _dy) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win || !dragState) return
+    const c = screen.getCursorScreenPoint()
+    win.setPosition(dragState.winX + (c.x - dragState.cursorX), dragState.winY + (c.y - dragState.cursorY))
+  })
+  ipcMain.on('window:drag-end', () => {
+    dragState = null
   })
 }
 

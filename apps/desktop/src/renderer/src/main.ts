@@ -73,6 +73,9 @@ interface DshDesktopBridge {
     toggleMaximize: () => Promise<boolean>
     close: () => Promise<void>
     isMaximized: () => Promise<boolean>
+    startDrag: () => void
+    dragBy: (dx: number, dy: number) => void
+    endDrag: () => void
   }
   onMaximizedChange?: (cb: (isMax: boolean) => void) => void
 }
@@ -101,6 +104,23 @@ function setupWindowControls(): void {
   maxBtn?.addEventListener('click', () => void api?.toggleMaximize())
   closeBtn?.addEventListener('click', () => void api?.close())
   dragbar?.addEventListener('dblclick', () => void api?.toggleMaximize())
+
+  // 手动拖动（不用 -webkit-app-region: drag，避免吞掉 DOM 事件导致双击失效）
+  let dragging = false
+  dragbar?.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return
+    dragging = true
+    api?.startDrag()
+  })
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return
+    api?.dragBy(e.movementX || 0, e.movementY || 0)
+  })
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return
+    dragging = false
+    api?.endDrag()
+  })
 
   // 最大化状态同步按钮图标（还原 ↔ 最大化）
   const reflectMax = (isMax: boolean): void => {
