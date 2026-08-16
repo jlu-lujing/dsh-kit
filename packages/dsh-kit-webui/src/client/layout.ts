@@ -51,7 +51,7 @@ const LAYOUT_CSS = `
   margin-right: var(--dsh-kit-right-width, 320px);
 }
 
-/* 右侧栏：内容区内、标题栏下方、右缘贴内容区 */
+/* 右侧栏：内容区内、标题栏下方、右缘贴内容区；默认隐藏，展开时显示 */
 .dsh-kit-right-panel {
   position: absolute;
   top: var(--dsh-kit-titlebar-height, 0px);
@@ -60,10 +60,13 @@ const LAYOUT_CSS = `
   width: var(--dsh-kit-right-width, 320px);
   background: var(--dsw-alias-bg-layer-1);
   border-left: 1px solid var(--dsw-alias-border-l2);
-  display: flex;
+  display: none;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+}
+.wSkVaW_root.dsh-kit-right-open .dsh-kit-right-panel {
+  display: flex;
 }
 .dsh-kit-right-panel-header {
   flex: none;
