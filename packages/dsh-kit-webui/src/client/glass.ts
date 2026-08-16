@@ -50,12 +50,21 @@ const GLASS_CSS = `
     background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 38%, transparent);
   }
 }
-/* 设置弹窗打开时：把侧边栏列抬到 2000，让 fixed 弹窗高于输入框(z:10)。 */
+/* 设置弹窗打开时：还原官方布局（去掉毛玻璃的 z-index/backdrop/背景），
+   让 fixed 弹窗以 viewport 为包含块、浮到最上层。 */
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame::before {
-  z-index: 2000;
+  display: none;
 }
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_sidebarCol {
-  z-index: 2000;
+  position: static;
+  z-index: auto;
+  background: var(--dsw-specific-sidebar-fill);
+}
+.dsh-kit-glass-sidebar.dsh-kit-settings-open [data-slot="sidebar"] {
+  background: var(--dsw-specific-sidebar-fill);
+}
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .hHd-Xa_root {
+  background: var(--dsw-specific-sidebar-fill);
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh-kit-glass-sidebar .pI_x6G_frame::before {
@@ -95,3 +104,4 @@ export function installSidebarGlass(): void {
   // 设置弹窗最上层修复：弹窗打开时抬升侧边栏列层级。
   attachSettingsLayerFix()
 }
+
