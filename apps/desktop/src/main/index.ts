@@ -126,9 +126,12 @@ function createWindow(url: string): void {
 function injectDesktopChrome(win: BrowserWindow | null): void {
   if (!win) return
   const wc = win.webContents
-  wc.executeJavaScript(`window.__DSH_DESKTOP_CHROME_CSS__ = ${JSON.stringify(DESKTOP_CHROME_CSS)}`, true)
-    .catch(() => { /* 忽略 */ })
-  wc.executeJavaScript('window.__DSH_DESKTOP_CHROME_CSS__; if (!window.__dshKitDesktopChrome__) {' + DESKTOP_CHROME_JS + '}', true)
+  // 单次注入：CSS 直接内联，避免两次 executeJavaScript 之间竞态
+  // （第二次可能读到 __DSH_DESKTOP_CHROME_CSS__ 为 undefined → 样式缺失 → 控件错位）。
+  const javaScript =
+    'window.__DSH_DESKTOP_CHROME_CSS__ = ' + JSON.stringify(DESKTOP_CHROME_CSS) +
+    '; if (!window.__dshKitDesktopChrome__) {' + DESKTOP_CHROME_JS + '}'
+  wc.executeJavaScript(javaScript, true)
     .catch((err) => {
       console.warn('[desktop-chrome] inject failed:', err)
     })
