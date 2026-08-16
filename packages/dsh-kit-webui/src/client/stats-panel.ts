@@ -1,12 +1,13 @@
 /**
- * dsh-kit-webui 右侧栏「信息」页 —— 实时会话统计（表格展示）。
+ * dsh-kit-webui 右侧栏「信息」页 —— 实时会话统计（Dashboard 仪表盘）。
  *
- * 注册进官方 `conversation.composer.dock` 槽位、shadow 掉官方 StatsLine，
- * 用官方标准 kit 提供的 `useProjection` 直接读取 `sessionStats` / `tokenUsage`
- * —— 与官方 StatsLine 同一数据源，跨版本稳定、数据实时更新。
- *
- * 组件本身在 React 树里返回 null（原对话框下方不显示任何东西）；
- * 真正的内容通过 useLayoutEffect 构建 DOM 写进右侧栏「信息」页容器。
+ * 设计：
+ *   - 缓存命中：SVG 环形仪表盘（donut），动画绘制，作为视觉主角；
+ *   - 关键指标：2×2 瓦片（轮次 / 步数 / 首 token / 吞吐）；
+ *   - 耗时分布：LLM vs 工具 等比分段条 + 图例；
+ *   - Token 体积：输入 vs 输出 等比分段条 + 图例；
+ *   - 全部用 DSW alias token，自动跟随主题深浅色；
+ *   - 数据用 useProjection 实时驱动；首帧有入场动画，后续数字就地更新。
  */
 import { useEffect, useLayoutEffect, useState } from 'react'
 
@@ -42,7 +43,7 @@ interface TokenUsage {
 export const SYNC_EVENT = 'dsh-kit:stats-sync-request'
 
 const HOLDER_SELECTOR = '.dsh-kit-info-stats'
-const PLACEHOLDER_SELECTOR = '.dsh-kit-info-empty'
+const CARD_SELECTOR = '.dsh-kit-stats-card'
 
 /* ── 与官方 StatsLine 一致的格式化工具（conversation 内部私有，这里复刻） ── */
 
@@ -77,67 +78,7 @@ function cacheHitPercent(usage: TokenUsage): number | null {
   return denominator === 0 ? null : Math.round((usage.cacheReadTokens / denominator) * 100)
 }
 
-/* ── 结构化表格模型 ── */
-
-interface Metric {
-  label: string
-  value: string
-  /** 可选强调色（数值列）。 */
-  accent?: 'success' | 'brand' | 'warn'
-}
-
-interface MetricGroup {
-  title: string
-  items: Metric[]
-}
-
-interface StatsModel {
-  groups: MetricGroup[]
-  cacheHit: number | null
-  hasData: boolean
-}
-
-function collectModel(stats: SessionStats | undefined, usage: TokenUsage | undefined, cacheHit: number | null): StatsModel {
-  const groups: MetricGroup[] = []
-
-  const counts: Metric[] = []
-  if (stats !== undefined && stats.steps > 0) {
-    counts.push({ label: '对话轮次', value: String(stats.turns), accent: 'brand' })
-    counts.push({ label: '执行步数', value: String(stats.steps), accent: 'brand' })
-  }
-  if (counts.length > 0) groups.push({ title: '对话', items: counts })
-
-  const durations: Metric[] = []
-  if (stats !== undefined) {
-    if (stats.llmMs > 0) durations.push({ label: 'LLM 耗时', value: formatDuration(stats.llmMs) })
-    if (stats.toolMs > 0) durations.push({ label: '工具耗时', value: formatDuration(stats.toolMs) })
-  }
-  if (durations.length > 0) groups.push({ title: '耗时', items: durations })
-
-  const perf: Metric[] = []
-  if (stats !== undefined) {
-    if (stats.ttftSteps > 0) perf.push({ label: '首 token', value: formatDuration(stats.ttftMs / stats.ttftSteps), accent: 'success' })
-    if (stats.decodeMs > 0) {
-      perf.push({ label: '吞吐', value: `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1000))} tok/s`, accent: 'success' })
-    }
-  }
-  if (perf.length > 0) groups.push({ title: '性能', items: perf })
-
-  const tokens: Metric[] = []
-  if (usage !== undefined && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)) {
-    tokens.push({ label: '输入 token', value: `${formatTokens(billedInputTokens(usage))} tok` })
-    tokens.push({ label: '输出 token', value: `${formatTokens(usage.outputTokens)} tok` })
-  }
-  if (tokens.length > 0) groups.push({ title: 'Token', items: tokens })
-
-  return {
-    groups,
-    cacheHit,
-    hasData: groups.length > 0 || cacheHit !== null,
-  }
-}
-
-/* ── DOM 构建（纯 createElement，避免 innerHTML / XSS） ── */
+/* ── DOM 构建（纯 createElement / createElementNS，避免 innerHTML） ── */
 
 function el(tag: string, className?: string, text?: string): HTMLElement {
   const node = document.createElement(tag)
@@ -146,69 +87,236 @@ function el(tag: string, className?: string, text?: string): HTMLElement {
   return node
 }
 
-function buildCard(root: HTMLElement, model: StatsModel): void {
-  // 清掉旧卡片与占位
-  root.querySelectorAll('.dsh-kit-stats-card, .dsh-kit-info-empty').forEach((n) => n.remove())
+const SVG_NS = 'http://www.w3.org/2000/svg'
 
-  if (!model.hasData) {
-    const empty = el('div', 'dsh-kit-info-empty', '暂无会话统计')
-    root.appendChild(empty)
-    return
+function svgEl(tag: string, attrs: Record<string, string | number>): SVGElement {
+  const node = document.createElementNS(SVG_NS, tag)
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v))
+  return node
+}
+
+/** 在卡片上定位一个带 data-k 的节点。 */
+function nodeOf(card: HTMLElement, key: string): HTMLElement | null {
+  return card.querySelector<HTMLElement>(`[data-k="${key}"]`)
+}
+
+/* ── 会话统计模型 ── */
+
+interface Tile {
+  key: string
+  label: string
+  value: string
+  accent?: 'brand' | 'good' | 'warn'
+}
+
+interface Pair {
+  key: string
+  label: string
+  value: string
+  ratio: number // 0..1，用于分段条
+}
+
+interface StatsModel {
+  cacheHit: number | null
+  tiles: Tile[]
+  timePair: Pair[] | null
+  tokenPair: Pair[] | null
+  hasData: boolean
+  /** 哪些部分存在 —— 变了就重建，否则就地更新。 */
+  signature: string
+}
+
+function collectModel(stats: SessionStats | undefined, usage: TokenUsage | undefined, cacheHit: number | null): StatsModel {
+  const tiles: Tile[] = []
+  const sig: string[] = []
+
+  if (stats !== undefined && stats.steps > 0) {
+    tiles.push({ key: 'turns', label: '轮次', value: String(stats.turns), accent: 'brand' })
+    tiles.push({ key: 'steps', label: '步数', value: String(stats.steps), accent: 'brand' })
+    sig.push('count')
+    if (stats.ttftSteps > 0) tiles.push({ key: 'ttft', label: '平均首 token', value: formatDuration(stats.ttftMs / stats.ttftSteps), accent: 'good' })
+    if (stats.decodeMs > 0) {
+      tiles.push({ key: 'throughput', label: '解码吞吐', value: `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1000))} tok/s`, accent: 'good' })
+    }
   }
 
+  // 耗时分布
+  let timePair: Pair[] | null = null
+  if (stats !== undefined && stats.llmMs + stats.toolMs > 0) {
+    const total = stats.llmMs + stats.toolMs
+    const items: Pair[] = []
+    if (stats.llmMs > 0) items.push({ key: 'llm', label: 'LLM', value: formatDuration(stats.llmMs), ratio: stats.llmMs / total })
+    if (stats.toolMs > 0) items.push({ key: 'tool', label: '工具', value: formatDuration(stats.toolMs), ratio: stats.toolMs / total })
+    timePair = items
+    sig.push('time')
+  }
+
+  // Token 体积
+  let tokenPair: Pair[] | null = null
+  if (usage !== undefined && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)) {
+    const input = billedInputTokens(usage)
+    const output = usage.outputTokens
+    const total = input + output
+    tokenPair = [
+      { key: 'input', label: '输入', value: `${formatTokens(input)} tok`, ratio: total > 0 ? input / total : 0 },
+      { key: 'output', label: '输出', value: `${formatTokens(output)} tok`, ratio: total > 0 ? output / total : 0 },
+    ]
+    sig.push('token')
+  }
+
+  if (cacheHit !== null) sig.push('cache')
+
+  return {
+    cacheHit,
+    tiles,
+    timePair,
+    tokenPair,
+    hasData: tiles.length > 0 || timePair !== null || tokenPair !== null || cacheHit !== null,
+    signature: sig.join(',') + '|' + tiles.map((t) => t.key).join(','),
+  }
+}
+
+/* ── 仪表盘构建（一次性） ── */
+
+const DONUT_R = 42
+const DONUT_C = 2 * Math.PI * DONUT_R
+
+function buildCard(model: StatsModel): HTMLElement {
   const card = el('div', 'dsh-kit-stats-card')
 
   // 标题行
   const head = el('div', 'dsh-kit-stats-head')
   head.appendChild(el('span', 'dsh-kit-stats-head-dot'))
-  head.appendChild(el('span', null, '会话统计'))
+  head.appendChild(el('span', 'dsh-kit-stats-head-title', '会话统计'))
+  const live = el('span', 'dsh-kit-stats-live')
+  live.appendChild(el('span', 'dsh-kit-stats-live-dot'))
+  live.appendChild(el('span', null, '实时'))
+  head.appendChild(live)
   card.appendChild(head)
 
-  // 表格
-  const table = el('table', 'dsh-kit-stats-table')
-  const thead = el('thead')
-  const headRow = el('tr')
-  headRow.appendChild(el('th', null, '指标'))
-  headRow.appendChild(el('th', null, '数值'))
-  thead.appendChild(headRow)
-  table.appendChild(thead)
+  const body = el('div', 'dsh-kit-stats-body')
+  card.appendChild(body)
 
-  const tbody = el('tbody')
-  for (const group of model.groups) {
-    if (group.items.length === 0) continue
-    const groupRow = el('tr', 'dsh-kit-stats-group')
-    const groupCell = el('td', null, group.title)
-    groupCell.colSpan = 2
-    groupRow.appendChild(groupCell)
-    tbody.appendChild(groupRow)
-    for (const m of group.items) {
-      const row = el('tr', 'dsh-kit-stats-row')
-      row.appendChild(el('td', 'dsh-kit-stats-row-label', m.label))
-      const valueCls = m.accent ? `dsh-kit-stats-row-value dsh-kit-accent-${m.accent}` : 'dsh-kit-stats-row-value'
-      row.appendChild(el('td', valueCls, m.value))
-      tbody.appendChild(row)
-    }
-  }
-
-  // 缓存命中最底部一行（跨行，带进度条）
+  // 缓存命中环形仪表
   if (model.cacheHit !== null) {
-    const cacheRow = el('tr', 'dsh-kit-stats-row dsh-kit-stats-cache')
-    cacheRow.appendChild(el('td', 'dsh-kit-stats-row-label', '缓存命中'))
-    const valueCell = el('td', 'dsh-kit-stats-row-value dsh-kit-accent-success')
-    const valText = el('span', 'dsh-kit-stats-cache-value', `${model.cacheHit}%`)
-    valueCell.appendChild(valText)
-    const bar = el('div', 'dsh-kit-stat-bar')
-    const fill = el('div', 'dsh-kit-stat-bar-fill')
-    fill.style.width = `${Math.min(100, Math.max(0, model.cacheHit))}%`
-    bar.appendChild(fill)
-    valueCell.appendChild(bar)
-    cacheRow.appendChild(valueCell)
-    tbody.appendChild(cacheRow)
+    const donutWrap = el('div', 'dsh-kit-stats-donut-wrap')
+    const donut = svgEl('svg', {
+      class: 'dsh-kit-stats-donut',
+      viewBox: '0 0 110 110',
+      role: 'img',
+      'aria-label': `缓存命中 ${model.cacheHit}%`,
+    })
+    const track = svgEl('circle', {
+      cx: 55, cy: 55, r: DONUT_R,
+      class: 'dsh-kit-stats-donut-track', fill: 'none',
+    })
+    const arc = svgEl('circle', {
+      cx: 55, cy: 55, r: DONUT_R,
+      class: 'dsh-kit-stats-donut-arc', fill: 'none',
+    })
+    donut.appendChild(track)
+    donut.appendChild(arc)
+    donutWrap.appendChild(donut)
+
+    const center = el('div', 'dsh-kit-stats-donut-center')
+    const donutVal = el('span', 'dsh-kit-stats-donut-value', `${model.cacheHit}%`)
+    donutVal.dataset.k = 'cache'
+    center.appendChild(donutVal)
+    center.appendChild(el('span', 'dsh-kit-stats-donut-label', '缓存命中'))
+    donutWrap.appendChild(center)
+
+    const note = el('div', 'dsh-kit-stats-donut-note', '提示词侧缓存占比')
+    body.appendChild(donutWrap)
+    body.appendChild(note)
   }
 
-  table.appendChild(tbody)
-  card.appendChild(table)
-  root.appendChild(card)
+  // 关键指标瓦片
+  if (model.tiles.length > 0) {
+    const grid = el('div', 'dsh-kit-stats-grid')
+    model.tiles.forEach((t, i) => {
+      const tile = el('div', 'dsh-kit-stats-tile')
+      tile.style.setProperty('--i', String(i))
+      const label = el('div', 'dsh-kit-stats-tile-label', t.label)
+      const valCls = t.accent ? `dsh-kit-stats-tile-value dsh-kit-accent-${t.accent}` : 'dsh-kit-stats-tile-value'
+      const value = el('div', valCls, t.value)
+      value.dataset.k = t.key
+      tile.appendChild(label)
+      tile.appendChild(value)
+      grid.appendChild(tile)
+    })
+    body.appendChild(grid)
+  }
+
+  // 耗时分布
+  if (model.timePair !== null && model.timePair.length > 0) {
+    body.appendChild(buildSection('耗时分布', model.timePair, 'time'))
+  }
+
+  // Token 体积
+  if (model.tokenPair !== null && model.tokenPair.length > 0) {
+    body.appendChild(buildSection('Token 体积', model.tokenPair, 'token'))
+  }
+
+  return card
+}
+
+function buildSection(title: string, pairs: Pair[], prefix: string): HTMLElement {
+  const section = el('div', 'dsh-kit-stats-section')
+  section.appendChild(el('div', 'dsh-kit-stats-section-title', title))
+
+  const bar = el('div', `dsh-kit-stats-pairbar dsh-kit-stats-pairbar-${prefix}`)
+  for (const p of pairs) {
+    const seg = el('div', '')
+    seg.dataset.k = `${prefix}-${p.key}-seg`
+    seg.style.width = `${Math.max(p.ratio * 100, 2)}%`
+    bar.appendChild(seg)
+  }
+  section.appendChild(bar)
+
+  const legend = el('div', 'dsh-kit-stats-pairlegend')
+  for (const p of pairs) {
+    const item = el('div', 'dsh-kit-stats-pairitem')
+    item.appendChild(el('span', 'dsh-kit-stats-pairitem-swatch'))
+    item.appendChild(el('span', 'dsh-kit-stats-pairitem-label', p.label))
+    const value = el('span', 'dsh-kit-stats-pairitem-value')
+    value.dataset.k = `${prefix}-${p.key}-value`
+    value.textContent = p.value
+    item.appendChild(value)
+    legend.appendChild(item)
+  }
+  section.appendChild(legend)
+  return section
+}
+
+/* ── 就地更新（数字实时变化时不清空重建） ── */
+
+function updateCard(card: HTMLElement, model: StatsModel, cacheHit: number | null): void {
+  for (const t of model.tiles) {
+    const node = nodeOf(card, t.key)
+    if (node) node.textContent = t.value
+  }
+  setDonutTarget(card, cacheHit)
+  const cacheNode = nodeOf(card, 'cache')
+  if (cacheNode && cacheHit !== null) cacheNode.textContent = `${cacheHit}%`
+
+  if (model.timePair) for (const p of model.timePair) {
+    const seg = nodeOf(card, `time-${p.key}-seg`)
+    if (seg) seg.style.width = `${Math.max(p.ratio * 100, 2)}%`
+    const val = nodeOf(card, `time-${p.key}-value`)
+    if (val) val.textContent = p.value
+  }
+
+  if (model.tokenPair) for (const p of model.tokenPair) {
+    const seg = nodeOf(card, `token-${p.key}-seg`)
+    if (seg) seg.style.width = `${Math.max(p.ratio * 100, 2)}%`
+    const val = nodeOf(card, `token-${p.key}-value`)
+    if (val) val.textContent = p.value
+  }
+}
+
+/** 画环形动画：下一帧把卡片切到 live 态，促使 dashoffset 过渡。 */
+function drawDonut(card: HTMLElement): void {
+  requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('dsh-kit-stats-live')))
 }
 
 /** 把最新统计写进右侧栏「信息」页容器；容器还不存在则静默跳过。 */
@@ -216,7 +324,34 @@ function writeToPanel(stats: SessionStats | undefined, usage: TokenUsage | undef
   const holder = document.querySelector<HTMLElement>(HOLDER_SELECTOR)
   if (!holder) return
   const cacheHit = usage !== undefined ? cacheHitPercent(usage) : null
-  buildCard(holder, collectModel(stats, usage, cacheHit))
+  const model = collectModel(stats, usage, cacheHit)
+
+  if (!model.hasData) {
+    const empty = el('div', 'dsh-kit-info-empty', '暂无会话统计')
+    holder.replaceChildren(empty)
+    return
+  }
+
+  let card = holder.querySelector<HTMLElement>(CARD_SELECTOR)
+  if (card === null || card.dataset.sig !== model.signature) {
+    card = buildCard(model)
+    card.dataset.sig = model.signature
+    setDonutTarget(card, model.cacheHit)
+    holder.replaceChildren(card)
+    drawDonut(card)
+  } else {
+    updateCard(card, model, cacheHit)
+  }
+}
+
+/**
+ * 立即记录环形弧的目标偏移 --donut-target；.live 态下 CSS 会过渡到它实现动画。
+ * 初始（非 live）时弧 dashoffset 硬编码 264（全空），切 live 后过渡到目标。
+ */
+function setDonutTarget(card: HTMLElement, cacheHit: number | null): void {
+  const pct = cacheHit === null ? 0 : Math.min(100, Math.max(0, cacheHit))
+  card.style.setProperty('--dsh-kit-donut-c', `${DONUT_C}px`)
+  card.style.setProperty('--donut-target', `${DONUT_C * (1 - pct / 100)}px`)
 }
 
 function StatsPanelEntry(_props: StatsPanelEntryProps): null {

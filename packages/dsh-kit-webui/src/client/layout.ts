@@ -208,7 +208,7 @@ const LAYOUT_CSS = `
 .dsh-kit-right-tabpane.is-active {
   display: block;
 }
-/* 信息面板：实时会话统计（React useProjection 驱动的表格卡片） */
+/* 信息面板：实时会话统计（React useProjection 驱动的 Dashboard） */
 .dsh-kit-info-stats {
   display: block;
   color: var(--dsw-alias-label-secondary);
@@ -219,13 +219,19 @@ const LAYOUT_CSS = `
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
   line-height: 20px;
+  padding: 8px 0;
 }
 .dsh-kit-stats-card {
   border: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px;
   box-shadow: var(--dsw-shadow-lv1, 0 1px 2px rgba(0, 0, 0, 0.04));
+  animation: dsh-kit-stats-in .3s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes dsh-kit-stats-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .dsh-kit-stats-head {
   display: flex;
@@ -235,7 +241,7 @@ const LAYOUT_CSS = `
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .dsh-kit-stats-head-dot {
   width: 8px;
@@ -244,74 +250,187 @@ const LAYOUT_CSS = `
   background: var(--dsw-alias-state-business-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
-.dsh-kit-stats-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-.dsh-kit-stats-table th {
-  text-align: left;
+.dsh-kit-stats-head-title { flex: 1; }
+.dsh-kit-stats-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  padding: 4px 8px 6px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  font-weight: 400;
 }
-.dsh-kit-stats-table th:nth-child(1) { width: 46%; }
-.dsh-kit-stats-table th:nth-child(2) { width: 54%; }
-.dsh-kit-stats-table td {
-  padding: 0 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1) 55%, transparent);
-  vertical-align: middle;
+.dsh-kit-stats-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
+  animation: dsh-kit-stats-pulse 2s ease-in-out infinite;
 }
-.dsh-kit-stats-row { line-height: 32px; }
-.dsh-kit-stats-row td:first-child { color: var(--dsw-alias-label-secondary); }
-.dsh-kit-stats-row-value {
-  text-align: right;
+@keyframes dsh-kit-stats-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+.dsh-kit-stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* 环形仪表 */
+.dsh-kit-stats-donut-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto;
+}
+.dsh-kit-stats-donut {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.dsh-kit-stats-donut-track {
+  stroke: var(--dsw-alias-interactive-bg-hover);
+  stroke-width: 12;
+}
+.dsh-kit-stats-donut-arc {
+  stroke: var(--dsw-alias-state-business-primary);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: var(--dsh-kit-donut-c, 264);
+  stroke-dashoffset: 264;
+  transition: stroke-dashoffset .8s cubic-bezier(.22,.61,.36,1);
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent));
+}
+.dsh-kit-stats-card.dsh-kit-stats-live .dsh-kit-stats-donut-arc {
+  stroke-dashoffset: var(--donut-target, 264);
+}
+.dsh-kit-stats-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.dsh-kit-stats-donut-value {
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.dsh-kit-stats-donut-label {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+.dsh-kit-stats-donut-note {
+  text-align: center;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+}
+/* 指标瓦片 */
+.dsh-kit-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.dsh-kit-stats-tile {
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-base);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  animation: dsh-kit-stats-tile-in .35s cubic-bezier(.22,.61,.36,1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes dsh-kit-stats-tile-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dsh-kit-stats-tile-label {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 15px;
+}
+.dsh-kit-stats-tile-value {
+  color: var(--dsw-alias-label-primary);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
+.dsh-kit-accent-good { color: var(--dsw-alias-state-success-primary); }
+.dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
+/* 分段条区 */
+.dsh-kit-stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dsh-kit-stats-section-title {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.dsh-kit-stats-pairbar {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-kit-stats-pairbar-time [data-k$="-seg"]:nth-child(1) { background: var(--dsw-alias-state-business-primary); }
+.dsh-kit-stats-pairbar-time [data-k$="-seg"]:nth-child(2) { background: var(--dsw-alias-state-warn-primary); }
+.dsh-kit-stats-pairbar-token [data-k$="-seg"]:nth-child(1) { background: var(--dsw-alias-state-business-primary); }
+.dsh-kit-stats-pairbar-token [data-k$="-seg"]:nth-child(2) { background: var(--dsw-alias-state-success-primary); }
+.dsh-kit-stats-pairbar [data-k] {
+  transition: width .5s cubic-bezier(.22,.61,.36,1);
+  border-radius: 999px;
+  min-width: 2px;
+}
+.dsh-kit-stats-pairlegend {
+  display: flex;
+  gap: 12px;
+}
+.dsh-kit-stats-pairitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dsh-kit-stats-pairitem-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  flex: none;
+}
+.dsh-kit-stats-pairitem-label {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+.dsh-kit-stats-pairitem-value {
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dsh-kit-stats-group td {
-  padding-top: 8px;
-  padding-bottom: 2px;
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  border-bottom: none;
-  line-height: 20px;
-}
-.dsh-kit-stats-group + .dsh-kit-stats-row td { border-bottom-color: transparent; }
-.dsh-kit-accent-success { color: var(--dsw-alias-state-success-primary); }
-.dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
-.dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
-.dsh-kit-stats-cache .dsh-kit-stats-row-value { text-align: left; }
-.dsh-kit-stats-cache-value {
-  display: block;
-  color: var(--dsw-alias-state-success-primary);
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 4px;
-}
-.dsh-kit-stat-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--dsw-alias-interactive-bg-hover);
-  overflow: hidden;
-}
-.dsh-kit-stat-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--dsw-alias-state-business-primary), color-mix(in srgb, var(--dsw-alias-state-business-primary) 60%, var(--dsw-alias-state-success-primary)));
-  transition: width 0.4s ease;
-}
+.dsh-kit-stats-pairbar-time + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(1) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-business-primary); }
+.dsh-kit-stats-pairbar-time + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(2) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-warn-primary); }
+.dsh-kit-stats-pairbar-token + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(1) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-business-primary); }
+.dsh-kit-stats-pairbar-token + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(2) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-success-primary); }
 
 /* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
 .dsh-kit-right-toggle {
