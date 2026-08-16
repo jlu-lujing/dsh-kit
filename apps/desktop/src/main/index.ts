@@ -45,7 +45,7 @@ let manualMaximized = false
 /** 最大化前的正常窗口 bounds（手动恢复用） */
 let normalBounds: Rectangle | null = null
 /** 手动拖动状态（记录起始窗口位置 + 起始光标位置） */
-let dragState: { winX: number; winY: number; cursorX: number; cursorY: number } | null = null
+let dragState: { winX: number; winY: number; winW: number; winH: number; cursorX: number; cursorY: number } | null = null
 
 function sendMaximizedState(win: BrowserWindow, isMax: boolean): void {
   manualMaximized = isMax
@@ -174,13 +174,14 @@ function registerWindowControls(): void {
     if (!win || manualMaximized) return
     const p = win.getPosition()
     const c = screen.getCursorScreenPoint()
-    dragState = { winX: p[0], winY: p[1], cursorX: c.x, cursorY: c.y }
+    const b = win.getBounds()
+    dragState = { winX: p[0], winY: p[1], winW: b.width, winH: b.height, cursorX: c.x, cursorY: c.y }
   })
   ipcMain.on('window:drag-move', (e, _dx, _dy) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win || !dragState) return
     const c = screen.getCursorScreenPoint()
-    win.setPosition(dragState.winX + (c.x - dragState.cursorX), dragState.winY + (c.y - dragState.cursorY))
+    win.setBounds({ x: dragState.winX + (c.x - dragState.cursorX), y: dragState.winY + (c.y - dragState.cursorY), width: dragState.winW, height: dragState.winH })
   })
   ipcMain.on('window:drag-end', () => {
     dragState = null
