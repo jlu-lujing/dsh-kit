@@ -49,9 +49,7 @@ export const DESKTOP_CHROME_CSS = [
   '/* 平台开关 */',
   'body[data-dsh-platform="darwin"] .dshkit-winctl { display: none; }',
   'body[data-dsh-platform="darwin"] .dshkit-trafficlights { display: flex; }',
-  'body[data-dsh-platform="darwin"] [class*="sidebarCol"] {',
-  '  padding-top: 40px !important;',
-  '}',
+  /* 不再给左栏加 padding-top（避免遮挡顶部按钮；mac 信号灯用 fixed 覆盖即可） */
   '',
   '/* ---- Windows/Linux：右上角控制按钮 ---- */',
   '.dshkit-winctl {',
