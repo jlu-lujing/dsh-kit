@@ -354,13 +354,21 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     return panel
   }
 
-  // 将官方「对话框下方统计」（StatsLine .FJxK0a_root）克隆进右侧栏「信息」标签页并隐藏原处。
+  // 无条件隐藏官方「对话框下方统计」——启动即隐藏，不依赖右栏是否展开。
+  const hideOfficialStats = () => {
+    document.querySelectorAll<HTMLElement>('.FJxK0a_root').forEach((el) => {
+      el.style.display = 'none'
+    })
+  }
+  hideOfficialStats()
+
+  // 把官方统计克隆进右侧栏「信息」标签页（面板已创建才填内容）。
   const syncStatsIntoInfo = () => {
     const pane = document.querySelector<HTMLElement>('.dsh-kit-right-tabpane[data-pane="info"]')
     if (pane === null) return
     const official = document.querySelector<HTMLElement>('.FJxK0a_root')
     if (!official) return
-    official.style.display = 'none'
+    hideOfficialStats()
     let holder = pane.querySelector<HTMLElement>('.dsh-kit-info-stats')
     if (!holder) {
       holder = document.createElement('div')
@@ -458,6 +466,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const mo = new MutationObserver(() => {
     mountToggle()
     mountLeftToggle()
+    hideOfficialStats()
     syncStatsIntoInfo()
   })
   mo.observe(document.body, { childList: true, subtree: true })
