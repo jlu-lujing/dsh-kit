@@ -15,6 +15,17 @@ const LAYOUT_CSS = `
   border-right-color: transparent !important;
 }
 
+/* 左栏顶部（logoRow 及按钮）提层，避免被窗口拖拽/覆盖层遮挡 */
+.pI_x6G_sidebarCol .hHd-Xa_logoRow,
+.pI_x6G_sidebarCol [class*="logoRow"] {
+  position: relative;
+  z-index: 100;
+}
+.pI_x6G_sidebarCol button {
+  position: relative;
+  z-index: 100;
+}
+
 /* 右侧顶部标题栏：官方 conversation header 背景改为左栏同色，横贯全窗 */
 .wSkVaW_header {
   background: var(--dsw-specific-sidebar-fill) !important;
@@ -157,6 +168,9 @@ export function installLayoutTweaks(): void {
     root.style.setProperty('--dsh-kit-titlebar-height', `${Math.max(0, h)}px`)
   }
   syncTitlebar()
+
+  // 移除历史残留的全屏拖拽条（.dshkit-dragbar），避免挡住左栏顶部按钮。
+  document.querySelectorAll('.dshkit-dragbar').forEach((el) => el.remove())
   if (typeof ResizeObserver !== 'undefined') {
     const tryObserve = () => {
       const header = document.querySelector('.wSkVaW_header')
