@@ -51,7 +51,7 @@ dsh-kit/
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 | 归档会话管理（内置） | 归档会话恢复 / 删除 | 官方「归档」只隐藏不删；设置页可恢复或彻底删除（含日志文件） |
 
-> 💡 TurboBoost Mode（满血模式）不是独立 npm 包，由 `dsh-kit` 内置打包分发（详见下方「借鉴」）。
+> 💡 TurboBoost Mode（满血模式）不是独立 npm 包，由 `dsh-kit` 内置打包分发。
 
 ---
 
@@ -226,9 +226,9 @@ pnpm -r publish --access public --no-git-checks
 
 ---
 
-## 📚 借鉴与许可
+## 📚 许可
 
-- **满血模式（TurboBoost Mode）preset** 的算法与文件集合**借鉴**自社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明）。dsh-kit 以自研的导入/删除管理器（`src/preset.ts`）内置并注明借鉴。
+- **满血模式（TurboBoost Mode）preset**：内置二阶段 agent preset，由 dsh-kit 的导入/删除管理器（`src/preset.ts`）打包分发。
 - **GitHub 生态目录**的分片抓取 / 缓存思路参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）；dsh-kit 只取展示能力，不做安装。
   - 简介：首次请求用 Minimal 工具对（`bash` / `str_replace_editor`），首次持久晋升信号后开放完整工具目录。
   - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除。
@@ -238,4 +238,3 @@ pnpm -r publish --access public --no-git-checks
 本项目遵循 [MIT License](LICENSE)。
 
 - Copyright (c) 2026 **Lu Jing**
-- 满血模式（TurboBoost Mode）preset 部分借鉴自社区 [dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 声明）。

@@ -69,7 +69,7 @@
 | `dsh-kit-notifier` | 桌面通知 | 监听回合结束，跨平台通知；**纯库** |
 | `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由；**纯库** |
 | `dsh-kit-input-history` | 输入历史 | 当前会话 ↑/↓ 回填；**纯 client** |
-| 满血模式 preset（内置） | 二阶段 agent preset | 内置导入/删除管理器；借鉴社区 dsh-anchored-standard（MIT） |
+| 满血模式 preset（内置） | 二阶段 agent preset | 内置导入/删除管理器 |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 只读展示，不提供一键安装 |
 | 归档会话管理（内置） | 归档恢复 / 彻底删除 | 补官方缺失的恢复/删除 API，落盘 workspace.json |
 | 桌面客户端（apps） | Electron 壳 + dsh-runtime | 开箱即用、自动装全家桶、托盘/自启/更新 |
@@ -112,7 +112,7 @@
 - `dsh-kit-notifier` 桌面通知——已验证
 - `dsh-kit-scheduler` 定时任务——已验证
 - `dsh-kit-input-history` 输入历史（↑/↓ 回填）——已验证
-- **满血模式内化**：剥离独立的 `dsh-anchored-standard` npm 包，改为 dsh-kit 内置 preset 导入/删除管理器，功能商店提供导入/删除，注明借鉴来源
+- **满血模式内化**：剥离独立的 `dsh-anchored-standard` npm 包，改为 dsh-kit 内置 preset 导入/删除管理器，功能商店提供导入/删除
 - **GitHub 生态目录**：分片抓取 + 30 分钟缓存 + fallback 快照 + `GITHUB_TOKEN` 提限流——已完成
 - **归档会话管理**：恢复 / 彻底删除（含日志文件），设置页面板，二次确认——已完成
 - **桌面客户端（M1–M5）**：dsh-runtime + Electron 壳 + 打包注入 + 更新链路 + 托盘/自启/错误页/图标；**首启自动装 dsh-kit 全家桶**——已真机验证
