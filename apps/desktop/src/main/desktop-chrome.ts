@@ -17,24 +17,14 @@
 
 /** 注入到页面 <head> 的样式（普通字符串，无模板插值）。 */
 export const DESKTOP_CHROME_CSS = [
-  // 方案二：透明窗口 + CSS 阴影。body 四周留 24px 透明边距（阴影透出），
-  // #root 内缩成带圆角的“卡片”，box-shadow 投影在透明边距区。
-  // 注意：阴影 blur 必须 ≤ 边距，否则阴影在窗口边界处被硬切、无法自然淡出到透明。
-  // 这里 blur=24px 恰好与边距 24px 相等 —— 阴影衰减到窗口边缘时已接近全透明。
+  // 无阴影版：透明窗口 + 圆角。内容铺满（#root），窗口控制控件贴在窗口边缘。
   'html, body { background: transparent !important; }',
-  'html, body { height: 100%; box-sizing: border-box; }',
-  'body { padding: 24px; }',
-  '#root, [data-slot="root"], .dsh-kit-app-root {',
-  '  height: 100%;',
-  '  border-radius: 12px;',
-  '  overflow: hidden;',
-  '  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);',
-  '}',
+  '#root, [data-slot="root"], .dsh-kit-app-root { border-radius: 12px; overflow: hidden; }',
   '',
-  '/* 顶部自绘标题栏（拖拽区；从内容边缘开始） */',
+  '/* 顶部自绘标题栏（拖拽区，全平台通用） */',
   '.dshkit-dragbar {',
   '  position: fixed;',
-  '  top: 24px; left: 24px; right: 24px;',
+  '  top: 0; left: 0; right: 0;',
   '  height: 38px;',
   '  -webkit-app-region: drag;',
   '  z-index: 2147483646;',
@@ -49,10 +39,10 @@ export const DESKTOP_CHROME_CSS = [
   '  left: 90px;',
   '}',
   '',
-  '/* ---- macOS：左上角信号灯（贴内容左上角） ---- */',
+  '/* ---- macOS：左上角信号灯 ---- */',
   '.dshkit-trafficlights {',
   '  position: fixed;',
-  '  top: calc(24px + 12px); left: calc(24px + 14px);',
+  '  top: 12px; left: 14px;',
   '  height: 20px;',
   '  display: none;',
   '  align-items: center;',
@@ -80,10 +70,10 @@ export const DESKTOP_CHROME_CSS = [
   '  padding-top: 40px !important;',
   '}',
   '',
-  '/* ---- Windows/Linux：右上角控制按钮（贴内容右上角） ---- */',
+  '/* ---- Windows/Linux：右上角控制按钮 ---- */',
   '.dshkit-winctl {',
   '  position: fixed;',
-  '  top: 24px; right: 24px;',
+  '  top: 0; right: 0;',
   '  height: 30px;',
   '  display: flex;',
   '  align-items: stretch;',
@@ -118,18 +108,13 @@ export const DESKTOP_CHROME_CSS = [
   '  margin-right: 128px;',
   '}',
   '',
-  '/* 最大化时取消边距/圆角/阴影（贴满屏幕，避免露出透明边与桌面） */',
-  'body.dshkit-maximized { padding: 0 !important; }',
+  '/* 最大化时取消圆角（贴满屏幕，避免露出桌面） */',
   'body.dshkit-maximized #root,',
   'body.dshkit-maximized [data-slot="root"] {',
   '  border-radius: 0 !important;',
-  '  box-shadow: none !important;',
   '}',
-  '/* 最大化时：dragbar 顶部归零；让位值（right:165 / left:90）保持生效避免重叠 */',
-  'body.dshkit-maximized .dshkit-dragbar { top: 0; }',
   'body.dshkit-maximized .dshkit-winctl { top: 0; right: 0; }',
   'body.dshkit-maximized .dshkit-winctl button.dshkit-close { border-radius: 0; }',
-  'body.dshkit-maximized .dshkit-trafficlights { top: 12px; left: 14px; }',
 ].join('\n')
 
 /** 注入到页面执行的脚本（普通字符串，无模板插值）。 */

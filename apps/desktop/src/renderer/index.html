@@ -18,21 +18,19 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         background: radial-gradient(1200px 600px at 50% -10%, #1a2236 0%, var(--bg) 60%);
         color: var(--fg);
-        min-height: calc(100vh - 48px);
+        min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
         text-align: center;
         -webkit-user-select: none;
         user-select: none;
-        /* 方案二：窗口透明四角留间隙 + CSS 阴影投影（max 边距 20px） */
-        margin: 24px;
+        /* frameless 圆角：窗口透明，四角留透明间隙 */
         border: 1px solid rgba(255,255,255,.08);
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 10px 24px rgba(0,0,0,.28);
       }
-      body.dshkit-maximized { margin: 0; min-height: 100vh; border-radius: 0; box-shadow: none; }
+      body.dshkit-maximized { border-radius: 0; }
       body.dshkit-maximized .dshkit-dragbar { top: 0; left: 0; right: 0; }
       body.dshkit-maximized .dshkit-winctl { top: 0; right: 0; }
       body.dshkit-maximized .dshkit-winctl button.dshkit-close { border-radius: 0; }
@@ -40,7 +38,7 @@
       /* 顶部拖拽区 + 右上角窗口控制按钮（frameless） */
       .dshkit-dragbar {
         position: fixed;
-        top: 24px; left: 24px; right: 24px;
+        top: 0; left: 0; right: 0;
         height: 38px;
         -webkit-app-region: drag;
         z-index: 1000;
@@ -51,7 +49,7 @@
       body[data-dsh-platform="darwin"] .dshkit-dragbar { left: 90px; }
       .dshkit-winctl {
         position: fixed;
-        top: 24px; right: 24px;
+        top: 0; right: 0;
         height: 30px;
         display: flex;
         align-items: stretch;
@@ -82,7 +80,7 @@
       /* macOS：左上角信号灯 */
       .dshkit-trafficlights {
         position: fixed;
-        top: calc(24px + 12px); left: calc(24px + 14px);
+        top: 12px; left: 14px;
         height: 20px;
         display: none;
         align-items: center;
