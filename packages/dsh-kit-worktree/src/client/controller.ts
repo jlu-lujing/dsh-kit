@@ -65,7 +65,8 @@ export class WorktreeController {
 
   constructor(workspaces: WorktreeWorkspaces, fetchImpl: typeof fetch = fetch) {
     this.workspaces = workspaces
-    this.fetchImpl = fetchImpl
+    // bind 到 globalThis：浏览器里原生 fetch 依赖正确的 `this`，否则报 Illegal invocation
+    this.fetchImpl = fetchImpl.bind(globalThis)
   }
 
   /** 列出 `cwd` 所属仓库的全部 git worktrees。 */

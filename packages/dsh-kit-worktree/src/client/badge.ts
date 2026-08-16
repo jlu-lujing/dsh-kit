@@ -6,6 +6,7 @@
  */
 
 import { createElement, useEffect, useState } from 'react'
+import { GitBranchIcon } from './icon.ts'
 import type { Attribution, WorktreeController } from './controller.ts'
 
 const badgeStyle = {
@@ -22,6 +23,7 @@ const badgeStyle = {
   lineHeight: '20px',
   whiteSpace: 'nowrap',
 } as const
+
 
 export function WorktreeBadge(props: Record<string, unknown>): unknown {
   const sessionId = String(props.sessionId ?? '')
@@ -59,5 +61,5 @@ export function WorktreeBadge(props: Record<string, unknown>): unknown {
     ? `worktree: ${attribution.path ?? ''}`
     : `main: ${attribution.root ?? cwd}`
 
-  return createElement('span', { style: badgeStyle, title }, '🌿 ', label)
+  return createElement('span', { style: badgeStyle, title }, createElement(GitBranchIcon, {}), label)
 }

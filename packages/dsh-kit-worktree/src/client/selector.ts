@@ -1,16 +1,17 @@
 /**
- * 新建会话 hero 的 worktree 选择行（挂在 conversation.input.dock）。
+ * 新建会话页的 worktree 选择 —— 与「项目文件夹 / 模式 preset」同款的小胶囊，且
+ * 由 DSH 前端运行时补丁渲染进同一行（conversation.hero.worktree 槽，single）。
  *
- * 仅 blank 会话（新建会话页）可见；进入正式对话后自动消失。当前会话的
- * cwd 由标准 props 的 useSessions 提供，归属与 worktree 列表由 host 路由解析。
+ * root 全局槽：标准 props 提供 useSessions/useWorkspaces（无 useSession），
+ * 当前会话取 `useSessions(s => s.current)`。
  */
 
 import { createElement, useEffect, useState } from 'react'
+import { GitBranchIcon } from './icon.ts'
 import type { Attribution, WorktreeController, WorktreeEntry, WorktreeList } from './controller.ts'
 
 const tk = {
   text: 'var(--dsw-alias-label-primary)',
-  secondary: 'var(--dsw-alias-label-secondary)',
   tertiary: 'var(--dsw-alias-label-tertiary)',
   border: 'var(--dsw-alias-border-l2)',
   panel: 'var(--dsw-alias-bg-layer-3)',
@@ -18,48 +19,44 @@ const tk = {
   danger: 'var(--dsw-alias-state-error-primary)',
 }
 
-const rowStyle = {
-  boxSizing: 'border-box',
-  width: 'calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance))',
-  maxWidth: 'var(--dsh-composer-card-max-width)',
-  margin: '0 auto',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '6px 12px',
-  border: `1px solid ${tk.border}`,
-  borderRadius: 12,
-  background: 'color-mix(in srgb, var(--dsw-specific-tip) 60%, transparent)',
-  color: tk.text,
-  font: 'var(--dsw-font-xs-13)',
-} as const
-
-const chipStyle = {
+/* 对齐「项目文件夹 / 模式 preset」(AgentPresetSeat) 的气泡样式 */
+const chip = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
-  minHeight: 26,
-  padding: '0 10px',
-  border: `1px solid ${tk.border}`,
-  borderRadius: 999,
-  background: 'transparent',
+  gap: 4,
+  minHeight: 28,
+  maxWidth: 240,
+  padding: '0 8px',
+  border: 'none',
   color: tk.text,
   cursor: 'pointer',
-  font: 'inherit',
-  lineHeight: '24px',
+  fontFamily: 'inherit',
+  fontSize: 13,
+  fontWeight: 500,
+  lineHeight: '20px',
+  whiteSpace: 'nowrap',
+  transition: 'background-color .16s ease, color .16s ease',
 } as const
 
-const ghostStyle = {
-  ...chipStyle,
-  color: tk.secondary,
-} as const
+const AURA_CLASS = 'dsh-kit-worktree-seat'
 
+/** 注入 hover 椭圆形底色（inline style 无法表达 :hover）。 */
+function ensureSeatStyle(): void {
+  if (typeof document === 'undefined' || document.querySelector('#dsh-kit-worktree-seat-style') !== null) return
+  const tag = document.createElement('style')
+  tag.id = 'dsh-kit-worktree-seat-style'
+  const sel = '.' + AURA_CLASS
+  tag.textContent = sel + '\n{border-radius:16px;background:transparent}' + '\n' +
+    sel + ':hover,' + sel + '[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover)}' + '\n'
+  document.head.appendChild(tag)
+}
 const menuStyle = {
   boxSizing: 'border-box',
   position: 'absolute',
   zIndex: 30,
-  marginTop: 4,
-  minWidth: 240,
+  top: 34,
+  left: 0,
+  minWidth: 220,
   padding: 6,
   border: `1px solid ${tk.border}`,
   borderRadius: 12,
@@ -90,32 +87,32 @@ function pathBase(path: string): string {
   return parts.length > 0 ? parts[parts.length - 1] : path
 }
 
-function shortBranch(branch?: string): string {
+function branchOf(branch?: string): string {
   const prefix = 'refs/heads/'
   return branch !== undefined && branch.startsWith(prefix) ? branch.slice(prefix.length) : branch ?? ''
 }
 
-function optionLabel(entry: WorktreeEntry): string {
-  return shortBranch(entry.branch) || pathBase(entry.path)
+function optionLabel(e: WorktreeEntry): string {
+  return branchOf(e.branch) || pathBase(e.path)
 }
 
+
+
 export function WorktreeSelector(props: Record<string, unknown>): unknown {
-  const sessionId = String(props.sessionId ?? '')
   const controller = props.controller as WorktreeController | undefined
-  const useSession = props.useSession as ((sel: (snapshot: unknown) => unknown) => unknown) | undefined
   const useSessions = props.useSessions as ((sel: (snapshot: unknown) => unknown) => unknown) | undefined
 
-  const blank = (useSession
-    ? (useSession((snapshot) => {
-        const s = snapshot as { blank?: boolean; composerPhase?: string } | undefined
-        return s?.blank === true || s?.composerPhase === 'blank'
-      }) as boolean | undefined)
-    : undefined) ?? false
+  const currentSessionId = useSessions
+    ? (useSessions((snapshot) => {
+        const s = snapshot as { current?: string } | undefined
+        return s?.current
+      }) as string | undefined)
+    : undefined
 
   const cwd = useSessions
     ? (useSessions((snapshot) => {
-        const s = snapshot as { byId?: Record<string, { cwd?: string } | undefined> } | undefined
-        return s?.byId?.[sessionId]?.cwd
+        const s = snapshot as { byId?: Record<string, { cwd?: string } | undefined>; current?: string } | undefined
+        return s?.current !== undefined ? s.byId?.[s.current]?.cwd : undefined
       }) as string | undefined)
     : undefined
 
@@ -128,7 +125,7 @@ export function WorktreeSelector(props: Record<string, unknown>): unknown {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (!blank || controller === undefined || cwd === undefined || cwd === '') return
+    if (controller === undefined || cwd === undefined || cwd === '') return
     let cancelled = false
     setList(null)
     setAttribution(null)
@@ -140,9 +137,9 @@ export function WorktreeSelector(props: Record<string, unknown>): unknown {
       .then((next) => { if (!cancelled) setAttribution(next) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [blank, controller, cwd])
+  }, [controller, cwd])
 
-  if (!blank || controller === undefined) return null
+  if (controller === undefined || cwd === undefined || cwd === '') return null
 
   const currentLabel = attribution?.mode === 'worktree'
     ? (attribution.branch ?? 'worktree')
@@ -175,106 +172,67 @@ export function WorktreeSelector(props: Record<string, unknown>): unknown {
   const createNew = (): void => {
     const root = list?.root ?? attribution?.root
     const name = branch.trim()
-    if (root === undefined || name === '') {
-      setError('请先选择项目文件夹，并填写分支名')
-      return
-    }
+    if (root === undefined || name === '') { setError('请填分支名'); return }
     void run(() => controller.createAndBind({ cwd: root, branch: name }))
   }
 
   const linked = (list?.worktrees ?? []).filter((w) => !w.main)
+  void currentSessionId
+  ensureSeatStyle()
 
-  return createElement('div', { style: rowStyle },
-    createElement('span', { style: { color: tk.tertiary, whiteSpace: 'nowrap' } }, 'worktree'),
-    createElement('div', { style: { position: 'relative' } },
-      createElement('button', {
-        type: 'button',
-        style: chipStyle,
-        disabled: busy,
-        onClick: () => setOpen((v) => !v),
-        title: attribution?.mode === 'worktree' ? attribution.path : attribution?.root,
-      },
-        '🌿 ',
-        currentLabel,
-        createElement('span', { style: { color: tk.tertiary, fontSize: 10 } }, '▾'),
-      ),
-      open
-        ? createElement('div', { style: { ...menuStyle, top: 34, left: 0 } },
-            createElement('button', {
-              type: 'button',
-              style: itemStyle,
-              disabled: busy,
-              onClick: chooseMain,
-            },
-              createElement('span', { style: { fontWeight: currentLabel === 'main' ? 600 : 400 } }, 'main'),
-              createElement('span', { style: { color: tk.tertiary, fontSize: 11, marginLeft: 'auto' } },
-                pathBase(list?.root ?? attribution?.root ?? '')),
-            ),
-            ...linked.map((entry) =>
-              createElement('button', {
-                key: entry.path,
-                type: 'button',
-                style: itemStyle,
-                disabled: busy,
-                onClick: () => chooseWorktree(entry),
-              },
-                createElement('span', { style: { fontWeight: currentLabel === optionLabel(entry) ? 600 : 400 } },
-                  optionLabel(entry)),
-                createElement('span', { style: { color: tk.tertiary, fontSize: 11, marginLeft: 'auto' } },
-                  '.dsh/worktree/' + pathBase(entry.path)),
-              ),
-            ),
-            createElement('button', {
-              type: 'button',
-              style: { ...itemStyle, color: tk.primary },
-              disabled: busy,
-              onClick: () => { setCreating((v) => !v); setOpen(false) },
-            }, '+ 新建 worktree（分支）'),
-          )
-        : null,
+  return createElement('div', { style: { display: 'inline-flex', position: 'relative' } },
+    createElement('button', {
+      type: 'button',
+      className: AURA_CLASS,
+      style: chip,
+      disabled: busy,
+      onClick: () => setOpen((v) => !v),
+      title: attribution?.mode === 'worktree' ? attribution.path : attribution?.root,
+    },
+      createElement(GitBranchIcon, {}),
+      createElement('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, currentLabel),
+      createElement('span', { style: { color: tk.tertiary, flex: 'none', fontSize: 10 } }, '▾'),
     ),
-    creating
-      ? createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flex: 1 } },
-          createElement('input', {
-            value: branch,
-            autoFocus: true,
-            placeholder: '分支名，例如 feat/xxx',
-            style: {
-              flex: 1,
-              minWidth: 120,
-              height: 26,
-              padding: '0 10px',
-              border: `1px solid ${tk.border}`,
-              borderRadius: 999,
-              background: 'transparent',
-              color: tk.text,
-              font: 'inherit',
-            },
-            onChange: (e: { target: { value: string } }) => setBranch(e.target.value),
-            onKeyDown: (e: { key: string }) => {
-              if (e.key === 'Enter') createNew()
-              if (e.key === 'Escape') { setCreating(false); setBranch('') }
-            },
-          }),
-          createElement('button', {
-            type: 'button',
-            style: { ...ghostStyle, borderColor: tk.primary, color: tk.primary },
-            disabled: busy || branch.trim() === '',
-            onClick: createNew,
-          }, busy ? '…' : '创建'),
-          createElement('button', {
-            type: 'button',
-            style: ghostStyle,
-            disabled: busy,
-            onClick: () => { setCreating(false); setBranch('') },
-          }, '取消'),
+    open
+      ? createElement('div', { style: menuStyle },
+          createElement('button', { type: 'button', style: itemStyle, disabled: busy, onClick: chooseMain },
+            createElement('span', { style: { fontWeight: currentLabel === 'main' ? 600 : 400 } }, 'main'),
+            createElement('span', { style: { color: tk.tertiary, fontSize: 11, marginLeft: 'auto' } },
+              pathBase(list?.root ?? attribution?.root ?? '')),
+          ),
+          ...linked.map((entry) =>
+            createElement('button', { key: entry.path, type: 'button', style: itemStyle, disabled: busy, onClick: () => chooseWorktree(entry) },
+              createElement('span', { style: { fontWeight: currentLabel === optionLabel(entry) ? 600 : 400 } }, optionLabel(entry)),
+            ),
+          ),
+          creating
+            ? createElement('div', { style: { display: 'flex', gap: 6, padding: '4px 2px' } },
+                createElement('input', {
+                  value: branch,
+                  autoFocus: true,
+                  placeholder: '分支名',
+                  style: {
+                    flex: 1,
+                    minWidth: 110,
+                    height: 26,
+                    padding: '0 9px',
+                    border: `1px solid ${tk.border}`,
+                    borderRadius: 999,
+                    background: 'transparent',
+                    color: tk.text,
+                    font: 'var(--dsw-font-xs-13)',
+                  },
+                  onChange: (e: { target: { value: string } }) => setBranch(e.target.value),
+                  onKeyDown: (e: { key: string }) => { if (e.key === 'Enter') createNew(); if (e.key === 'Escape') { setCreating(false); setBranch('') } },
+                }),
+                createElement('button', { type: 'button', style: { ...chip, color: tk.primary }, disabled: busy || branch.trim() === '', onClick: createNew }, busy ? '…' : '创建'),
+              )
+            : createElement('button', { type: 'button', style: { ...itemStyle, color: tk.primary }, disabled: busy, onClick: () => { setCreating(true) } },
+                '+ 新建 worktree'),
+          error
+            ? createElement('div', { style: { color: tk.danger, fontSize: 11, padding: '4px 10px' } }, error)
+            : null,
         )
       : null,
-    error
-      ? createElement('span', { style: { color: tk.danger, fontSize: 11, whiteSpace: 'nowrap' } }, error)
-      : createElement('span', {
-          style: { color: tk.tertiary, fontSize: 11, marginLeft: 'auto', whiteSpace: 'nowrap' },
-        },
-        list === null ? '…' : `${linked.length} 个分支 worktree`),
   )
 }
