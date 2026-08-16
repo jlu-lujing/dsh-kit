@@ -5,8 +5,8 @@
  *   1. conversation.hero.worktree —— 新建会话 hero 的 worktree 选择胶囊，
  *      与「项目文件夹 / 模式 preset」同一行（该槽由 DSH 前端运行时补丁新增，
  *      默认 main / 已有分支 / 新建分支并绑定）；
- *   2. conversation.session.header.utilities —— 已打开对话顶栏名称旁的归属徽标
- *      +「在新 worktree 新建会话」切换。
+ *   2. conversation.session.header.actions —— 与「满血模式」标签并列的 worktree 徽标（同款样式）
+ *      只读显示当前 worktree；新建会话走左侧栏原生入口。
  *
  * 数据全部来自 host 路由（/dsh-kit-worktree/...）；把 worktree 注册成 DSH
  * workspace、并让新会话落进去走官方 ctx.workspaces RPC，不直接改存储。
@@ -46,11 +46,10 @@ export function apply(ctx: { get(name: string): unknown }): void {
   )
 
 
-
-  // 会话头部：标注当前对话归属（main / 分支）。
-  slots.inject('conversation.session.header.utilities', () =>
+  // 会话标题旁：与「满血模式」标签并列（header.actions），样式对齐 AgentPresetLabel。
+  slots.inject('conversation.session.header.actions', () =>
     slots.register({
-      name: 'conversation.session.header.utilities',
+      name: 'conversation.session.header.actions',
       id: 'dsh-kit-worktree-badge',
       priority: 0,
       inject: () => ({ controller }),
