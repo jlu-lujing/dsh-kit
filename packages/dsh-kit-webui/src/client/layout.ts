@@ -46,12 +46,21 @@ const LAYOUT_CSS = `
   position: relative;
 }
 
-/* 右侧栏展开时：对话滚动区往左挤窄（挤占式） */
+/* 滑动过渡时长（与左栏近似） */
+.wSkVaW_root {
+  --dsh-kit-right-slow: var(--ds-transition-duration-slow, 0.2s);
+  --dsh-kit-right-ease: var(--ds-ease-in-out, ease-in-out);
+}
+
+/* 右侧栏展开时：对话滚动区往左挤窄，并平滑过渡（模拟左栏 grid 动画） */
+.wSkVaW_scrollBody {
+  transition: margin-right var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
+}
 .wSkVaW_root.dsh-kit-right-open .wSkVaW_scrollBody {
   margin-right: var(--dsh-kit-right-width, 320px);
 }
 
-/* 右侧栏：内容区内、标题栏下方、右缘贴内容区；默认隐藏，展开时显示 */
+/* 右侧栏：内容区内、标题栏下方、右缘贴内容区；transform 滑入/滑出 */
 .dsh-kit-right-panel {
   position: absolute;
   top: var(--dsh-kit-titlebar-height, 0px);
@@ -60,13 +69,19 @@ const LAYOUT_CSS = `
   width: var(--dsh-kit-right-width, 320px);
   background: var(--dsw-alias-bg-layer-1);
   border-left: 1px solid var(--dsw-alias-border-l2);
-  display: none;
+  display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  transform: translateX(102%);
+  transition: transform var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
+  visibility: hidden;
+  pointer-events: none;
 }
 .wSkVaW_root.dsh-kit-right-open .dsh-kit-right-panel {
-  display: flex;
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
 }
 .dsh-kit-right-panel-header {
   flex: none;
