@@ -59,8 +59,8 @@ function appendLog(line: string): void {
 
 function createWindow(url: string): void {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    width: 1320,
+    height: 860,
     show: false,
     // 无边框自绘窗口：frame:false 去掉系统标题栏/边框；
     // transparent + hasShadow 在 Windows 下让圆角外的区域透明（配合注入的
@@ -250,8 +250,8 @@ function showErrorPage(message: string): void {
   try {
     if (!mainWindow) {
       mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 820,
+        width: 1320,
+        height: 860,
         show: false,
         // 与主窗口一致的无边框 + 圆角
         frame: false,
