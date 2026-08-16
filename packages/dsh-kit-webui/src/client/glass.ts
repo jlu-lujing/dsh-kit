@@ -1,14 +1,14 @@
 /** 侧边栏毛玻璃材质。
  *
- * ⚠️ 布局约束：不能把 backdrop-filter 加在设置弹窗的任何祖先上。
- * 设置弹窗（.VOzbGW_overlay）用 `position: fixed; inset: 0`，一旦祖先带
- * backdrop-filter（与 filter 一样会变成 fixed 的包含块），弹窗会被裁进
- * 侧边栏里。因此模糊做在「帧的独立玻璃层」上：
+ * 不能在会包含设置弹窗的祖先上放 backdrop-filter（fixed 弹窗会被裁进
+ * 侧边栏），因此模糊做在「帧的独立玻璃层」：
  *
  *   .pI_x6G_frame::before   ← 玻璃层（z-index:0，blur），覆盖左栏区域
  *   .pI_x6G_sidebarCol      ← position:relative; z-index:1（压在玻璃层上）
  *   .hHd-Xa_root            ← 半透明背景（color-mix），内容可透出玻璃层
  *
+ * 设置弹窗打开时（settings-layer.ts 切 dsh-kit-settings-open），把侧边栏列
+ * 抬到 z-index:2000，盖过中心列输入框（z:10），弹窗浮到最上层；关闭后回落。
  * 玻璃层宽度用 ResizeObserver 跟随侧边栏列宽（支持拖拽/折叠）。
  */
 
@@ -50,13 +50,12 @@ const GLASS_CSS = `
     background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 38%, transparent);
   }
 }
-/* 玻璃层 / 侧边栏列在设置弹窗打开时退到内容之下，弹窗回到最上层。
-   由 settings-layer.ts 在弹窗开关时切 dsh-kit-settings-open 标记。 */
+/* 设置弹窗打开时：把侧边栏列抬到 2000，让 fixed 弹窗高于输入框(z:10)。 */
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame::before {
-  z-index: 0;
+  z-index: 2000;
 }
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_sidebarCol {
-  z-index: auto;
+  z-index: 2000;
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh-kit-glass-sidebar .pI_x6G_frame::before {
@@ -91,6 +90,6 @@ export function installSidebarGlass(): void {
   ro.observe(col)
   sync()
 
-  // 附加的设置弹窗层级修复（:has() 不支持时无副作用）。
+  // 设置弹窗最上层修复：弹窗打开时抬升侧边栏列层级。
   attachSettingsLayerFix()
 }
