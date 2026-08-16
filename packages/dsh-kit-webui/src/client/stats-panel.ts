@@ -1,5 +1,5 @@
 /**
- * dsh-kit-webui 右侧栏「信息」页 —— 实时会话统计（卡片式展示）。
+ * dsh-kit-webui 右侧栏「信息」页 —— 实时会话统计（表格展示）。
  *
  * 注册进官方 `conversation.composer.dock` 槽位、shadow 掉官方 StatsLine，
  * 用官方标准 kit 提供的 `useProjection` 直接读取 `sessionStats` / `tokenUsage`
@@ -77,41 +77,63 @@ function cacheHitPercent(usage: TokenUsage): number | null {
   return denominator === 0 ? null : Math.round((usage.cacheReadTokens / denominator) * 100)
 }
 
-/* ── 结构化指标 ── */
+/* ── 结构化表格模型 ── */
 
 interface Metric {
   label: string
   value: string
-  /** 可选 accent 主题色 class 后缀。 */
+  /** 可选强调色（数值列）。 */
   accent?: 'success' | 'brand' | 'warn'
 }
 
+interface MetricGroup {
+  title: string
+  items: Metric[]
+}
+
 interface StatsModel {
-  metrics: Metric[]
+  groups: MetricGroup[]
   cacheHit: number | null
   hasData: boolean
 }
 
 function collectModel(stats: SessionStats | undefined, usage: TokenUsage | undefined, cacheHit: number | null): StatsModel {
-  const metrics: Metric[] = []
+  const groups: MetricGroup[] = []
+
+  const counts: Metric[] = []
   if (stats !== undefined && stats.steps > 0) {
-    metrics.push({ label: '轮次', value: String(stats.turns), accent: 'brand' })
-    metrics.push({ label: '步数', value: String(stats.steps), accent: 'brand' })
-    if (stats.llmMs > 0) metrics.push({ label: 'LLM 耗时', value: formatDuration(stats.llmMs) })
-    if (stats.toolMs > 0) metrics.push({ label: '工具耗时', value: formatDuration(stats.toolMs) })
-    if (stats.ttftSteps > 0) metrics.push({ label: '首 token', value: formatDuration(stats.ttftMs / stats.ttftSteps), accent: 'success' })
+    counts.push({ label: '对话轮次', value: String(stats.turns), accent: 'brand' })
+    counts.push({ label: '执行步数', value: String(stats.steps), accent: 'brand' })
+  }
+  if (counts.length > 0) groups.push({ title: '对话', items: counts })
+
+  const durations: Metric[] = []
+  if (stats !== undefined) {
+    if (stats.llmMs > 0) durations.push({ label: 'LLM 耗时', value: formatDuration(stats.llmMs) })
+    if (stats.toolMs > 0) durations.push({ label: '工具耗时', value: formatDuration(stats.toolMs) })
+  }
+  if (durations.length > 0) groups.push({ title: '耗时', items: durations })
+
+  const perf: Metric[] = []
+  if (stats !== undefined) {
+    if (stats.ttftSteps > 0) perf.push({ label: '首 token', value: formatDuration(stats.ttftMs / stats.ttftSteps), accent: 'success' })
     if (stats.decodeMs > 0) {
-      metrics.push({ label: '吞吐', value: `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1000))} tok/s`, accent: 'success' })
+      perf.push({ label: '吞吐', value: `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1000))} tok/s`, accent: 'success' })
     }
   }
+  if (perf.length > 0) groups.push({ title: '性能', items: perf })
+
+  const tokens: Metric[] = []
   if (usage !== undefined && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)) {
-    metrics.push({ label: '输入', value: `${formatTokens(billedInputTokens(usage))} tok` })
-    metrics.push({ label: '输出', value: `${formatTokens(usage.outputTokens)} tok` })
+    tokens.push({ label: '输入 token', value: `${formatTokens(billedInputTokens(usage))} tok` })
+    tokens.push({ label: '输出 token', value: `${formatTokens(usage.outputTokens)} tok` })
   }
+  if (tokens.length > 0) groups.push({ title: 'Token', items: tokens })
+
   return {
-    metrics,
+    groups,
     cacheHit,
-    hasData: metrics.length > 0 || cacheHit !== null,
+    hasData: groups.length > 0 || cacheHit !== null,
   }
 }
 
@@ -138,44 +160,54 @@ function buildCard(root: HTMLElement, model: StatsModel): void {
 
   // 标题行
   const head = el('div', 'dsh-kit-stats-head')
-  const headDot = el('span', 'dsh-kit-stats-head-dot')
-  headDot.textContent = ''
-  head.appendChild(headDot)
-  head.appendChild(document.createTextNode('会话统计'))
+  head.appendChild(el('span', 'dsh-kit-stats-head-dot'))
+  head.appendChild(el('span', null, '会话统计'))
   card.appendChild(head)
 
-  // 指标瓦片网格
-  if (model.metrics.length > 0) {
-    const grid = el('div', 'dsh-kit-stats-grid')
-    for (const m of model.metrics) {
-      const tile = el('div', 'dsh-kit-stat')
-      const label = el('div', 'dsh-kit-stat-label', m.label)
-      const valueCls = m.accent ? `dsh-kit-stat-value dsh-kit-accent-${m.accent}` : 'dsh-kit-stat-value'
-      const value = el('div', valueCls, m.value)
-      tile.appendChild(label)
-      tile.appendChild(value)
-      grid.appendChild(tile)
+  // 表格
+  const table = el('table', 'dsh-kit-stats-table')
+  const thead = el('thead')
+  const headRow = el('tr')
+  headRow.appendChild(el('th', null, '指标'))
+  headRow.appendChild(el('th', null, '数值'))
+  thead.appendChild(headRow)
+  table.appendChild(thead)
+
+  const tbody = el('tbody')
+  for (const group of model.groups) {
+    if (group.items.length === 0) continue
+    const groupRow = el('tr', 'dsh-kit-stats-group')
+    const groupCell = el('td', null, group.title)
+    groupCell.colSpan = 2
+    groupRow.appendChild(groupCell)
+    tbody.appendChild(groupRow)
+    for (const m of group.items) {
+      const row = el('tr', 'dsh-kit-stats-row')
+      row.appendChild(el('td', 'dsh-kit-stats-row-label', m.label))
+      const valueCls = m.accent ? `dsh-kit-stats-row-value dsh-kit-accent-${m.accent}` : 'dsh-kit-stats-row-value'
+      row.appendChild(el('td', valueCls, m.value))
+      tbody.appendChild(row)
     }
-    card.appendChild(grid)
   }
 
-  // 缓存命中：跨整行的进度条卡片
+  // 缓存命中最底部一行（跨行，带进度条）
   if (model.cacheHit !== null) {
-    const wide = el('div', 'dsh-kit-stat dsh-kit-stat-wide')
-    const row = el('div', 'dsh-kit-stat-widerow')
-    const label = el('div', 'dsh-kit-stat-label', '缓存命中')
-    const value = el('div', 'dsh-kit-stat-value dsh-kit-accent-success', `${model.cacheHit}%`)
-    row.appendChild(label)
-    row.appendChild(value)
+    const cacheRow = el('tr', 'dsh-kit-stats-row dsh-kit-stats-cache')
+    cacheRow.appendChild(el('td', 'dsh-kit-stats-row-label', '缓存命中'))
+    const valueCell = el('td', 'dsh-kit-stats-row-value dsh-kit-accent-success')
+    const valText = el('span', 'dsh-kit-stats-cache-value', `${model.cacheHit}%`)
+    valueCell.appendChild(valText)
     const bar = el('div', 'dsh-kit-stat-bar')
     const fill = el('div', 'dsh-kit-stat-bar-fill')
     fill.style.width = `${Math.min(100, Math.max(0, model.cacheHit))}%`
     bar.appendChild(fill)
-    wide.appendChild(row)
-    wide.appendChild(bar)
-    card.appendChild(wide)
+    valueCell.appendChild(bar)
+    cacheRow.appendChild(valueCell)
+    tbody.appendChild(cacheRow)
   }
 
+  table.appendChild(tbody)
+  card.appendChild(table)
   root.appendChild(card)
 }
 

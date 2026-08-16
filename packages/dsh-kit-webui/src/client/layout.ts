@@ -208,7 +208,7 @@ const LAYOUT_CSS = `
 .dsh-kit-right-tabpane.is-active {
   display: block;
 }
-/* 信息面板：实时会话统计（React useProjection 驱动的卡片） */
+/* 信息面板：实时会话统计（React useProjection 驱动的表格卡片） */
 .dsh-kit-info-stats {
   display: block;
   color: var(--dsw-alias-label-secondary);
@@ -225,9 +225,6 @@ const LAYOUT_CSS = `
   background: var(--dsw-alias-bg-layer-1);
   border-radius: 12px;
   padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   box-shadow: var(--dsw-shadow-lv1, 0 1px 2px rgba(0, 0, 0, 0.04));
 }
 .dsh-kit-stats-head {
@@ -238,6 +235,7 @@ const LAYOUT_CSS = `
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
+  margin-bottom: 10px;
 }
 .dsh-kit-stats-head-dot {
   width: 8px;
@@ -246,55 +244,67 @@ const LAYOUT_CSS = `
   background: var(--dsw-alias-state-business-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
-.dsh-kit-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+.dsh-kit-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
-.dsh-kit-stat {
-  border: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-base);
-  border-radius: 10px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.dsh-kit-stat-label {
+.dsh-kit-stats-table th {
+  text-align: left;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
+  font-weight: 500;
   line-height: 16px;
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
-.dsh-kit-stat-value {
+.dsh-kit-stats-table th:nth-child(1) { width: 46%; }
+.dsh-kit-stats-table th:nth-child(2) { width: 54%; }
+.dsh-kit-stats-table td {
+  padding: 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1) 55%, transparent);
+  vertical-align: middle;
+}
+.dsh-kit-stats-row { line-height: 32px; }
+.dsh-kit-stats-row td:first-child { color: var(--dsw-alias-label-secondary); }
+.dsh-kit-stats-row-value {
+  text-align: right;
   color: var(--dsw-alias-label-primary);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 22px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dsh-kit-stats-group td {
+  padding-top: 8px;
+  padding-bottom: 2px;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom: none;
+  line-height: 20px;
+}
+.dsh-kit-stats-group + .dsh-kit-stats-row td { border-bottom-color: transparent; }
 .dsh-kit-accent-success { color: var(--dsw-alias-state-success-primary); }
 .dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
 .dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
-/* 缓存命中：跨整行 */
-.dsh-kit-stat-wide {
-  grid-column: 1 / -1;
-}
-.dsh-kit-stat-widerow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+.dsh-kit-stats-cache .dsh-kit-stats-row-value { text-align: left; }
+.dsh-kit-stats-cache-value {
+  display: block;
+  color: var(--dsw-alias-state-success-primary);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
 }
 .dsh-kit-stat-bar {
   height: 6px;
   border-radius: 999px;
   background: var(--dsw-alias-interactive-bg-hover);
   overflow: hidden;
-  margin-top: 8px;
 }
 .dsh-kit-stat-bar-fill {
   height: 100%;
