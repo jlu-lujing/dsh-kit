@@ -30,9 +30,6 @@ export function apply(ctx: { get(name: string): unknown }): void {
   const controller = new ThemeStoreController(theme)
   void controller.init()
 
-  // 左侧栏毛玻璃：先去掉，验证设置弹窗层级问题是否由此引起。
-  installSidebarGlass()
-
   // 官方设置页「主题商店」面板（id 专属 → 官方设置页多一项）。
   slots.inject('settings.section', () =>
     slots.register(
