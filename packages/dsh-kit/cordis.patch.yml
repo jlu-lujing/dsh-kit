@@ -63,3 +63,7 @@
     - id: dsh-kit-webui
       name: dsh-kit-webui
       disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-webui'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-webui'] === false; } catch (e) { return false; } })() )"
+
+    - id: dsh-kit-worktree
+      name: dsh-kit-worktree
+      disabled: !!js "( (function () { try { var mod = process.getBuiltinModule('module'); var req = mod.createRequire((typeof ctx !== 'undefined' && ctx.baseUrl) ? ctx.baseUrl : process.cwd() + '/'); req.resolve('dsh-kit-worktree'); } catch (e) { return true; } try { var fs = process.getBuiltinModule('fs'); var s = JSON.parse(fs.readFileSync(dshHomePath('dsh-kit/state.json'), 'utf8')); return s.features['dsh-kit-worktree'] === false; } catch (e) { return false; } })() )"
