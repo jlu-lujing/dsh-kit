@@ -10,10 +10,9 @@
 import { createElement } from 'react'
 import type { ThemeService } from './themes.ts'
 import { ThemeStoreController } from './controller.ts'
-import { ThemeStorePanel } from './panel.ts'
 import { installSidebarGlass } from './glass.ts'
 import {
-  bindSettingsPageController, SettingsPageOverlay, SettingsPageTrigger,
+  bindSettingsPageController, SettingsPageConversation, SettingsPageTrigger,
 } from './settings-page.ts'
 
 export const name = 'dsh-kit-webui'
@@ -37,30 +36,23 @@ export function apply(ctx: { get(name: string): unknown }): void {
   // 左侧栏毛玻璃。
   installSidebarGlass()
 
-  // 自建全屏设置页绑定控制器。
+  // 整页设置绑定控制器。
   bindSettingsPageController(controller)
 
-  // 侧边栏底部「设置页」入口。
+  // 侧边栏底部「主题商店」入口（右侧整页）。
   slots.inject('sidebar.footer.action', () =>
     slots.register(
-      { name: 'sidebar.footer.action', id: 'dsh-kit-webui-settings-page', order: 100, label: () => '设置页' },
+      { name: 'sidebar.footer.action', id: 'dsh-kit-webui-settings-page', order: 100, label: () => '主题商店' },
       () => createElement(SettingsPageTrigger),
     ),
   )
 
-  // 全屏设置页覆盖层（shell.overlay：frame 内全帧覆盖，天然最上层）。
-  slots.inject('shell.overlay', () =>
+  // 整页设置：注册 single 的 conversation 槽，影子替换对话/输入区为设置整页。
+  // （动态注册优先级低于内置 → 成为 winner，左侧栏在 frame 里不受影响。）
+  slots.inject('conversation', () =>
     slots.register(
-      { name: 'shell.overlay', id: 'dsh-kit-webui-settings-page', order: 100 },
-      () => createElement(SettingsPageOverlay),
-    ),
-  )
-
-  // 官方设置页「主题商店」面板仍保留（双入口），slot id 专属不冲突。
-  slots.inject('settings.section', () =>
-    slots.register(
-      { name: 'settings.section', id: 'dsh-kit-webui-themes', priority: 40, label: () => '主题商店' },
-      () => createElement(ThemeStorePanel, { controller }),
+      { name: 'conversation', id: 'dsh-kit-webui-settings-page' },
+      () => createElement(SettingsPageConversation),
     ),
   )
 }
