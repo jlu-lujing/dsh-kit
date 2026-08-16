@@ -44,10 +44,12 @@ const LAYOUT_CSS = `
 }
 `
 
-/** 右侧面板图标（与左侧 IconPanelLeftOutline16 对称：面板靠右、箭头向右拨）。 */
+/** 右侧面板图标 = 左侧 IconPanelLeftOutline16 的水平镜像（完全对称）。 */
 function rightPanelSvg(): string {
   return `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5C1.17 2.5 .5 3.17.5 4V12C.5 12.83 1.17 13.5 2 13.5H9C9.83 13.5 10.5 12.83 10.5 12V4C10.5 3.17 9.83 2.5 9 2.5H2ZM2 4H9V12H2V4ZM17.5 4C17.5 3.17 16.83 2.5 16 2.5H15.5V4H16V12H15.5V13.5H16C16.83 13.5 17.5 12.83 17.5 12V4ZM13.5 7.5H11.5V8.5H13.5V11L15.5 8L13.5 5V7.5Z" fill="currentColor"/>
+  <g transform="scale(-1,1) translate(-16,0)">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="${d}" fill="currentColor"/>
+  </g>
 </svg>`
 }
 
