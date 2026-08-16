@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  BUILTIN_THEMES, TOKEN_FIELDS, loadStored, saveStored, setTokenMode,
+  BUILTIN_THEMES, TOKEN_FIELDS, TOKEN_GROUPS,
+  DEFAULT_DARK_THEME_TOKENS, DEFAULT_LIGHT_THEME_TOKENS,
+  loadStored, saveStored, setTokenMode, mixHex, alphaHex,
 } from '../src/client/themes.ts'
 
 function mockStorage() {
@@ -58,4 +60,58 @@ test('setTokenMode：另一模式为空时回填同值，已有值保持不变',
   assert.deepEqual(a['--dsw-alias-brand-primary'], { light: '#123456', dark: '#123456' })
   const b = setTokenMode(a, '--dsw-alias-brand-primary', 'dark', '#abcdef')
   assert.deepEqual(b['--dsw-alias-brand-primary'], { light: '#123456', dark: '#abcdef' })
+})
+
+test('token 目录分组：窗口 / 按钮与输入 / Markdown 与代码 / 状态', () => {
+  const fields = (id) => TOKEN_GROUPS.find((g) => g.id === id)?.fields.map((f) => f.name) ?? []
+
+  assert.ok(fields('window').includes('--dsw-alias-bg-base'))
+  assert.ok(fields('window').includes('--dsw-specific-sidebar-fill'))
+  assert.ok(fields('window').includes('--dsw-alias-scrollbar-bg-l1'))
+
+  assert.ok(fields('controls').includes('--dsw-alias-button-primary-fill'))
+  assert.ok(fields('controls').includes('--dsw-alias-button-ghost-active-hover'))
+  assert.ok(fields('controls').includes('--dsw-specific-input-major'))
+  assert.ok(fields('controls').includes('--dsw-alias-interactive-bg-hover'))
+
+  assert.ok(fields('markdown').includes('--dsw-alias-markdown-code-block'))
+  assert.ok(fields('markdown').includes('--dsw-alias-markdown-inline-code'))
+  assert.ok(fields('markdown').includes('--shiki-token-comment'))
+  assert.ok(fields('markdown').includes('--shiki-token-keyword'))
+  assert.ok(fields('markdown').includes('--shiki-background'))
+
+  assert.ok(fields('status').includes('--dsw-alias-state-error-primary'))
+  assert.ok(fields('status').includes('--dsw-alias-state-business-primary'))
+
+  // 所有组字段都被拍平进 TOKEN_FIELDS，且无重复
+  assert.equal(TOKEN_FIELDS.length, TOKEN_GROUPS.reduce((n, g) => n + g.fields.length, 0))
+  assert.equal(new Set(TOKEN_FIELDS.map((f) => f.name)).size, TOKEN_FIELDS.length)
+})
+
+test('预设已覆盖按钮 / 输入框 / Markdown / 代码：派生值与种子一致', () => {
+  for (const t of BUILTIN_THEMES) {
+    assert.equal(t.tokens['--dsw-alias-button-primary-fill'], t.tokens['--dsw-alias-brand-primary'])
+    assert.equal(t.tokens['--dsw-alias-button-info-fill'], t.tokens['--dsw-alias-brand-primary'])
+    assert.equal(t.tokens['--shiki-foreground'], t.tokens['--dsw-alias-label-primary'])
+    assert.equal(t.tokens['--shiki-background'], t.tokens['--dsw-alias-markdown-code-block'])
+    assert.equal(t.tokens['--dsw-alias-markdown-code-segment-unselected'], t.tokens['--dsw-alias-markdown-code-block'])
+    assert.equal(typeof t.tokens['--dsw-specific-input-major'], 'string')
+    assert.equal(typeof t.tokens['--dsw-alias-button-ghost-active-border'], 'string')
+    assert.equal(typeof t.tokens['--dsw-specific-bubble-highlight'], 'string')
+  }
+})
+
+test('编辑器默认配色覆盖全量字段（深色 / 浅色）', () => {
+  for (const f of TOKEN_FIELDS) {
+    assert.equal(typeof DEFAULT_DARK_THEME_TOKENS[f.name], 'string', `dark 缺 ${f.name}`)
+    assert.equal(typeof DEFAULT_LIGHT_THEME_TOKENS[f.name], 'string', `light 缺 ${f.name}`)
+  }
+})
+
+test('颜色工具：mixHex 与 alphaHex', () => {
+  assert.equal(mixHex('#000000', '#ffffff', 0.5), '#808080')
+  assert.equal(mixHex('#000000', '#ffffff', 0), '#000000')
+  assert.equal(mixHex('#000000', '#ffffff', 1), '#ffffff')
+  assert.match(alphaHex('#ff0000', 0.5), /^rgba\(255, 0, 0, 0\.5\)$/)
+  assert.match(alphaHex('#112233', 0.08), /^rgba\(17, 34, 51, 0\.08\)$/)
 })
