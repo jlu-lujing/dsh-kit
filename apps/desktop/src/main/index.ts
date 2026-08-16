@@ -7,10 +7,11 @@
  *   → 运行期仅放行同 origin → 退出时优雅停掉自管 dsh 子进程（external 实例不杀）。
  */
 
-import { app, BrowserWindow, shell, dialog, Tray } from 'electron'
+import { app, BrowserWindow, shell, dialog, Tray, ipcMain } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { DESKTOP_CHROME_CSS, DESKTOP_CHROME_JS } from './desktop-chrome'
 import {
   type DshProcess,
   buildSpawn,
@@ -61,8 +62,14 @@ function createWindow(url: string): void {
     width: 1280,
     height: 820,
     show: false,
-    autoHideMenuBar: true,
-    title: `dsh-kit Desktop v${appVersion()}`,
+    // 无边框自绘窗口：frame:false 去掉系统标题栏/边框；
+    // transparent + hasShadow 在 Windows 下让圆角外的区域透明（配合注入的
+    // 根容器 border-radius），是社区通行的 frameless 圆角方案。
+    frame: false,
+    transparent: true,
+    hasShadow: true,
+    roundedCorners: true,
+    title: `DeepSeek Harness App v${appVersion()}`,
     icon: windowIconPath(), // 非 darwin 平台窗口图标
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -73,7 +80,11 @@ function createWindow(url: string): void {
   })
 
   mainWindow.once('ready-to-show', () => mainWindow?.show())
-  mainWindow.loadURL(url)
+  void mainWindow.loadURL(url)
+
+  // 窗口最大化状态变化 → 通知 renderer（切换按钮图标 / 取消圆角）
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximized-changed', true))
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximized-changed', false))
 
   // 导航仅放行同 origin；外部链接交给系统浏览器。
   mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
@@ -89,7 +100,44 @@ function createWindow(url: string): void {
     }
   })
 
+  // 页面加载后注入无边框 chrome（圆角 / 拖拽 / 右上角窗口控制 / Session log 左移）
+  mainWindow.webContents.on('did-finish-load', () => {
+    injectDesktopChrome(mainWindow)
+  })
+
   mainWindow.on('closed', () => { mainWindow = null })
+}
+
+/** 向 dsh web UI 页面注入无边框窗口自绘 chrome（CSS + 控制按钮）。 */
+function injectDesktopChrome(win: BrowserWindow | null): void {
+  if (!win) return
+  const wc = win.webContents
+  wc.executeJavaScript(`window.__DSH_DESKTOP_CHROME_CSS__ = ${JSON.stringify(DESKTOP_CHROME_CSS)}`, true)
+    .catch(() => { /* 忽略 */ })
+  wc.executeJavaScript('window.__DSH_DESKTOP_CHROME_CSS__; if (!window.__dshKitDesktopChrome__) {' + DESKTOP_CHROME_JS + '}', true)
+    .catch((err) => {
+      console.warn('[desktop-chrome] inject failed:', err)
+    })
+}
+
+/** 注册无边框窗口控制 IPC（min / toggleMaximize / close / isMaximized）。 */
+function registerWindowControls(): void {
+  ipcMain.handle('window:minimize', (e) => {
+    BrowserWindow.fromWebContents(e.sender)?.minimize()
+  })
+  ipcMain.handle('window:toggle-maximize', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return false
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+    return win.isMaximized()
+  })
+  ipcMain.handle('window:close', (e) => {
+    BrowserWindow.fromWebContents(e.sender)?.close()
+  })
+  ipcMain.handle('window:is-maximized', (e) => {
+    return BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
+  })
 }
 
 /** 只放行同 origin（当前 dsh loopback URL）；其余一律当作外部链接 */
@@ -205,8 +253,13 @@ function showErrorPage(message: string): void {
         width: 1280,
         height: 820,
         show: false,
-        autoHideMenuBar: true,
-        title: 'dsh-kit Desktop — 启动失败',
+        // 与主窗口一致的无边框 + 圆角
+        frame: false,
+        transparent: true,
+        hasShadow: true,
+        roundedCorners: true,
+        title: 'DeepSeek Harness App — 启动失败',
+        icon: windowIconPath(),
         webPreferences: {
           preload: join(__dirname, '../preload/index.mjs'),
           contextIsolation: true,
@@ -331,5 +384,6 @@ app.on('will-quit', () => {
 })
 
 if (gotLock) {
+  registerWindowControls()
   void app.whenReady().then(boot)
 }

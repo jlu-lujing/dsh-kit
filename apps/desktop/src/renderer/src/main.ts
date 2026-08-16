@@ -52,7 +52,7 @@ function render(): void {
       retry.classList.remove('hidden')
       retry.addEventListener('click', () => window.location.reload())
     }
-    document.title = 'dsh-kit Desktop — 启动失败'
+    document.title = 'DeepSeek Harness App — 启动失败'
   } else {
     // 启动页
     const url = desktop?.dshUrl
@@ -62,9 +62,67 @@ function render(): void {
     if (detail) {
       detail.textContent = '若长时间停留在此页，请查看应用日志（用户数据目录 desktop.log）'
     }
-    document.title = 'dsh-kit Desktop'
+    document.title = 'DeepSeek Harness App'
   }
 }
 
+/** 无边框窗口控制桥类型（与 preload 暴露的 __dshDesktop 对应） */
+interface DshDesktopBridge {
+  windowControl?: {
+    minimize: () => Promise<void>
+    toggleMaximize: () => Promise<boolean>
+    close: () => Promise<void>
+    isMaximized: () => Promise<boolean>
+  }
+  onMaximizedChange?: (cb: (isMax: boolean) => void) => void
+}
+
+const dshDesktopApi = (window as unknown as { __dshDesktop?: DshDesktopBridge }).__dshDesktop
+const platform = desktop?.platform ?? ''
+
+/** 绑定窗口控制按钮（win/linux 右上角三键 + mac 左上角信号灯）+ 拖拽条双击最大化。 */
+function setupWindowControls(): void {
+  const api = dshDesktopApi?.windowControl
+  const dragbar = document.querySelector<HTMLElement>('#dragbar')
+
+  // mac：左上角信号灯（关闭/最小化/最大化）
+  const tlClose = document.querySelector<HTMLButtonElement>('#tl-close')
+  const tlMin = document.querySelector<HTMLButtonElement>('#tl-min')
+  const tlMax = document.querySelector<HTMLButtonElement>('#tl-max')
+  tlClose?.addEventListener('click', () => void api?.close())
+  tlMin?.addEventListener('click', () => void api?.minimize())
+  tlMax?.addEventListener('click', () => void api?.toggleMaximize())
+
+  // win/linux：右上角三键
+  const minBtn = document.querySelector<HTMLButtonElement>('#btn-min')
+  const maxBtn = document.querySelector<HTMLButtonElement>('#btn-max')
+  const closeBtn = document.querySelector<HTMLButtonElement>('#btn-close')
+  minBtn?.addEventListener('click', () => void api?.minimize())
+  maxBtn?.addEventListener('click', () => void api?.toggleMaximize())
+  closeBtn?.addEventListener('click', () => void api?.close())
+  dragbar?.addEventListener('dblclick', () => void api?.toggleMaximize())
+
+  // 最大化状态同步按钮图标（还原 ↔ 最大化）
+  const reflectMax = (isMax: boolean): void => {
+    if (maxBtn) {
+      maxBtn.title = isMax ? '还原' : '最大化'
+      maxBtn.setAttribute('aria-label', maxBtn.title)
+      const svg = maxBtn.querySelector('svg')
+      if (svg) {
+        svg.innerHTML = isMax
+          ? '<path d="M4 4V2h6v6H8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><rect x="2" y="4" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/>'
+          : '<rect x="2.2" y="2.2" width="7.6" height="7.6" rx="1" stroke="currentColor" stroke-width="1.2"/>'
+      }
+    }
+    if (tlMax) tlMax.title = isMax ? '还原' : '最大化'
+  }
+  dshDesktopApi?.onMaximizedChange?.(reflectMax)
+  void api?.isMaximized().then(reflectMax)
+}
+
+// 平台标记（CSS 据此切 win 右上角 / mac 信号灯）
+document.body.setAttribute('data-dsh-platform', platform)
+
 applyLogo()
 render()
+setupWindowControls()

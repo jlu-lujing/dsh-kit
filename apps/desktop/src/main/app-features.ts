@@ -16,9 +16,12 @@ function trayIcon(): NativeImage {
   const candidates = [
     join(process.resourcesPath ?? '', 'tray-16.png'),
     join(process.resourcesPath ?? '', 'tray-32.png'),
-    join(__dirname, '..', '..', '..', 'build', 'tray-16.png'),
-    join(__dirname, '..', '..', '..', 'build', 'tray-32.png'),
   ]
+  // dev 回退：向上逐级查找 build/tray-*.png（和 windowIconPath 同一个策略）
+  for (const name of ['tray-16.png', 'tray-32.png']) {
+    const dev = findBuildAsset(name)
+    if (dev) candidates.push(dev)
+  }
   for (const p of candidates) {
     if (existsSync(p)) {
       const img = nativeImage.createFromPath(p)
@@ -42,7 +45,7 @@ export function createTray(callbacks: TrayCallbacks): Tray | null {
   // macOS：黑色爪印当 template 图标（系统自动适配深/浅色菜单栏）
   icon.setTemplateImage(process.platform === 'darwin')
   const tray = new Tray(icon)
-  tray.setToolTip('dsh-kit Desktop')
+  tray.setToolTip('DeepSeek Harness App')
   const menu = Menu.buildFromTemplate([
     { label: '显示窗口', click: () => callbacks.onShow() },
     { label: '检查更新', click: () => callbacks.onCheckUpdate() },
@@ -82,13 +85,33 @@ export function isAutostartEnabled(): boolean {
 }
 
 /**
+ * 从 __dirname 向上逐级查找 build/<name>（dev 态回退，深度自适应）。
+ * 覆盖 out/main、src/main 等不同编译/运行深度。
+ */
+function findBuildAsset(name: string): string | undefined {
+  let dir = __dirname
+  for (let i = 0; i < 6; i += 1) {
+    const p = join(dir, 'build', name)
+    if (existsSync(p)) return p
+    const parent = join(dir, '..')
+    if (parent === dir) break
+    dir = parent
+  }
+  return undefined
+}
+
+/**
  * 窗口图标：macOS 在 dock 用应用图标；Windows/Linux 用 build/icon.png。
  * 返回 BrowserWindow options.icon（仅非 darwin 需要，darwin 由 app bundle 提供）。
+ *
+ * 路径解析与托盘一致：优先打包资源（afterPack 已把 icon.png 拷进 Resources），
+ * 开发态（npm run dev）回退到仓库源码 build/icon.png——否则 dev 下任务栏/标题栏
+ * 会显示 Electron 默认 logo。
  */
 export function windowIconPath(): string | undefined {
   if (process.platform === 'darwin') return undefined
   const p = join(process.resourcesPath ?? '', 'icon.png')
-  return existsSync(p) ? p : undefined
+  return existsSync(p) ? p : findBuildAsset('icon.png')
 }
 
 /** 读取应用版本（package.json version）。打包后 app.getVersion 优先，开发回退文件读。 */

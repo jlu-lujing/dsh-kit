@@ -1,5 +1,5 @@
 appId: com.dshkit.desktop
-productName: dsh-kit Desktop
+productName: DeepSeek Harness App
 # 图标源：取自 dsh web 的 /favicon.svg（爪印 logo，2026-08-16 抓取）光栅化。
 # build/icon.png (1024x1024) 由 electron-builder 自动生成 .icns/.ico。
 directories:
