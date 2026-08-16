@@ -152,15 +152,45 @@ const LAYOUT_CSS = `
 }
 .dsh-kit-right-panel-header {
   flex: none;
-  height: 42px;
+  height: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 0 14px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
+  gap: 2px;
+}
+
+/* 右侧栏标签页 */
+.dsh-kit-right-tab {
+  flex: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--dsw-alias-label-secondary);
+  padding: 0 10px;
+  height: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  position: relative;
+}
+.dsh-kit-right-tab:hover {
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-kit-right-tab.is-active {
+  color: var(--dsw-alias-state-business-primary);
+}
+.dsh-kit-right-tab.is-active:after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  background: var(--dsw-alias-state-business-primary);
+  border-radius: 1px;
 }
 .dsh-kit-right-panel-body {
   flex: 1;
@@ -169,6 +199,28 @@ const LAYOUT_CSS = `
   padding: 12px 16px;
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
+}
+.dsh-kit-right-tabpane {
+  display: none;
+}
+.dsh-kit-right-tabpane.is-active {
+  display: block;
+}
+/* 信息面板：会话统计（复用官方 StatsLine 克隆件） */
+.dsh-kit-info-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.dsh-kit-info-stats .FJxK0a_root {
+  text-align: left;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  white-space: normal;
 }
 
 /* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
@@ -265,16 +317,59 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     panel.className = 'dsh-kit-right-panel'
     const header = document.createElement('div')
     header.className = 'dsh-kit-right-panel-header'
-    const title = document.createElement('span')
-    title.textContent = '右侧栏'
-    header.appendChild(title)
+
+    const tabs: Array<{ id: string; label: string }> = [
+      { id: 'info', label: '信息' },
+      { id: 'session', label: '会话' },
+    ]
     const body = document.createElement('div')
     body.className = 'dsh-kit-right-panel-body'
-    body.textContent = '右侧栏内容占位。'
+
+    const panes = new Map<string, HTMLElement>()
+    for (const t of tabs) {
+      const tabBtn = document.createElement('button')
+      tabBtn.type = 'button'
+      tabBtn.className = 'dsh-kit-right-tab'
+      tabBtn.textContent = t.label
+      tabBtn.dataset.tab = t.id
+      tabBtn.addEventListener('click', () => {
+        header.querySelectorAll<HTMLElement>('.dsh-kit-right-tab').forEach((b) => b.classList.toggle('is-active', b === tabBtn))
+        panes.forEach((pane, pid) => pane.classList.toggle('is-active', pid === t.id))
+      })
+      header.appendChild(tabBtn)
+
+      const pane = document.createElement('div')
+      pane.className = 'dsh-kit-right-tabpane'
+      pane.dataset.pane = t.id
+      body.appendChild(pane)
+      panes.set(t.id, pane)
+    }
+    header.querySelector<HTMLElement>('.dsh-kit-right-tab[data-tab="info"]')?.classList.add('is-active')
+    panes.get('info')?.classList.add('is-active')
+
     panel.appendChild(header)
     panel.appendChild(body)
     contentRoot.appendChild(panel)
+    syncStatsIntoInfo()
     return panel
+  }
+
+  // 将官方「对话框下方统计」（StatsLine .FJxK0a_root）克隆进右侧栏「信息」标签页并隐藏原处。
+  const syncStatsIntoInfo = () => {
+    const pane = document.querySelector<HTMLElement>('.dsh-kit-right-tabpane[data-pane="info"]')
+    if (pane === null) return
+    const official = document.querySelector<HTMLElement>('.FJxK0a_root')
+    if (!official) return
+    official.style.display = 'none'
+    let holder = pane.querySelector<HTMLElement>('.dsh-kit-info-stats')
+    if (!holder) {
+      holder = document.createElement('div')
+      holder.className = 'dsh-kit-info-stats'
+      pane.appendChild(holder)
+    }
+    if (!holder.querySelector('.FJxK0a_root')) {
+      holder.appendChild(official.cloneNode(true) as HTMLElement)
+    }
   }
 
   const toggleBtn = () => document.querySelector('.dsh-kit-right-toggle') as HTMLButtonElement | null
@@ -363,6 +458,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const mo = new MutationObserver(() => {
     mountToggle()
     mountLeftToggle()
+    syncStatsIntoInfo()
   })
   mo.observe(document.body, { childList: true, subtree: true })
 }
