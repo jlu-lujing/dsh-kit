@@ -12,6 +12,7 @@ import type { ThemeService } from './themes.ts'
 import { ThemeStoreController } from './controller.ts'
 import { ThemeStorePanel } from './panel.ts'
 import { installLayoutTweaks } from './layout.ts'
+import { StatsPanelEntry, SYNC_EVENT } from './stats-panel.ts'
 
 export const name = 'dsh-kit-webui'
 
@@ -33,6 +34,17 @@ export function apply(ctx: { get(name: string): unknown }): void {
 
   // 布局微调：去掉分割线颜色 + 右侧标题栏 + 右侧边栏折叠/展开按钮。
   installLayoutTweaks(ctx.get('layout') as { toggleSidebar: () => void } | undefined)
+
+  // 右侧栏「信息」页：实时会话统计。注册进官方 composer.dock 槽位，
+  // 用更低 priority (-1) shadow 掉官方 StatsLine（同 id 'stats'）：
+  //   - 原对话框下方不再渲染官方统计行；
+  //   - 数据来自官方 useProjection（sessionStats/tokenUsage），实时、跨版本稳定。
+  slots.inject('conversation.composer.dock', () =>
+    slots.register(
+      { name: 'conversation.composer.dock', id: 'stats', order: 0, priority: -1 },
+      StatsPanelEntry,
+    ),
+  )
 
   // 官方设置页「主题商店」面板（id 专属 → 官方设置页多一项）。
   slots.inject('settings.section', () =>

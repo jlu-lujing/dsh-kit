@@ -7,6 +7,8 @@
  *   标题栏折叠按钮调用官方 ctx.layout 的 openDetails()/closeDetails()。
  */
 
+import { SYNC_EVENT } from './stats-panel.ts'
+
 const STYLE_ID = 'dsh-kit-webui-layout-tweaks'
 
 const LAYOUT_CSS = `
@@ -206,7 +208,7 @@ const LAYOUT_CSS = `
 .dsh-kit-right-tabpane.is-active {
   display: block;
 }
-/* 信息面板：会话统计（复用官方 StatsLine 克隆件） */
+/* 信息面板：实时会话统计（React useProjection 驱动的 live 节点） */
 .dsh-kit-info-stats {
   display: flex;
   flex-wrap: wrap;
@@ -215,12 +217,20 @@ const LAYOUT_CSS = `
   font-size: 12px;
   line-height: 20px;
 }
-.dsh-kit-info-stats .FJxK0a_root {
+.dsh-kit-info-stats [data-dsh-kit-live="stats"] {
   text-align: left;
   max-width: none;
   margin: 0;
   padding: 0;
   white-space: normal;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.dsh-kit-info-stats .dsh-kit-info-empty {
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 20px;
 }
 
 /* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
@@ -350,42 +360,32 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     panel.appendChild(header)
     panel.appendChild(body)
     contentRoot.appendChild(panel)
-    syncStatsIntoInfo()
+    ensureInfoStats(panes.get('info') ?? null)
     return panel
   }
 
-  // 无条件隐藏官方「对话框下方统计」——启动即隐藏，不依赖右栏是否展开。
-  const hideOfficialStats = () => {
-    document.querySelectorAll<HTMLElement>('.FJxK0a_root').forEach((el) => {
-      el.style.display = 'none'
-    })
-  }
-  hideOfficialStats()
-
-  // 把官方统计克隆进右侧栏「信息」标签页（面板已创建才填内容）。
-  const syncStatsIntoInfo = () => {
-    const pane = document.querySelector<HTMLElement>('.dsh-kit-right-tabpane[data-pane="info"]')
-    console.log('[dsh-kit-info] pane exists?', pane !== null)
-    if (pane === null) return
-    const official = document.querySelector<HTMLElement>('.FJxK0a_root')
-    console.log('[dsh-kit-info] official stats count/found?', official !== null)
-    if (!official) return
-    hideOfficialStats()
+  // 确保右侧栏「信息」页有 .dsh-kit-info-stats 容器（实时统计 React 组件写入点）。
+  const ensureInfoStats = (pane: HTMLElement | null) => {
+    if (!pane) return
     let holder = pane.querySelector<HTMLElement>('.dsh-kit-info-stats')
     if (!holder) {
       holder = document.createElement('div')
       holder.className = 'dsh-kit-info-stats'
       pane.appendChild(holder)
     }
-    const hasClone = holder.querySelector('.FJxK0a_root')
-    console.log('[dsh-kit-info] holder exists? clone present?', holder !== null, hasClone !== null)
-    if (!hasClone) {
-      const clone = official.cloneNode(true) as HTMLElement
-      clone.style.display = ''
-      clone.style.removeProperty('display')
-      holder.appendChild(clone)
-      console.log('[dsh-kit-info] cloned:', clone.textContent?.slice(0, 60))
+    // 保证信息页永远不是空白：先放一个可见的“加载中…”占位，
+    // 实时统计组件写入真实数据时会被替换掉。
+    if (!holder.querySelector('.dsh-kit-info-empty') && !holder.querySelector('[data-dsh-kit-live="stats"]')) {
+      const empty = document.createElement('div')
+      empty.className = 'dsh-kit-info-empty'
+      empty.textContent = '会话统计加载中…'
+      holder.appendChild(empty)
     }
+    // 面板（含容器）就绪后，通知实时统计组件把最新数据写进来。
+    // 等一帧再派发：确保 StatsPanelEntry 已挂载并注册了监听。
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event(SYNC_EVENT))
+    })
   }
 
   const toggleBtn = () => document.querySelector('.dsh-kit-right-toggle') as HTMLButtonElement | null
@@ -474,8 +474,6 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const mo = new MutationObserver(() => {
     mountToggle()
     mountLeftToggle()
-    hideOfficialStats()
-    syncStatsIntoInfo()
   })
   mo.observe(document.body, { childList: true, subtree: true })
 }
