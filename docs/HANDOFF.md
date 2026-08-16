@@ -70,6 +70,7 @@
 | `dsh-kit-scheduler` | cron 定时任务 | 持久化 + 管理路由；**纯库** |
 | `dsh-kit-input-history` | 输入历史 | 当前会话 ↑/↓ 回填；**纯 client** |
 | 满血模式 preset（内置） | 二阶段 agent preset | 内置导入/删除管理器 |
+| J-Space 认知协议 skill（内置） | 推理/长任务协议 | 随满血模式安装到 `~/.dsh/skills/j-space`；满血 persona 轻量引导按需 `skill_load j-space` |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 只读展示，不提供一键安装 |
 | 归档会话管理（内置） | 归档恢复 / 彻底删除 | 补官方缺失的恢复/删除 API，落盘 workspace.json |
 | 桌面客户端（apps） | Electron 壳 + dsh-runtime | 开箱即用、自动装全家桶、托盘/自启/更新 |

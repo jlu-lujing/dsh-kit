@@ -186,6 +186,7 @@ dsh-kit 的 host（`src/index.ts`）除了提供 store 服务，还注册了以�
 - **接入**：preset 文件内置在 `packages/dsh-kit/preset/`，`src/preset.ts` 负责导入/删除（幂等、非破坏；目标已存在不覆盖；staging + rename 原子落位）；
 - **开关**：store 清单里的功能 id 为 `dsh-anchored-standard`，默认开启；启用即自动导入，删除即禁用；
 - **名称**：DSH 预设选择器里显示 `TurboBoost Mode`（`preset.yml` 的 `name` 字段；中文语境为「满血模式」）。
+- **J-Space 认知协议 skill**：随 preset 一起内置（`packages/dsh-kit/preset/j-space/`）。安装 preset 时自动装入 `~/.dsh/skills/j-space/`（可被 `skill_search`/`skill_load` 发现）；满血 persona 轻量引导模型在深度推理/长任务/工具重任务/验证恢复时用 `skill_load j-space` 按需加载。遵循 J-Space 官方「选择性加载」，不注入每轮上下文。
 
 ### 6.3 GitHub 生态目录
 

@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { createStore } from './state.ts'
 import { FEATURES, type FeatureId } from './store.ts'
-import { installPreset, uninstallPreset, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
+import { installPreset, uninstallPreset, uninstallJspaceSkill, isInstalled as isPresetInstalled, PRESET_ID } from './preset.ts'
 import { createEcosystemController } from './ecosystem.ts'
 import { listArchived, restoreSession, deleteSession, deleteAllArchived } from './archive.ts'
 
@@ -256,10 +256,12 @@ export function apply(ctx: Context, config: Config = {}): void {
       if (!feature) return sendJson(res, 404, { error: `unknown or non-installable feature "${id}"` })
       try {
         const result = uninstallPreset({ home })
+        // 联动删除随 preset 一起安装的 j-space skill，保持装卸一致性。
+        const jspace = uninstallJspaceSkill({ home })
         // Removing the artifact also disables the feature so a later restart
         // does not silently re-install it (apply only installs while enabled).
         service.setEnabled(id, false)
-        return sendJson(res, 200, { ok: true, id, removed: result.removed, target: result.target })
+        return sendJson(res, 200, { ok: true, id, removed: result.removed, target: result.target, jspaceRemoved: jspace.removed })
       } catch (error) {
         return sendJson(res, 500, { error: String((error as Error).message ?? error) })
       }

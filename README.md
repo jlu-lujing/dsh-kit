@@ -47,7 +47,7 @@ dsh-kit/
 | `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
 | `dsh-kit-webui` | WebUI 主题商店 | **全局界面调整**（叠加在所有主题上，自动适配深/浅色）+ **每主题独立风格**；内置海洋/樱/森林三套预设（各含深色版/浅色版），支持自定义主题的新建/编辑/删除 |
 | `dsh-kit-worktree` | git Worktree 会话归属 | 每个会话按 cwd 判定 `main`（项目主路径）或 `.dsh/worktree/<branch>`；新建会话页可选已有/新建 worktree 并绑定，对话顶部显示归属徽标 |
-| `TurboBoost Mode`（满血模式，preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
+| `TurboBoost Mode`（满血模式，preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器；附 J-Space 认知协议 skill（skill_load j-space） |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 | 归档会话管理（内置） | 归档会话恢复 / 删除 | 官方「归档」只隐藏不删；设置页可恢复或彻底删除（含日志文件） |
 
@@ -229,6 +229,7 @@ pnpm -r publish --access public --no-git-checks
 ## 📚 许可
 
 - **满血模式（TurboBoost Mode）preset**：内置二阶段 agent preset，由 dsh-kit 的导入/删除管理器（`src/preset.ts`）打包分发。
+- **J-Space 认知协议 skill**：随满血模式一起内置分发（`packages/dsh-kit/preset/j-space/`），安装 preset 时自动装入 `~/.dsh/skills/j-space/`；满血 persona 轻量引导模型在深度推理/长任务/工具重任务时用 `skill_load j-space` 按需加载（遵循官方选择性加载，不注入每轮上下文）。
 - **GitHub 生态目录**的分片抓取 / 缓存思路参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）；dsh-kit 只取展示能力，不做安装。
   - 简介：首次请求用 Minimal 工具对（`bash` / `str_replace_editor`），首次持久晋升信号后开放完整工具目录。
   - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除。
