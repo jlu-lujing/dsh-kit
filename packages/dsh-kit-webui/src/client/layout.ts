@@ -42,6 +42,10 @@ const LAYOUT_CSS = `
 .dsh-kit-right-toggle:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+/* win/linux：左移避让右上角三按钮（与官方 headerUtilities 同宽度让位） */
+body:not([data-dsh-platform="darwin"]) .dsh-kit-right-toggle {
+  margin-right: 128px;
+}
 `
 
 /** 右侧面板图标 = 左侧 IconPanelLeftOutline16 的水平镜像（createElementNS 构建，可靠）。 */
