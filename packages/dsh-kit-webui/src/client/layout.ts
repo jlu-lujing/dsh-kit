@@ -42,9 +42,12 @@ const LAYOUT_CSS = `
   flex-direction: column;
   justify-content: center;
 }
-/* 下方 frame 整体下移，避开 fixed 标题栏 */
+/* 下方 frame 整体下移避开 fixed 标题栏；用 height+margin 而非 padding，
+   避免 grid 高度超出视口把底部输入框挤出屏幕 */
 .pI_x6G_frame {
-  padding-top: 60px;
+  box-sizing: border-box;
+  height: calc(100% - 60px) !important;
+  margin-top: 60px;
 }
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
