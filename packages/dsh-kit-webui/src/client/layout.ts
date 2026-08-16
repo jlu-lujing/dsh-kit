@@ -26,11 +26,19 @@ const LAYOUT_CSS = `
   z-index: 100;
 }
 
-/* 右侧顶部标题栏：官方 conversation header 背景改为左栏同色，横贯全窗 */
+/* 右侧顶部标题栏：背景左栏同色、横贯全窗；高度与左栏 logo 行一致（60px） */
 .wSkVaW_header {
   background: var(--dsw-specific-sidebar-fill) !important;
   border-bottom-color: transparent !important;
-  padding: 8px 20px 0 !important;
+  height: 60px !important;
+  padding: 0 20px !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.wSkVaW_header .wSkVaW_titleRow {
+  min-height: 0;
 }
 .wSkVaW_header::after {
   display: none !important;
