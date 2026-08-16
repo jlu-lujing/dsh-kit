@@ -12,6 +12,8 @@
  * 玻璃层宽度用 ResizeObserver 跟随侧边栏列宽（支持拖拽/折叠）。
  */
 
+import { attachSettingsLayerFix } from './settings-layer.ts'
+
 const ROOT_CLASS = 'dsh-kit-glass-sidebar'
 const STYLE_ID = 'dsh-kit-webui-sidebar-glass'
 const WIDTH_VAR = '--dsh-kit-sidebar-width'
@@ -48,6 +50,14 @@ const GLASS_CSS = `
     background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 38%, transparent);
   }
 }
+/* 玻璃层 / 侧边栏列在设置弹窗打开时退到内容之下，弹窗回到最上层。
+   由 settings-layer.ts 在弹窗开关时切 dsh-kit-settings-open 标记。 */
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame::before {
+  z-index: 0;
+}
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_sidebarCol {
+  z-index: auto;
+}
 @media (prefers-reduced-motion: reduce) {
   .dsh-kit-glass-sidebar .pI_x6G_frame::before {
     -webkit-backdrop-filter: blur(8px);
@@ -80,4 +90,7 @@ export function installSidebarGlass(): void {
   const ro = new ResizeObserver(sync)
   ro.observe(col)
   sync()
+
+  // 附加的设置弹窗层级修复（:has() 不支持时无副作用）。
+  attachSettingsLayerFix()
 }
