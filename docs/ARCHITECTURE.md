@@ -179,13 +179,13 @@ dsh-kit 的 host（`src/index.ts`）除了提供 store 服务，还注册了以�
 - 「满血模式」是 `installable` 但 `togglable: false`——只提供「安装/删除」，不提供启停按钮（启停由安装状态直接决定）；
 - 底部「一键安装全」= `POST /dsh-kit/store/install` → 执行 `dsh plugin --profile <p> add -w dsh-kit`。
 
-### 6.2 满血模式 preset（内置）
+### 6.2 满血模式（TurboBoost Mode）preset（内置）
 
 - **形态**：DSH **agent preset**（`~/.dsh/.agent-presets/anchored-standard`），不是 Cordis bundle；
 - **来源**：算法与文件集合**借鉴**社区项目 [xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)（MIT，含 DeepSeek 声明；`refs/dsh-anchored-standard/` 本地参考副本）；
 - **接入**：preset 文件内置在 `packages/dsh-kit/preset/`，`src/preset.ts` 负责导入/删除（幂等、非破坏；目标已存在不覆盖；staging + rename 原子落位）；
 - **开关**：store 清单里的功能 id 为 `dsh-anchored-standard`，默认开启；启用即自动导入，删除即禁用；
-- **名称**：DSH 预设选择器里显示 `满血模式`（`preset.yml` 的 `name` 字段）。
+- **名称**：DSH 预设选择器里显示 `TurboBoost Mode`（`preset.yml` 的 `name` 字段；中文语境为「满血模式」）。
 
 ### 6.3 GitHub 生态目录
 
