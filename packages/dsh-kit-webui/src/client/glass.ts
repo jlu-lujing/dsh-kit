@@ -1,16 +1,17 @@
-/** 侧边栏真毛玻璃：让对话内容延伸到侧边栏下，透过半透明 + backdrop-filter 显示。
+/** 侧边栏真毛玻璃（叠层布局：对话铺满整窗，侧边栏浮在其上 + blur）。
  *
- * 官方 grid：frame 三列 [sidebar | center | details]。中心列默认 overflow:hidden，
- * 内容不会延伸到侧边栏下。做法：
- *  1. centerCol 负 margin 向左延伸到侧边栏下（宽度用 --dsh-kit-sidebar-width）+ 补回 padding
- *  2. centerCol overflow:hidden→visible（否则被裁）
- *  3. 对话根/背景透明，让下层内容能透到侧边栏
- *  4. sidebarCol 半透明 + backdrop-filter（blur）
+ * 官方 frame 是 grid[sidebar|center|details]，且 grid-template-columns 是
+ * React inline style。方案：
+ *  1. 覆盖 frame 的 grid-template-columns: 0px 1fr 0px !important
+ *     （!important 可压过 inline，使 sidebar/details 不占列）
+ *  2. sidebarCol 变 position:absolute 浮层（left:0, width=侧栏宽, z-index 高）
+ *  3. centerCol 占满整窗，对话内容自然延伸到侧边栏底下
+ *  4. sidebarCol 半透明 + backdrop-filter blur → 内容透过侧边栏
  *
- * 注意：blur 加在 sidebarCol 上会和 fixed 弹窗冲突（祖先 filter 会变成 fixed 包含块）。
- * 因此设置弹窗打开时（settings-layer.ts 切 dsh-kit-settings-open）关闭这些布局/背景，
- * 恢复官方原状，弹窗回 viewport 顶层。
+ * 设置弹窗打开时（settings-layer.ts 切 open）全部关闭恢复官方布局。
  */
+
+import { attachSettingsLayerFix } from './settings-layer.ts'
 
 const ROOT_CLASS = 'dsh-kit-glass-sidebar'
 const STYLE_ID = 'dsh-kit-webui-sidebar-glass'
@@ -19,19 +20,20 @@ const WIDTH_VAR = '--dsh-kit-sidebar-width'
 const GLASS_CSS = `
 .dsh-kit-glass-sidebar .pI_x6G_frame {
   --${WIDTH_VAR}: 280px;
+  grid-template-columns: 0px minmax(0, 1fr) 0px !important;
 }
-/* 中心列延伸到侧边栏下 */
+/* center 铺满整窗 */
 .dsh-kit-glass-sidebar .pI_x6G_centerCol {
-  margin-left: calc(-1 * var(${WIDTH_VAR}, 280px));
-  padding-left: var(${WIDTH_VAR}, 280px);
-  overflow: visible;
+  grid-column: 1 / -1;
 }
-/* 对话根背景透明，让下层透到侧边栏 */
-.dsh-kit-glass-sidebar .wSkVaW_root {
-  background: transparent;
-}
-/* 侧边栏半透明 + 模糊 */
+/* sidebar 浮层 */
 .dsh-kit-glass-sidebar .pI_x6G_sidebarCol {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(${WIDTH_VAR}, 280px);
+  z-index: 5;
   background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 45%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   backdrop-filter: blur(18px) saturate(150%);
@@ -39,16 +41,17 @@ const GLASS_CSS = `
 .dsh-kit-glass-sidebar [data-slot="sidebar"] {
   background: transparent;
 }
-/* 设置弹窗打开：关闭全部相关布局/背景，恢复官方原状 */
-.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_centerCol {
-  margin-left: 0;
-  padding-left: 0;
-  overflow: hidden;
+/* 设置弹窗打开：关闭叠层/毛玻璃，恢复官方布局 */
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame {
+  grid-template-columns: revert !important;
 }
-.dsh-kit-glass-sidebar.dsh-kit-settings-open .wSkVaW_root {
-  background: var(--dsw-alias-bg-base);
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_centerCol {
+  grid-column: revert;
 }
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_sidebarCol {
+  position: static;
+  width: auto;
+  z-index: auto;
   background: var(--dsw-specific-sidebar-fill);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -74,14 +77,14 @@ export function installSidebarGlass(): void {
     ;(document.head ?? root).append(style)
   }
 
-  // 侧边栏宽度同步到 root，供 centerCol 负 margin / fixed 弹窗读取。
+  // 侧边栏宽度同步到 root，供浮层宽度 / 设置弹窗读取。
   const col = document.querySelector('.pI_x6G_sidebarCol')
   if (col !== null && typeof ResizeObserver !== 'undefined') {
     const sync = () => {
       const frame = col.parentElement
       if (frame === null) return
       const w = Math.round(col.getBoundingClientRect().width)
-      const px = \`\${Math.max(0, w)}px\`
+      const px = `${Math.max(0, w)}px`
       frame.style.setProperty(WIDTH_VAR, px)
       root.style.setProperty(WIDTH_VAR, px)
     }
@@ -90,6 +93,6 @@ export function installSidebarGlass(): void {
     sync()
   }
 
-  // 设置弹窗打开时关玻璃/还原，避免 fixed 弹窗被 backdrop-filter 困住。
+  // 设置弹窗打开时关闭叠层/毛玻璃。
   attachSettingsLayerFix()
 }
