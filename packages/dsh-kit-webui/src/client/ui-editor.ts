@@ -2,6 +2,10 @@
 import { createElement, useState } from 'react'
 import type { TokenModes, WebUITheme } from './themes.ts'
 import { TOKEN_FIELDS, setTokenMode } from './themes.ts'
+import {
+  EXTRA_TOKEN_PREFIX, splitExtraTokens, mergeExtraTokens,
+  type ExtraToken,
+} from './custom-tokens.ts'
 import { tk, cardS, ghostBtn, primaryBtn, inputS } from './ui-style.ts'
 
 const colorInputS = { width: 34, height: 26, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }
@@ -53,6 +57,7 @@ export function ThemeEditor(props: {
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(initial?.colorScheme ?? 'dark')
+  // 基础编辑：只对固定 TOKEN_FIELDS 用 color 控件（见 defaultsFor + 下方 map）。
   const [tokens, setTokens] = useState<Record<string, string>>(() => {
     const scheme = initial?.colorScheme ?? 'dark'
     const t = defaultsFor(scheme)
@@ -62,6 +67,10 @@ export function ThemeEditor(props: {
     }
     return t
   })
+  // 额外 token（固定字段之外）：文本 key/value 行编辑，增删自由。
+  const [extraTokens, setExtraTokens] = useState<ExtraToken[]>(() =>
+    splitExtraTokens(initial?.tokens ?? {}),
+  )
 
   const submit = () => {
     if (!id.trim() || !name.trim()) return
@@ -71,7 +80,7 @@ export function ThemeEditor(props: {
       description: description.trim() || `${colorScheme === 'dark' ? '深色' : '浅色'} · 自定义主题`,
       colorScheme,
       builtin: false,
-      tokens: { ...tokens },
+      tokens: mergeExtraTokens(tokens, extraTokens),
     })
   }
 
@@ -117,6 +126,45 @@ export function ThemeEditor(props: {
           }),
           createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, tokens[f.name] ?? ''),
           createElement('span', { style: { flex: 1, fontSize: 10, color: tk.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+        ),
+      ),
+    ),
+    /* ── 额外 token：固定字段之外的 --dsw-alias-* 可自由增删 ── */
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+      createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        createElement('div', { style: { flex: 1, fontSize: 13, fontWeight: 600 } }, '额外 token'),
+        createElement('button', {
+          style: ghostBtn,
+          onClick: () => setExtraTokens((prev) => [...prev, { key: EXTRA_TOKEN_PREFIX, value: '' }]),
+        }, '＋ 添加'),
+      ),
+      createElement('div', { style: { fontSize: 11, color: tk.tertiary } },
+        '固定字段之外的主题 token（key 以 -- 开头，常用 ' + EXTRA_TOKEN_PREFIX + ' 前缀）。留空 value 的行会被忽略。'),
+      extraTokens.map((row, i) =>
+        createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          createElement('input', {
+            value: row.key,
+            onChange: (e: { target: { value: string } }) => {
+              const key = e.target.value
+              setExtraTokens((prev) => prev.map((r, j) => (j === i ? { ...r, key } : r)))
+            },
+            placeholder: '--dsw-alias-xxx',
+            style: { ...inputS, maxWidth: 300, fontFamily: 'monospace' },
+          }),
+          createElement('input', {
+            value: row.value,
+            onChange: (e: { target: { value: string } }) => {
+              const value = e.target.value
+              setExtraTokens((prev) => prev.map((r, j) => (j === i ? { ...r, value } : r)))
+            },
+            placeholder: '#rrggbb 或任意 CSS 值',
+            style: { ...inputS, maxWidth: 260 },
+          }),
+          createElement('button', {
+            style: { ...ghostBtn, color: tk.danger, borderColor: tk.danger, fontSize: 11, padding: '2px 10px' },
+            onClick: () => setExtraTokens((prev) => prev.filter((_, j) => j !== i)),
+            disabled: row.key === '' && row.value === '',
+          }, '删除'),
         ),
       ),
     ),
