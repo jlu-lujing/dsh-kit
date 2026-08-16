@@ -430,8 +430,84 @@ function ArchivePanel() {
   )
 }
 
+/**
+ * 权限预设名双语化。
+ *
+ * 官方 dsh 把权限预设名（read only / workspace-write / Full access 等）由 host
+ * schema 硬编码、经 displayPermissionPreset() 直接显示，不随 UI 语言本地化——
+ * 英文界面是原名，中文界面也仍是英文。这里在中文界面下用 DOM 精确文本替换，
+ * 把下拉里**恰好**为一个权限名的文本节点换成中文。只替换精确相等的整段文本，
+ * 不触碰句子中嵌入的英文（如确认弹窗里的 "启用 Full access？"）。
+ */
+function installPermissionNamesLocalizer(): () => void {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {}
+  const lang = (document.documentElement.lang || navigator.language || 'en').toLowerCase()
+  if (!lang.startsWith('zh')) return () => {}
+
+  // key 为精确（或 trim 后精确）匹配的英文展示名。value 为中文。
+  const map: Record<string, string> = {
+    'Read Only': '只读',
+    'Read only': '只读',
+    'read only': '只读',
+    'Workspace Write': '工作区写入',
+    'Workspace write': '工作区写入',
+    'workspace-write': '工作区写入',
+    'Workspace Write (ask)': '工作区写入（询问）',
+    'Full access': '完全访问',
+    'Full Access': '完全访问',
+    'full access': '完全访问',
+    'Danger full access': '完全访问',
+  }
+
+  const replaceNode = (text: Text): void => {
+    const v = String(text.nodeValue ?? '')
+    if (v === '') return
+    if (Object.prototype.hasOwnProperty.call(map, v)) {
+      text.nodeValue = map[v]
+      return
+    }
+    const trimmed = v.trim()
+    if (trimmed !== '' && Object.prototype.hasOwnProperty.call(map, trimmed)) {
+      // 保留原首尾空白
+      text.nodeValue = v.replace(trimmed, map[trimmed])
+    }
+  }
+
+  const walk = (root: Node): void => {
+    if (root.nodeType === Node.TEXT_NODE) {
+      replaceNode(root as Text)
+      return
+    }
+    const iter = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node: Node | null
+    while ((node = iter.nextNode()) !== null) replaceNode(node as Text)
+  }
+
+  // 首次：现存的权限名（设置页等已挂载内容）
+  if (document.body) walk(document.body)
+  else document.addEventListener('DOMContentLoaded', () => document.body && walk(document.body), { once: true })
+
+  // 后续：React 动态挂载的权限下拉/弹窗项
+  const mo = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type !== 'childList') continue
+      // 新增节点里的文本
+      for (const added of record.addedNodes) walk(added)
+      // 某些实现会整体替换目标文本（target 为容器）——也扫 target
+      if (record.target.nodeType === Node.TEXT_NODE) replaceNode(record.target as Text)
+      else walk(record.target)
+    }
+  })
+  if (document.body) mo.observe(document.body, { childList: true, subtree: true })
+  return () => mo.disconnect()
+}
+
 /** Registration through the slot system; the shell provides the `settings.section` hole. */
 export function apply(ctx: { get(name: string): unknown }): void {
+  // 权限预设名双语化（中文界面下官方仍显示英文）——插件生命周期内注册，无需 slot。
+  const stopLocalizer = installPermissionNamesLocalizer()
+  ;(ctx as { effect?: (fn: () => unknown, label: string) => void }).effect?.(() => stopLocalizer, 'dsh-kit: permission names localizer')
+
   const slots = ctx.get('slots') as { inject(name: string, fn: () => unknown): unknown; register(...a: unknown[]): unknown } | undefined
   if (slots === undefined) return
   slots.inject('settings.section', () =>
