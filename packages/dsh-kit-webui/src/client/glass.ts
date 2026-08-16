@@ -1,80 +1,29 @@
-/** 侧边栏毛玻璃材质。
+/** 侧边栏半透明背景（无 blur、无 z-index）。
  *
- * 不能在会包含设置弹窗的祖先上放 backdrop-filter（fixed 弹窗会被裁进
- * 侧边栏），因此模糊做在「帧的独立玻璃层」：
+ * 之前尝试 backdrop-filter 毛玻璃：必须给侧边栏列加 position/z-index（创建
+ * 堆叠上下文），结果把官方 `position:fixed` 的设置弹窗困住、被输入框盖住。
+ * 且 DSH 三栏布局里中心内容不会出现在侧边栏底下，blur 本就无物可模糊。
  *
- *   .pI_x6G_frame::before   ← 玻璃层（z-index:0，blur），覆盖左栏区域
- *   .pI_x6G_sidebarCol      ← position:relative; z-index:1（压在玻璃层上）
- *   .hHd-Xa_root            ← 半透明背景（color-mix），内容可透出玻璃层
- *
- * 设置弹窗打开时（settings-layer.ts 切 dsh-kit-settings-open），把侧边栏列
- * 抬到 z-index:2000，盖过中心列输入框（z:10），弹窗浮到最上层；关闭后回落。
- * 玻璃层宽度用 ResizeObserver 跟随侧边栏列宽（支持拖拽/折叠）。
+ * 所以只做「半透明背景」：用 color-mix 把 --dsw-specific-sidebar-fill 压到
+ * 62% 不透明度，不加任何 position/z-index/backdrop-filter → 完全不影响官方
+ * fixed 弹窗的定位与层级。弹窗打开时也无需任何特殊处理。
  */
-
-import { attachSettingsLayerFix } from './settings-layer.ts'
 
 const ROOT_CLASS = 'dsh-kit-glass-sidebar'
 const STYLE_ID = 'dsh-kit-webui-sidebar-glass'
-const WIDTH_VAR = '--dsh-kit-sidebar-width'
 
 const GLASS_CSS = `
-.dsh-kit-glass-sidebar .pI_x6G_frame {
-  --${WIDTH_VAR}: 280px;
-}
-.dsh-kit-glass-sidebar .pI_x6G_frame::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: var(${WIDTH_VAR}, 280px);
-  z-index: 0;
-  pointer-events: none;
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
-}
-.dsh-kit-glass-sidebar .pI_x6G_sidebarCol {
-  position: relative;
-  z-index: 1;
-  background: transparent;
-}
-.dsh-kit-glass-sidebar [data-slot="sidebar"] {
-  background: transparent;
-}
 .dsh-kit-glass-sidebar .hHd-Xa_root {
   background: var(--dsw-specific-sidebar-fill);
 }
 @supports (background: color-mix(in srgb, red 50%, transparent)) {
   .dsh-kit-glass-sidebar .hHd-Xa_root {
-    background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 38%, transparent);
-  }
-}
-/* 设置弹窗打开时：还原官方布局（去掉毛玻璃的 z-index/backdrop/背景），
-   让 fixed 弹窗以 viewport 为包含块、浮到最上层。 */
-.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame::before {
-  display: none;
-}
-.dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_sidebarCol {
-  position: static;
-  z-index: auto;
-  background: var(--dsw-specific-sidebar-fill);
-}
-.dsh-kit-glass-sidebar.dsh-kit-settings-open [data-slot="sidebar"] {
-  background: var(--dsw-specific-sidebar-fill);
-}
-.dsh-kit-glass-sidebar.dsh-kit-settings-open .hHd-Xa_root {
-  background: var(--dsw-specific-sidebar-fill);
-}
-@media (prefers-reduced-motion: reduce) {
-  .dsh-kit-glass-sidebar .pI_x6G_frame::before {
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 62%, transparent);
   }
 }
 `
 
-/** 安装全局毛玻璃样式（根节点打标 + 注入 style + 跟随侧边栏宽度）。幂等。 */
+/** 安装侧边栏半透明背景。幂等。 */
 export function installSidebarGlass(): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement
@@ -86,22 +35,4 @@ export function installSidebarGlass(): void {
     style.textContent = GLASS_CSS
     ;(document.head ?? root).append(style)
   }
-
-  const col = document.querySelector('.pI_x6G_sidebarCol')
-  if (col === null || typeof ResizeObserver === 'undefined') return
-  const sync = () => {
-    const frame = col.parentElement
-    if (frame === null) return
-    const w = Math.round(col.getBoundingClientRect().width)
-    const px = `${Math.max(0, w)}px`
-    frame.style.setProperty(WIDTH_VAR, px)
-    root.style.setProperty(WIDTH_VAR, px)
-  }
-  const ro = new ResizeObserver(sync)
-  ro.observe(col)
-  sync()
-
-  // 设置弹窗最上层修复：弹窗打开时抬升侧边栏列层级。
-  attachSettingsLayerFix()
 }
-
