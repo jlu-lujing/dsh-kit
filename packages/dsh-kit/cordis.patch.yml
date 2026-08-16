@@ -41,6 +41,11 @@
 - id: directory-picker
   disabled: true
 
+# The official "download session log" header button is a rarely used duplicate;
+# disable it globally (it comes from @deepseek-ai/dsh-session-log-export).
+- id: session-log-download
+  disabled: true
+
 - insert:
     - id: dsh-kit
       name: dsh-kit
