@@ -212,7 +212,6 @@ function deriveThemeTokens(
   const error = base['--dsw-alias-state-error-primary']
   const success = base['--dsw-alias-state-success-primary']
   const warn = base['--dsw-alias-state-warn-primary']
-  const sidebar = base['--dsw-specific-sidebar-fill']
 
   const dark = scheme === 'dark'
   const bgLayer3 = dark ? mixHex(bgLayer2, labelPrimary, 0.08) : mixHex(bgLayer2, bgLayer1, 0.55)
@@ -223,12 +222,9 @@ function deriveThemeTokens(
   const shikiKeyword = mixHex(brand, error, 0.55)
   const shikiFunction = mixHex(brand, success, 0.55)
   const shikiConstant = mixHex(brand, success, 0.35)
-  // 左侧栏毛玻璃：半透明底色，由 glass.ts 给布局列加 backdrop-filter。
-  const sidebarGlass = alphaHex(sidebar, dark ? 0.55 : 0.60)
 
   return {
     ...base,
-    '--dsw-specific-sidebar-fill': sidebarGlass,
     '--dsw-alias-bg-layer-3': bgLayer3,
     '--dsw-alias-bg-overlay': bgOverlay,
     '--dsw-alias-border-l1': alphaHex(labelPrimary, dark ? 0.08 : 0.06),

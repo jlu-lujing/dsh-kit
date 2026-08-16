@@ -101,13 +101,13 @@ test('预设已覆盖按钮 / 输入框 / Markdown / 代码：派生值与种子
   }
 })
 
-test('侧边栏毛玻璃：预设与默认配色使用半透明 sidebar fill', () => {
+test('侧边栏毛玻璃：透明度由 CSS 统一控制，种子 token 保持 hex', () => {
   for (const t of BUILTIN_THEMES) {
     const v = t.tokens['--dsw-specific-sidebar-fill']
-    assert.match(v, /^rgba\(\d+, \d+, \d+, 0\.(55|6)\)$/, `${t.id} sidebar fill 应为半透明 rgba: ${v}`)
+    assert.match(v, /^#[0-9a-f]{6}$/i, `${t.id} sidebar fill 应保持 hex（玻璃透明度由 glass.ts 的 color-mix 控制）: ${v}`)
   }
-  assert.match(DEFAULT_DARK_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^rgba\(/)
-  assert.match(DEFAULT_LIGHT_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^rgba\(/)
+  assert.match(DEFAULT_DARK_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^#[0-9a-f]{6}$/i)
+  assert.match(DEFAULT_LIGHT_THEME_TOKENS['--dsw-specific-sidebar-fill'], /^#[0-9a-f]{6}$/i)
 })
 
 test('编辑器默认配色覆盖全量字段（深色 / 浅色）', () => {
