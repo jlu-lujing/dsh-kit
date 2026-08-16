@@ -41,6 +41,11 @@ const LAYOUT_CSS = `
   display: none !important;
 }
 
+/* 取消顶部「对话/轨迹」标签切换器：整个中间区域都是对话 */
+.wSkVaW_tabs {
+  display: none !important;
+}
+
 /* 内容区定位上下文（右栏 absolute 用） */
 .wSkVaW_root {
   position: relative;
@@ -286,22 +291,7 @@ export function installLayoutTweaks(): void {
   }
   mountToggle()
 
-  // 去掉顶部「轨迹」标签：隐藏 role=tab 中文本含「轨迹」的按钮，并防止其被激活。
-  const hideTrajectoryTab = () => {
-    const tabs = document.querySelectorAll<HTMLElement>('[role="tab"]')
-    for (const tab of tabs) {
-      const text = (tab.textContent ?? '').trim()
-      if (text.includes('轨迹')) {
-        tab.style.display = 'none'
-      }
-    }
-  }
-  hideTrajectoryTab()
-
   if (typeof MutationObserver === 'undefined') return
-  const mo = new MutationObserver(() => {
-    mountToggle()
-    hideTrajectoryTab()
-  })
+  const mo = new MutationObserver(mountToggle)
   mo.observe(document.body, { childList: true, subtree: true })
 }
