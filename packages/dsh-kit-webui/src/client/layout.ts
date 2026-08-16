@@ -162,22 +162,6 @@ const LAYOUT_CSS = `
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
-.dsh-kit-right-panel-close {
-  width: 28px;
-  height: 28px;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.dsh-kit-right-panel-close:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
 .dsh-kit-right-panel-body {
   flex: 1;
   min-height: 0;
@@ -283,14 +267,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     header.className = 'dsh-kit-right-panel-header'
     const title = document.createElement('span')
     title.textContent = '右侧栏'
-    const close = document.createElement('button')
-    close.type = 'button'
-    close.className = 'dsh-kit-right-panel-close'
-    close.textContent = '✕'
-    close.setAttribute('aria-label', '关闭右侧栏')
-    close.addEventListener('click', () => setOpen(false))
     header.appendChild(title)
-    header.appendChild(close)
     const body = document.createElement('div')
     body.className = 'dsh-kit-right-panel-body'
     body.textContent = '右侧栏内容占位。'
