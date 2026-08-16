@@ -724,18 +724,28 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     setOpen(!open)
   }
 
-  // 按存储恢复展开/收起状态（每个面板实例只恢复一次）：
-  //  - 面板被 React 重建（切换对话/刷新）后是新节点，标记丢失 → 重新应用存储状态；
-  //  - 同一面板实例内只恢复一次，避免 observer 高频触发反复调用。
-  const restoreOpenOnce = () => {
-    const panel = document.querySelector('.dsh-kit-right-panel') as (HTMLElement & { ___dshkitOpenRestored?: boolean }) | null
+  // 静默同步展开/收起到存储值（无动画、不写回存储、不触发 setOpen）。
+  // 用于对抗 React 重渲染把 .dsh-kit-right-open class 覆盖掉的情况
+  // （切换对话等）：用户最后意图以存储为准，class 丢了就补回来。
+  // 防抖：observer 高频触发时合并到下一帧，避免反复改 class。
+  let syncScheduled = false
+  const ensureOpenState = () => {
+    if (syncScheduled) return
     const contentRoot = document.querySelector('.wSkVaW_root')
-    if (panel === null || contentRoot === null) return
-    if (panel.___dshkitOpenRestored === true) return
-    panel.___dshkitOpenRestored = true
-    const wantOpen = readOpen()
-    const isOpen = contentRoot.classList.contains('dsh-kit-right-open')
-    if (wantOpen !== isOpen) setOpen(wantOpen)
+    if (contentRoot === null) return
+    syncScheduled = true
+    requestAnimationFrame(() => {
+      syncScheduled = false
+      const wantOpen = readOpen()
+      const isOpen = contentRoot.classList.contains('dsh-kit-right-open')
+      if (wantOpen !== isOpen) {
+        contentRoot.classList.toggle('dsh-kit-right-open', wantOpen)
+        const btn = toggleBtn()
+        if (btn) btn.setAttribute('aria-pressed', wantOpen ? 'true' : 'false')
+        // 面板可能还没建：强制确保（展开时）
+        if (wantOpen) ensurePanel()
+      }
+    })
   }
 
   // 标题栏右侧折叠按钮。
@@ -797,7 +807,14 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const mo = new MutationObserver(() => {
     mountToggle()
     mountLeftToggle()
-    restoreOpenOnce()
+    ensureOpenState()
   })
-  mo.observe(document.body, { childList: true, subtree: true })
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+
+  // 兜底：切换左侧会话后，无论 React 如何重渲染/重挂载 root，
+  // 定期复核展开状态与存储一致（用户最后意图优先）。
+  window.setInterval(() => {
+    mountLeftToggle()
+    ensureOpenState()
+  }, 600)
 }
