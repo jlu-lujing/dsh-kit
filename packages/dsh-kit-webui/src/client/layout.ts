@@ -1,11 +1,12 @@
 /** 布局微调（纯 CSS 注入，不动官方源码）。
  *
- * - 去掉左栏与内容区之间分割线的颜色（保留 1px 宽度，避免布局跳动）。
- * - 右侧内容区顶部加一条标题栏：与左栏同色、与右上角控制按钮同高（30px）。
+ * - 去掉左栏与内容区之间分割线的颜色。
+ * - 右侧顶部标题栏：官方 conversation header 背景改成左栏同色，形成一条
+ *   与右上角控制按钮同高度的顶部标题栏；对话名（crumbs）、mode、worktree
+ *   徽标都显示在这条标题栏上。
  */
 
 const STYLE_ID = 'dsh-kit-webui-layout-tweaks'
-const WIDTH_VAR = '--dsh-kit-sidebar-width'
 
 const LAYOUT_CSS = `
 /* 左栏与内容区分割线：透明（无视觉分割线，宽度保留） */
@@ -13,20 +14,15 @@ const LAYOUT_CSS = `
   border-right-color: transparent !important;
 }
 
-/* 右侧顶部标题栏：与左栏同色、与右上角控制按钮同高(30px) */
-.dsh-kit-right-titlebar {
-  position: fixed;
-  top: 0;
-  left: var(${WIDTH_VAR}, 280px);
-  right: 0;
-  height: 30px;
-  background: var(--dsw-specific-sidebar-fill);
-  z-index: 1000;
-  pointer-events: none;
+/* 右侧顶部标题栏：复用官方 conversation header，背景改为左栏同色 */
+.wSkVaW_header {
+  background: var(--dsw-specific-sidebar-fill) !important;
+  border-bottom-color: transparent !important;
+  padding: 8px 20px 0 !important;
 }
-/* 右侧内容整体下让 30px，避免被标题栏盖住 */
-.pI_x6G_centerCol {
-  padding-top: 30px;
+/* header 底部伪元素分割线去掉，保持纯色标题栏 */
+.wSkVaW_header::after {
+  display: none !important;
 }
 `
 /** 安装布局微调样式。幂等。 */
@@ -34,25 +30,9 @@ export function installLayoutTweaks(): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   if (root === null) return
-  if (document.getElementById(STYLE_ID) === null) {
-    const titlebar = document.createElement('div')
-    titlebar.className = 'dsh-kit-right-titlebar'
-    document.body.append(titlebar)
-
-    const style = document.createElement('style')
-    style.id = STYLE_ID
-    style.textContent = LAYOUT_CSS
-    ;(document.head ?? root).append(style)
-  }
-
-  // 同步侧边栏宽度到 root，供标题栏 left 定位使用。
-  const col = document.querySelector('.pI_x6G_sidebarCol')
-  if (col === null || typeof ResizeObserver === 'undefined') return
-  const sync = () => {
-    const w = Math.round(col.getBoundingClientRect().width)
-    root.style.setProperty(WIDTH_VAR, `${Math.max(0, w)}px`)
-  }
-  const ro = new ResizeObserver(sync)
-  ro.observe(col)
-  sync()
+  if (document.getElementById(STYLE_ID) !== null) return
+  const style = document.createElement('style')
+  style.id = STYLE_ID
+  style.textContent = LAYOUT_CSS
+  ;(document.head ?? root).append(style)
 }
