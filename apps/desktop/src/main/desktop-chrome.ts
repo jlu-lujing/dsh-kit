@@ -97,7 +97,7 @@ export const DESKTOP_CHROME_CSS = [
   '  border: none;',
   '  background: transparent;',
   '  color: var(--dsw-alias-label-primary, #e8ecf4);',
-  '  border-radius: 6px;',
+  '  border-radius: 0;',
   '  font-size: 14px;',
   '  line-height: 1;',
   '  display: inline-flex;',
@@ -106,6 +106,8 @@ export const DESKTOP_CHROME_CSS = [
   '  cursor: default;',
   '  transition: background-color .12s ease;',
   '}',
+  '/* 与窗口轮廓一致：关闭按钮右上角跟随卡片 12px 圆角，其余直角 */',
+  '.dshkit-winctl button.dshkit-close { border-radius: 0 12px 0 0; }',
   '.dshkit-winctl button:hover { background: rgba(127,127,127,.18); }',
   '.dshkit-winctl button.dshkit-close:hover { background: rgba(232,17,35,.85); color: #fff; }',
   '',
@@ -124,6 +126,7 @@ export const DESKTOP_CHROME_CSS = [
   '/* 最大化时：dragbar 顶部归零；让位值（right:165 / left:90）保持生效避免重叠 */',
   'body.dshkit-maximized .dshkit-dragbar { top: 0; }',
   'body.dshkit-maximized .dshkit-winctl { top: 0; right: 0; }',
+  'body.dshkit-maximized .dshkit-winctl button.dshkit-close { border-radius: 0; }',
   'body.dshkit-maximized .dshkit-trafficlights { top: 12px; left: 14px; }',
 ].join('\n')
 

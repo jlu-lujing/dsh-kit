@@ -35,6 +35,7 @@
       body.dshkit-maximized { margin: 0; min-height: 100vh; border-radius: 0; box-shadow: none; }
       body.dshkit-maximized .dshkit-dragbar { top: 0; left: 0; right: 0; }
       body.dshkit-maximized .dshkit-winctl { top: 0; right: 0; }
+      body.dshkit-maximized .dshkit-winctl button.dshkit-close { border-radius: 0; }
       body.dshkit-maximized .dshkit-trafficlights { top: 12px; left: 14px; }
       /* 顶部拖拽区 + 右上角窗口控制按钮（frameless） */
       .dshkit-dragbar {
@@ -67,7 +68,7 @@
         border: none;
         background: transparent;
         color: var(--muted);
-        border-radius: 6px;
+        border-radius: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -76,6 +77,7 @@
       }
       .dshkit-winctl button svg { display: block; }
       .dshkit-winctl button:hover { background: rgba(255,255,255,.12); color: var(--fg); }
+      .dshkit-winctl button.dshkit-close { border-radius: 0 12px 0 0; }
       .dshkit-winctl button.dshkit-close:hover { background: rgba(232,17,35,.85); color: #fff; }
       /* macOS：左上角信号灯 */
       .dshkit-trafficlights {
