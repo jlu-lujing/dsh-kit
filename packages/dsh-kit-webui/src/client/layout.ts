@@ -26,16 +26,25 @@ const LAYOUT_CSS = `
   z-index: 100;
 }
 
-/* 右侧顶部标题栏：背景左栏同色、横贯全窗；高度与左栏 logo 行一致（60px） */
+/* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
 .wSkVaW_header {
-  background: var(--dsw-specific-sidebar-fill) !important;
-  border-bottom-color: transparent !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483000 !important;
   height: 60px !important;
   padding: 0 20px !important;
   box-sizing: border-box;
+  background: var(--dsw-specific-sidebar-fill) !important;
+  border-bottom-color: transparent !important;
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+/* 下方 frame 整体下移，避开 fixed 标题栏 */
+.pI_x6G_frame {
+  padding-top: 60px;
 }
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
@@ -78,7 +87,7 @@ const LAYOUT_CSS = `
    这样收起的滑出动画不会被 visibility:hidden 立即吞掉。 */
 .dsh-kit-right-panel {
   position: absolute;
-  top: var(--dsh-kit-titlebar-height, 0px);
+  top: 0;
   right: 0;
   bottom: 0;
   width: var(--dsh-kit-right-width, 320px);
@@ -299,7 +308,38 @@ export function installLayoutTweaks(): void {
   }
   mountToggle()
 
+  // 把左栏 logo 行里的 brand（logo）与折叠按钮（toggle）迁到标题栏左侧，
+  // 左栏从「新会话」开始。React 重渲染可能放回，因此用持续 MutationObserver 重做。
+  const migrateSidebarTop = () => {
+    const logoRow = document.querySelector('.hHd-Xa_logoRow')
+    const header = document.querySelector('.wSkVaW_header')
+    const titleRow = header ? header.querySelector('.wSkVaW_titleRow') : null
+    if (!logoRow || !titleRow) return
+    const brand = logoRow.querySelector('.hHd-Xa_brand')
+    const toggle = logoRow.querySelector('.hHd-Xa_toggle')
+    // 把 brand 放到 titleRow 最左（在对话名之前）
+    if (brand && brand.parentNode === logoRow) {
+      titleRow.insertBefore(brand, titleRow.firstChild)
+      brand.style.flex = 'none'
+      brand.style.marginRight = '12px'
+    }
+    // toggle（左折叠）放到标题栏，位于 brand 之后（或最左靠 logo）
+    if (toggle && toggle.parentNode === logoRow && brand) {
+      titleRow.insertBefore(toggle, brand.nextSibling)
+      toggle.style.flex = 'none'
+    } else if (toggle && toggle.parentNode === logoRow) {
+      titleRow.insertBefore(toggle, titleRow.firstChild)
+      toggle.style.flex = 'none'
+    }
+    // 隐藏左栏 logoRow（左栏从新会话开始）
+    logoRow.style.display = 'none'
+  }
+  migrateSidebarTop()
+
   if (typeof MutationObserver === 'undefined') return
-  const mo = new MutationObserver(mountToggle)
+  const mo = new MutationObserver(() => {
+    mountToggle()
+    migrateSidebarTop()
+  })
   mo.observe(document.body, { childList: true, subtree: true })
 }
