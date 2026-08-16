@@ -2,6 +2,7 @@
 import { createElement } from 'react'
 import type { WebUITheme } from './themes.ts'
 import { TOKEN_FIELDS } from './themes.ts'
+import { colorSwatches } from './custom-tokens.ts'
 import { tk, cardS, ghostBtn, primaryBtn } from './ui-style.ts'
 
 export function ThemeCard(props: {
@@ -12,8 +13,10 @@ export function ThemeCard(props: {
   onDelete: (id: string) => void
 }) {
   const { theme, active, onApply, onEdit, onDelete } = props
-  const swatches = TOKEN_FIELDS.map((f) => ({ name: f.name, value: theme.tokens[f.name] }))
+  const defaultSwatches = TOKEN_FIELDS.map((f) => ({ name: f.name, value: theme.tokens[f.name] }))
     .filter((s): s is { name: string; value: string } => typeof s.value === 'string')
+  // 额外 token 里能当颜色的部分，追加到默认色板之后，直观展示深度定制效果。
+  const extraSwatches = colorSwatches(theme.tokens)
 
   return createElement('div', {
     style: {
@@ -43,9 +46,22 @@ export function ThemeCard(props: {
           ),
     ),
     createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(18px, 1fr))', gap: 4 } },
-      swatches.map((s) =>
+      defaultSwatches.map((s) =>
         createElement('div', {
           key: s.name, title: `${s.name}: ${s.value}`,
+          style: { height: 22, borderRadius: 4, background: s.value, border: '1px solid ' + tk.border },
+        }),
+      ),
+      ...(extraSwatches.length > 0
+        ? [createElement('div', {
+            key: 'extra-divider',
+            title: '额外 token',
+            style: { height: 22, width: 2, borderRadius: 1, background: tk.border, margin: '0 3px' },
+          })]
+        : []),
+      extraSwatches.map((s) =>
+        createElement('div', {
+          key: s.key, title: `${s.key}: ${s.value}（额外）`,
           style: { height: 22, borderRadius: 4, background: s.value, border: '1px solid ' + tk.border },
         }),
       ),

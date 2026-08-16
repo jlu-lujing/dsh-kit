@@ -4,7 +4,8 @@ import type { TokenModes, WebUITheme } from './themes.ts'
 import { TOKEN_FIELDS, setTokenMode } from './themes.ts'
 import {
   EXTRA_TOKEN_PREFIX, splitExtraTokens, mergeExtraTokens,
-  type ExtraToken,
+  splitExtraTokenModes, mergeExtraTokenModes,
+  type ExtraToken, type ExtraTokenModes,
 } from './custom-tokens.ts'
 import { tk, cardS, ghostBtn, primaryBtn, inputS } from './ui-style.ts'
 
@@ -190,6 +191,29 @@ export function GlobalAdjuster(props: {
     onChange(setTokenMode(tokens, name, mode, value))
   }
 
+  // 额外 token（固定字段之外）：双值 light/dark 行编辑，源数据来自 props（受控）。
+  const extraModes = splitExtraTokenModes(tokens)
+  const setExtraKey = (i: number, key: string): void => {
+    const next = extraModes.map((r, j) => (j === i ? { ...r, key } : r))
+    onChange(mergeExtraTokenModes(tokens, next))
+  }
+  const setExtraMode = (i: number, mode: 'light' | 'dark', value: string): void => {
+    const next = extraModes.map((r, j) =>
+      j === i ? { ...r, value: { ...r.value, [mode]: value } } : r,
+    )
+    onChange(mergeExtraTokenModes(tokens, next))
+  }
+  const removeExtra = (i: number): void => {
+    const next = extraModes.filter((_, j) => j !== i)
+    onChange(mergeExtraTokenModes(tokens, next))
+  }
+  const addExtra = (): void => {
+    onChange(mergeExtraTokenModes(tokens, [
+      ...extraModes,
+      { key: EXTRA_TOKEN_PREFIX, value: { light: '', dark: '' } },
+    ]))
+  }
+
   return createElement('div', { style: { ...cardS, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 } },
     createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
       createElement('div', { style: { flex: 1 } },
@@ -217,6 +241,47 @@ export function GlobalAdjuster(props: {
           }),
           createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 20 } }, '深'),
           createElement('code', { style: { fontSize: 11, color: tk.tertiary } }, f.name),
+        ),
+      ),
+    ),
+    /* ── 全局层额外 token：固定字段之外的 --dsw-alias-*（浅色/深色双值） ── */
+    createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+      createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        createElement('div', { style: { flex: 1, fontSize: 13, fontWeight: 600 } }, '额外 token'),
+        createElement('button', {
+          style: ghostBtn,
+          onClick: addExtra,
+        }, '＋ 添加'),
+      ),
+      createElement('div', { style: { fontSize: 11, color: tk.tertiary } },
+        '固定字段之外的主题 token（key 以 -- 开头）。浅色/深色都留空的行会被忽略。'),
+      extraModes.map((row, i) =>
+        createElement('div', { key: `${i}-${row.key}`, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          createElement('input', {
+            value: row.key,
+            onChange: (e: { target: { value: string } }) => setExtraKey(i, e.target.value),
+            placeholder: '--dsw-alias-xxx',
+            style: { ...inputS, maxWidth: 300, fontFamily: 'monospace' },
+          }),
+          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 16 } }, '浅'),
+          createElement('input', {
+            value: row.value.light,
+            onChange: (e: { target: { value: string } }) => setExtraMode(i, 'light', e.target.value),
+            placeholder: '#rrggbb',
+            style: { ...inputS, maxWidth: 110, fontFamily: 'monospace' },
+          }),
+          createElement('span', { style: { fontSize: 11, color: tk.tertiary, width: 16 } }, '深'),
+          createElement('input', {
+            value: row.value.dark,
+            onChange: (e: { target: { value: string } }) => setExtraMode(i, 'dark', e.target.value),
+            placeholder: '#rrggbb',
+            style: { ...inputS, maxWidth: 110, fontFamily: 'monospace' },
+          }),
+          createElement('button', {
+            style: { ...ghostBtn, color: tk.danger, borderColor: tk.danger, fontSize: 11, padding: '2px 10px' },
+            onClick: () => removeExtra(i),
+            disabled: row.value.light === '' && row.value.dark === '',
+          }, '删除'),
         ),
       ),
     ),
