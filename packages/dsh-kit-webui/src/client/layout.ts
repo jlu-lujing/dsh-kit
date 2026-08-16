@@ -351,10 +351,17 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     const titleRow = header ? header.querySelector('.wSkVaW_titleRow') : null
     if (!titleRow) return
 
+    // logo：clone 官方 brand 的 SVG（唯一一次，折叠态不重取），保持真实官方 logo
     const logo = document.createElement('button')
     logo.type = 'button'
     logo.className = 'dsh-kit-titlebar-logo'
-    logo.textContent = 'dsh-kit'
+    const brand = document.querySelector<HTMLElement>('.hHd-Xa_brand')
+    const brandSvg = brand ? brand.querySelector('svg') : null
+    if (brandSvg) {
+      logo.appendChild(brandSvg.cloneNode(true) as Element)
+    } else {
+      logo.textContent = 'dsh-kit'
+    }
     logo.title = '新建会话'
     logo.addEventListener('click', () => layout.toggleSidebar())
 
