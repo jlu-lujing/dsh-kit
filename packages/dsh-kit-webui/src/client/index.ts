@@ -12,6 +12,9 @@ import type { ThemeService } from './themes.ts'
 import { ThemeStoreController } from './controller.ts'
 import { ThemeStorePanel } from './panel.ts'
 import { installSidebarGlass } from './glass.ts'
+import {
+  bindSettingsPageController, SettingsPageOverlay, SettingsPageTrigger,
+} from './settings-page.ts'
 
 export const name = 'dsh-kit-webui'
 
@@ -31,10 +34,29 @@ export function apply(ctx: { get(name: string): unknown }): void {
   const controller = new ThemeStoreController(theme)
   void controller.init()
 
-  // 左侧栏毛玻璃：半透明 sidebar token + 官方布局列 backdrop-filter。
+  // 左侧栏毛玻璃。
   installSidebarGlass()
 
-  // 设置页「主题商店」页面（id 专属 → 官方设置页旁边多一项）
+  // 自建全屏设置页绑定控制器。
+  bindSettingsPageController(controller)
+
+  // 侧边栏底部「设置页」入口。
+  slots.inject('sidebar.footer.action', () =>
+    slots.register(
+      { name: 'sidebar.footer.action', id: 'dsh-kit-webui-settings-page', order: 100, label: () => '设置页' },
+      () => createElement(SettingsPageTrigger),
+    ),
+  )
+
+  // 全屏设置页覆盖层（shell.overlay：frame 内全帧覆盖，天然最上层）。
+  slots.inject('shell.overlay', () =>
+    slots.register(
+      { name: 'shell.overlay', id: 'dsh-kit-webui-settings-page', order: 100 },
+      () => createElement(SettingsPageOverlay),
+    ),
+  )
+
+  // 官方设置页「主题商店」面板仍保留（双入口），slot id 专属不冲突。
   slots.inject('settings.section', () =>
     slots.register(
       { name: 'settings.section', id: 'dsh-kit-webui-themes', priority: 40, label: () => '主题商店' },
