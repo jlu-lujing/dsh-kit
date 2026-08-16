@@ -129,8 +129,8 @@ const LAYOUT_CSS = `
   right: 0;
   bottom: 0;
   width: var(--dsh-kit-right-width, 320px);
-  background: var(--dsw-alias-bg-layer-1);
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-sidebar-fill);
+  border-left: 1px solid transparent;
   display: flex;
   flex-direction: column;
   min-width: 0;
