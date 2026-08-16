@@ -169,6 +169,8 @@ const LAYOUT_CSS = `
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: right-panel;
   transform: translateX(102%);
   transition:
     transform var(--dsh-kit-right-slow) var(--dsh-kit-right-ease),
@@ -240,7 +242,7 @@ const LAYOUT_CSS = `
 .dsh-kit-right-tabpane.is-active {
   display: block;
 }
-/* 信息面板：实时会话统计（React useProjection 驱动的 Dashboard） */
+/* ══════ 信息面板：响应式会话统计（容器查询自适应右侧栏宽度） ══════ */
 .dsh-kit-info-stats {
   display: block;
   color: var(--dsw-alias-label-secondary);
@@ -313,14 +315,13 @@ const LAYOUT_CSS = `
 .dsh-kit-stats-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
-/* 环形仪表 */
 .dsh-kit-stats-donut-wrap {
   position: relative;
   width: 132px;
   height: 132px;
-  margin: 0 auto;
+  z-index: 0;
 }
 .dsh-kit-stats-donut {
   width: 100%;
@@ -354,22 +355,52 @@ const LAYOUT_CSS = `
 }
 .dsh-kit-stats-donut-value {
   color: var(--dsw-alias-label-primary);
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 .dsh-kit-stats-donut-label {
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }
-.dsh-kit-stats-donut-note {
-  text-align: center;
+.dsh-kit-stats-donut-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dsh-kit-stats-cache-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dsh-kit-stats-cache-row-label {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+.dsh-kit-stats-cache-pct {
+  color: var(--dsw-alias-state-success-primary);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.dsh-kit-stats-cache-sub {
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 16px;
 }
-/* 指标瓦片 */
+.dsh-kit-stats-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.dsh-kit-stats-hero .dsh-kit-stats-cache-row {
+  align-items: center;
+}
 .dsh-kit-stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -395,6 +426,9 @@ const LAYOUT_CSS = `
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
   line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dsh-kit-stats-tile-value {
   color: var(--dsw-alias-label-primary);
@@ -409,7 +443,6 @@ const LAYOUT_CSS = `
 .dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
 .dsh-kit-accent-good { color: var(--dsw-alias-state-success-primary); }
 .dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
-/* 分段条区 */
 .dsh-kit-stats-section {
   display: flex;
   flex-direction: column;
@@ -472,6 +505,32 @@ const LAYOUT_CSS = `
 .dsh-kit-stats-pairbar-token + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(1) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-business-primary); }
 .dsh-kit-stats-pairbar-token + .dsh-kit-stats-pairlegend .dsh-kit-stats-pairitem:nth-child(2) .dsh-kit-stats-pairitem-swatch { background: var(--dsw-alias-state-success-primary); }
 
+@container right-panel (max-width: 319px) {
+  .dsh-kit-stats-card { padding: 12px; }
+  .dsh-kit-stats-donut-wrap { width: 108px; height: 108px; }
+  .dsh-kit-stats-donut-value { font-size: 20px; }
+  .dsh-kit-stats-cache-pct { font-size: 18px; }
+  .dsh-kit-stats-tile-value { font-size: 15px; }
+  .dsh-kit-stats-tile { padding: 6px 8px; }
+  .dsh-kit-stats-body { gap: 12px; }
+}
+@container right-panel (min-width: 420px) {
+  .dsh-kit-stats-hero {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 18px;
+  }
+  .dsh-kit-stats-hero .dsh-kit-stats-cache-row {
+    align-items: flex-start;
+  }
+  .dsh-kit-stats-cache-row-label { font-size: 12px; }
+  .dsh-kit-stats-cache-pct { font-size: 24px; }
+}
+@container right-panel (min-width: 520px) {
+  .dsh-kit-stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .dsh-kit-stats-card { padding: 16px; }
+  .dsh-kit-stats-body { gap: 18px; }
+}
 /* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
 .dsh-kit-right-toggle {
   cursor: pointer;

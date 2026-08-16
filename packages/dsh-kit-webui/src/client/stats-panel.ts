@@ -225,9 +225,21 @@ function buildCard(model: StatsModel): HTMLElement {
     center.appendChild(el('span', 'dsh-kit-stats-donut-label', '缓存命中'))
     donutWrap.appendChild(center)
 
-    const note = el('div', 'dsh-kit-stats-donut-note', '提示词侧缓存占比')
-    body.appendChild(donutWrap)
-    body.appendChild(note)
+    // 环形 + 右侧详情（宽容器并排，窄容器上下居中）
+    const hero = el('div', 'dsh-kit-stats-hero')
+    hero.appendChild(donutWrap)
+
+    const detail = el('div', 'dsh-kit-stats-donut-detail')
+    const cacheRow = el('div', 'dsh-kit-stats-cache-row')
+    cacheRow.appendChild(el('div', 'dsh-kit-stats-cache-row-label', '缓存命中'))
+    const pct = el('div', 'dsh-kit-stats-cache-pct', `${model.cacheHit}%`)
+    pct.dataset.k = 'cache-pct'
+    cacheRow.appendChild(pct)
+    detail.appendChild(cacheRow)
+    detail.appendChild(el('div', 'dsh-kit-stats-cache-sub', '提示词侧缓存占比'))
+    hero.appendChild(detail)
+
+    body.appendChild(hero)
   }
 
   // 关键指标瓦片
@@ -296,8 +308,12 @@ function updateCard(card: HTMLElement, model: StatsModel, cacheHit: number | nul
     if (node) node.textContent = t.value
   }
   setDonutTarget(card, cacheHit)
-  const cacheNode = nodeOf(card, 'cache')
-  if (cacheNode && cacheHit !== null) cacheNode.textContent = `${cacheHit}%`
+  if (cacheHit !== null) {
+    const cacheNode = nodeOf(card, 'cache')
+    if (cacheNode) cacheNode.textContent = `${cacheHit}%`
+    const cachePct = nodeOf(card, 'cache-pct')
+    if (cachePct) cachePct.textContent = `${cacheHit}%`
+  }
 
   if (model.timePair) for (const p of model.timePair) {
     const seg = nodeOf(card, `time-${p.key}-seg`)
