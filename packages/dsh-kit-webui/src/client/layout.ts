@@ -376,7 +376,11 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       pane.appendChild(holder)
     }
     if (!holder.querySelector('.FJxK0a_root')) {
-      holder.appendChild(official.cloneNode(true) as HTMLElement)
+      const clone = official.cloneNode(true) as HTMLElement
+      // 原统计被我们 display:none 隐藏，克隆需清掉内联 display 才在右栏可见
+      clone.style.display = ''
+      clone.style.removeProperty('display')
+      holder.appendChild(clone)
     }
   }
 
