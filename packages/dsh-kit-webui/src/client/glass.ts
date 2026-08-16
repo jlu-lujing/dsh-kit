@@ -38,9 +38,12 @@ const GLASS_CSS = `
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   backdrop-filter: blur(18px) saturate(150%);
 }
-.dsh-kit-glass-sidebar [data-slot="sidebar"] {
+/* 侧边栏内容根节点去掉自己的不透明背景，透出下层的 blur+半透明 */
+.dsh-kit-glass-sidebar [data-slot="sidebar"],
+.dsh-kit-glass-sidebar .hHd-Xa_root {
   background: transparent;
 }
+
 /* 设置弹窗打开：关闭叠层/毛玻璃，恢复官方布局 */
 .dsh-kit-glass-sidebar.dsh-kit-settings-open .pI_x6G_frame {
   grid-template-columns: revert !important;
@@ -55,6 +58,9 @@ const GLASS_CSS = `
   background: var(--dsw-specific-sidebar-fill);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+.dsh-kit-glass-sidebar.dsh-kit-settings-open .hHd-Xa_root {
+  background: var(--dsw-specific-sidebar-fill);
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh-kit-glass-sidebar .pI_x6G_sidebarCol {
