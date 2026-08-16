@@ -236,7 +236,22 @@ export function installLayoutTweaks(): void {
   }
   mountToggle()
 
+  // 去掉顶部「轨迹」标签：隐藏 role=tab 中文本含「轨迹」的按钮，并防止其被激活。
+  const hideTrajectoryTab = () => {
+    const tabs = document.querySelectorAll<HTMLElement>('[role="tab"]')
+    for (const tab of tabs) {
+      const text = (tab.textContent ?? '').trim()
+      if (text.includes('轨迹')) {
+        tab.style.display = 'none'
+      }
+    }
+  }
+  hideTrajectoryTab()
+
   if (typeof MutationObserver === 'undefined') return
-  const mo = new MutationObserver(mountToggle)
+  const mo = new MutationObserver(() => {
+    mountToggle()
+    hideTrajectoryTab()
+  })
   mo.observe(document.body, { childList: true, subtree: true })
 }
