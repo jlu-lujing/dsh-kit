@@ -74,6 +74,7 @@ export function installLayoutTweaks(layout?: LayoutLike): void {
     if (document.querySelector('.dsh-kit-right-toggle') !== null) return
     const header = document.querySelector('.wSkVaW_header')
     if (header === null) return
+    const titleRow = header.querySelector('.wSkVaW_titleRow')
 
     const btn = document.createElement('button')
     btn.type = 'button'
@@ -87,8 +88,9 @@ export function installLayoutTweaks(layout?: LayoutLike): void {
       if (collapsed) layout.openDetails()
       else layout.closeDetails()
     })
-    // 插到 header 末尾（标题栏最右侧）。
-    header.appendChild(btn)
+    // 插到标题栏最上面一排（titleRow）末尾，与左侧折叠按钮同排对称。
+    const host = titleRow ?? header
+    host.appendChild(btn)
   }
   mountToggle()
 
