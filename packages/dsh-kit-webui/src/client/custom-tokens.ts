@@ -49,3 +49,15 @@ export function mergeExtraTokens(
   }
   return out
 }
+
+const HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+
+/** 该字符串是否像 CSS 颜色（十六进制，可作为彩色色板单元格）。 */
+export function looksLikeColor(value: string): boolean {
+  return HEX_RE.test(value.trim())
+}
+
+/** 提取可用于卡片色板预览的额外 token（仅十六进制色值，排除默认字段）。 */
+export function colorSwatches(tokens: Record<string, string>): ExtraToken[] {
+  return splitExtraTokens(tokens).filter((e) => looksLikeColor(e.value))
+}

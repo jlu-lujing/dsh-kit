@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   isDefaultField, splitExtraTokens, isValidExtraKey, mergeExtraTokens,
+  looksLikeColor, colorSwatches,
 } from '../src/client/custom-tokens.ts'
 import { TOKEN_FIELDS } from '../src/client/themes.ts'
 
@@ -59,4 +60,30 @@ test('mergeExtraTokens：覆盖同 key 额外 token（base 与 extras 都有非�
     '--dsw-alias-existing': '#222',
     '--dsw-alias-new': '#333',
   })
+})
+
+test('looksLikeColor：识别十六进制色值（3/4/6/8 位，大小写任意）', () => {
+  assert.equal(looksLikeColor('#fff'), true)
+  assert.equal(looksLikeColor('#1234'), true)
+  assert.equal(looksLikeColor('#a1b2c3'), true)
+  assert.equal(looksLikeColor('#a1b2c3d4'), true)
+  assert.equal(looksLikeColor('#AABBCC'), true)
+  assert.equal(looksLikeColor(' #0f0 '), true)  // 容忍首尾空格
+  assert.equal(looksLikeColor('red'), false)
+  assert.equal(looksLikeColor('rgb(1,2,3)'), false)
+  assert.equal(looksLikeColor('2px solid red'), false)
+  assert.equal(looksLikeColor(''), false)
+})
+
+test('colorSwatches：只挑额外的十六进制色值，排除默认字段与非色值', () => {
+  const out = colorSwatches({
+    '--dsw-alias-bg-base': '#000',            // 默认字段 → 排除
+    '--dsw-alias-custom-accent': '#f00',      // 额外 + hex → 保留
+    '--dsw-custom-size': '2px',               // 额外但非色值 → 排除
+    '--dsw-custom-bg': '#a1b2c3',             // 额外 + hex → 保留
+  })
+  assert.deepEqual(out, [
+    { key: '--dsw-alias-custom-accent', value: '#f00' },
+    { key: '--dsw-custom-bg', value: '#a1b2c3' },
+  ])
 })
