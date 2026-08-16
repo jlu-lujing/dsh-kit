@@ -31,7 +31,7 @@ const LAYOUT_CSS = `
   font-size: 15px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
-  margin-right: 6px;
+  margin-right: 18px;
   cursor: pointer;
   background: none;
   border: none;
