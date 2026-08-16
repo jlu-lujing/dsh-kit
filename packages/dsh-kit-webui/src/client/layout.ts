@@ -365,8 +365,10 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   // 把官方统计克隆进右侧栏「信息」标签页（面板已创建才填内容）。
   const syncStatsIntoInfo = () => {
     const pane = document.querySelector<HTMLElement>('.dsh-kit-right-tabpane[data-pane="info"]')
+    console.log('[dsh-kit-info] pane exists?', pane !== null)
     if (pane === null) return
     const official = document.querySelector<HTMLElement>('.FJxK0a_root')
+    console.log('[dsh-kit-info] official stats count/found?', official !== null)
     if (!official) return
     hideOfficialStats()
     let holder = pane.querySelector<HTMLElement>('.dsh-kit-info-stats')
@@ -375,12 +377,14 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       holder.className = 'dsh-kit-info-stats'
       pane.appendChild(holder)
     }
-    if (!holder.querySelector('.FJxK0a_root')) {
+    const hasClone = holder.querySelector('.FJxK0a_root')
+    console.log('[dsh-kit-info] holder exists? clone present?', holder !== null, hasClone !== null)
+    if (!hasClone) {
       const clone = official.cloneNode(true) as HTMLElement
-      // 原统计被我们 display:none 隐藏，克隆需清掉内联 display 才在右栏可见
       clone.style.display = ''
       clone.style.removeProperty('display')
       holder.appendChild(clone)
+      console.log('[dsh-kit-info] cloned:', clone.textContent?.slice(0, 60))
     }
   }
 
