@@ -1,9 +1,10 @@
 # dsh-kit aggregate patch layer.
 #
-# Installing dsh-kit installs the whole family: it declares the five feature
+# Installing dsh-kit installs the whole family: it declares the six feature
 # packages (dsh-kit-notifier / dsh-kit-scheduler / dsh-kit-lan-auth /
-# dsh-kit-input-history) as npm dependencies (hoisted into the profile's
-# top-level node_modules), and this patch inserts all six rows below. The
+# dsh-kit-input-history / dsh-kit-webui / dsh-kit-worktree) as npm
+# dependencies (hoisted into the profile's top-level node_modules), and this
+# patch inserts all seven rows below. The
 # mechanism mirrors how the official
 # dsh-base aggregate works: the bundle's dependencies make the packages
 # resolvable by the Loader, and the bundle's own patch declares the rows.

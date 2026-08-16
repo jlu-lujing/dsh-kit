@@ -118,10 +118,12 @@ function canonical(p: string): string {
   return realpathSync(p)
 }
 
-/** Repo root of `cwd` (git rev-parse --show-toplevel). */
+/** 主仓库根（main worktree 路径）：取 common git dir 的父目录。
+ * 从 linked worktree 调用时，--show-toplevel 会返回该 worktree 自身，因此
+ * 归属判定必须用 common dir 定位真正的主路径。 */
 export function repoRoot(cwd?: string): string {
-  const out = gitOut(['rev-parse', '--show-toplevel'], cwd)
-  return canonical(out)
+  const gitDir = gitOut(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd)
+  return canonical(dirname(gitDir))
 }
 
 /** Whether we are inside a git worktree (not the main worktree). */
@@ -333,6 +335,90 @@ export function checkRepo(cwd?: string): CheckResult {
     return { ok: true, repoRoot: root }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/* ── 会话 → worktree 归属判定 ───────────────────────────────────── */
+
+/** 会话归属：main = 项目主路径；worktree = 某个 `.dsh/worktree` 分支。 */
+export interface WorktreeAttribution {
+  mode: 'main' | 'worktree'
+  /** git 仓库根（= 主 worktree 路径）。cwd 不属于任何仓库时回退为 cwd 本身。 */
+  root: string
+  /** 命中 linked worktree 时的绝对路径。 */
+  path?: string
+  /** 短分支名（不含 `refs/heads/`）。 */
+  branch?: string
+  /** 未能解析进任何 git 仓库（调用方通常按 main 展示）。 */
+  unresolved?: boolean
+}
+
+/** 规范化比较键：优先 realpath；不存在时退回绝对路径（win32 忽略大小写）。 */
+function pathKey(p: string): string {
+  let value = p
+  try {
+    value = realpathSync(p)
+  } catch {
+    value = resolve(p)
+  }
+  if (process.platform === 'win32') value = value.toLowerCase()
+  return value.split('\\').join('/')
+}
+
+/** child 是否等于 parent 或位于其目录树内（统一小写/斜杠规范后做前缀比较）。 */
+function isSameOrInside(child: string, parent: string): boolean {
+  const a = pathKey(child)
+  const b = pathKey(parent)
+  if (a === b) return true
+  return a.startsWith(b.endsWith('/') ? b : `${b}/`)
+}
+
+/** `refs/heads/feat/x` → `feat/x`。 */
+export function shortBranch(branch?: string): string | undefined {
+  const prefix = 'refs/heads/'
+  return branch !== undefined && branch.startsWith(prefix)
+    ? branch.slice(prefix.length)
+    : branch
+}
+
+/**
+ * 计算一个会话目录的 worktree 归属。
+ *
+ * 规则（按优先级）：
+ *  1. cwd 等于或位于某个 linked worktree 目录内 → `worktree`（路径最长的先匹配，
+ *     嵌套路径更精确）；
+ *  2. cwd 等于或位于主 worktree 内 → `main`；
+ *  3. cwd 不在任何 git 仓库 → 兜底 `main`（unresolved: true，UI 仍显示 main）。
+ */
+export function resolveAttribution(cwd?: string): WorktreeAttribution {
+  const target = cwd === undefined || cwd.trim() === '' ? process.cwd() : resolve(cwd)
+  let list: WorktreeListResult
+  try {
+    list = listWorktrees(target)
+  } catch {
+    return { mode: 'main', root: target, unresolved: true }
+  }
+
+  const main = list.worktrees.find((w) => w.main)
+  const linked = list.worktrees
+    .filter((w) => !w.main)
+    .sort((a, b) => b.path.length - a.path.length)
+
+  for (const wt of linked) {
+    if (isSameOrInside(target, wt.path)) {
+      return {
+        mode: 'worktree',
+        root: list.root,
+        path: wt.path,
+        branch: shortBranch(wt.branch),
+      }
+    }
+  }
+
+  return {
+    mode: 'main',
+    root: list.root,
+    branch: shortBranch(main?.branch),
   }
 }
 

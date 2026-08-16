@@ -1,15 +1,18 @@
 /**
  * dsh-kit-worktree host plugin.
  *
- * 纯库 host 插件：不声明 dsh.bundle，行由 dsh-kit 聚合包挂载（与 scheduler /
+ * host 侧插件：不声明 dsh.bundle，行由 dsh-kit 聚合包挂载（与 scheduler /
  * notifier 一致）。提供一组 loopback 管理路由，把 `git worktree` 封装成
- * 「列表 / 新建 / 删除 / 清理」：
+ * 「列表 / 新建 / 删除 / 清理 / 会话归属判定」：
  *
- *   GET  /dsh-kit-worktree/worktrees              → { root, defaultParent, worktrees }
- *   POST /dsh-kit-worktree/worktrees              body { branch, path?, base? } → 新建
- *   POST /dsh-kit-worktree/worktrees/remove       body { path, force? }         → 删除
- *   POST /dsh-kit-worktree/worktrees/prune        → 清理失效登记
- *   GET  /dsh-kit-worktree/status                 → 当前目录是否 git 仓库
+ *   GET  /dsh-kit-worktree/worktrees?cwd=<path>   → { root, defaultParent, worktrees }
+ *   POST /dsh-kit-worktree/worktrees              body { branch, path?, base?, cwd? } → 新建
+ *   POST /dsh-kit-worktree/worktrees/remove       body { path, force?, cwd? }         → 删除
+ *   POST /dsh-kit-worktree/worktrees/prune?cwd=   → 清理失效登记
+ *   GET  /dsh-kit-worktree/status?cwd=<path>      → 目录是否 git 仓库
+ *   GET  /dsh-kit-worktree/attribution?cwd=<path> → 会话目录归属 main/worktree
+ *
+ * `cwd` 缺省时退回 dsh 进程工作目录（兼容最早的 host-only 用法）。
  *
  * 路由挂在 loopback DSH webServer（生命周期同 scheduler）：局域网通过
  * lan-auth 网关进来的流量在 DSH 眼里仍是 loopback 调用，因此与其它 dsh-kit
@@ -26,6 +29,7 @@ import {
   pruneWorktrees,
   checkRepo,
   repoName,
+  resolveAttribution,
   GitWorktreeError,
   type CreateOptions,
 } from './worktree.ts'
@@ -63,6 +67,7 @@ function toErrorBody(error: unknown): { status: number; error: string; detail?: 
 }
 
 export function apply(ctx: Context, config: Config = {}): void {
+  void config
   const webServer = ctx.get('webServer') as {
     register(opts: {
       kind: 'exact' | 'prefix'
@@ -74,12 +79,18 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   const PREFIX = '/dsh-kit-worktree'
 
+  const queryCwd = (req: IncomingMessage): string | undefined => {
+    const raw = new URL(req.url ?? '/', 'http://localhost').searchParams.get('cwd')
+    return raw !== null && raw.trim() !== '' ? raw.trim() : undefined
+  }
+
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const pathname = (req.url ?? '/').split('?')[0]
+    const cwd = queryCwd(req)
 
-    // GET /status — 当前目录是否为 git 仓库（面板探测用）。
+    // GET /status — 目录是否为 git 仓库（面板探测用）。
     if (req.method === 'GET' && pathname === `${PREFIX}/status`) {
-      const repo = checkRepo()
+      const repo = checkRepo(cwd)
       return sendJson(res, 200, {
         ok: repo.ok,
         ...(repo.ok
@@ -88,10 +99,20 @@ export function apply(ctx: Context, config: Config = {}): void {
       })
     }
 
-    // GET /worktrees — 列出当前仓库的 worktrees。
+    // GET /attribution — 会话目录归属（main / 某个分支 worktree）。
+    if (req.method === 'GET' && pathname === `${PREFIX}/attribution`) {
+      try {
+        return sendJson(res, 200, { ok: true, attribution: resolveAttribution(cwd) })
+      } catch (error) {
+        const e = toErrorBody(error)
+        return sendJson(res, e.status, { ok: false, error: e.error, detail: e.detail })
+      }
+    }
+
+    // GET /worktrees — 列出仓库的 worktrees。
     if (req.method === 'GET' && (pathname === PREFIX || pathname === `${PREFIX}/worktrees` || pathname === `${PREFIX}/worktrees/`)) {
       try {
-        const result = listWorktrees()
+        const result = listWorktrees(cwd)
         return sendJson(res, 200, { ok: true, ...result })
       } catch (error) {
         const e = toErrorBody(error)
@@ -107,7 +128,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       try {
         const body = JSON.parse(await readBody(req)) as {
-          branch?: unknown; path?: unknown; base?: unknown
+          branch?: unknown; path?: unknown; base?: unknown; cwd?: unknown
         }
         if (typeof body.branch !== 'string' || body.branch.trim() === '') {
           return sendJson(res, 400, { error: 'branch is required' })
@@ -115,6 +136,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         const opts: CreateOptions = { branch: body.branch }
         if (typeof body.path === 'string' && body.path.trim() !== '') opts.path = body.path.trim()
         if (typeof body.base === 'string' && body.base.trim() !== '') opts.base = body.base.trim()
+        if (typeof body.cwd === 'string' && body.cwd.trim() !== '') opts.cwd = body.cwd.trim()
         const result = createWorktree(opts)
         return sendJson(res, 200, { ok: true, ...result })
       } catch (error) {
@@ -130,11 +152,12 @@ export function apply(ctx: Context, config: Config = {}): void {
         return sendJson(res, 415, { error: 'content-type must be application/json' })
       }
       try {
-        const body = JSON.parse(await readBody(req)) as { path?: unknown; force?: unknown }
+        const body = JSON.parse(await readBody(req)) as { path?: unknown; force?: unknown; cwd?: unknown }
         if (typeof body.path !== 'string' || body.path.trim() === '') {
           return sendJson(res, 400, { error: 'path is required' })
         }
-        const result = removeWorktree({ path: body.path, force: body.force === true })
+        const bodyCwd = typeof body.cwd === 'string' && body.cwd.trim() !== '' ? body.cwd.trim() : undefined
+        const result = removeWorktree({ path: body.path, force: body.force === true }, bodyCwd ?? cwd)
         return sendJson(res, 200, { ok: true, ...result })
       } catch (error) {
         const e = toErrorBody(error)
@@ -145,7 +168,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     // POST /worktrees/prune — 清理失效登记。
     if (req.method === 'POST' && pathname === `${PREFIX}/worktrees/prune`) {
       try {
-        const result = pruneWorktrees()
+        const result = pruneWorktrees(cwd)
         return sendJson(res, 200, { ok: true, ...result })
       } catch (error) {
         const e = toErrorBody(error)

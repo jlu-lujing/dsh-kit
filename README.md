@@ -46,7 +46,7 @@ dsh-kit/
 | `dsh-kit-lan-auth` | 局域网鉴权网关 | HTTPS 反向代理 + token/登录，默认关闭；私有 CA 零配置自动生成 |
 | `dsh-kit-input-history` | 输入历史 | 记录**当前会话**发送的消息，输入框无命令菜单时按 ↑/↓ 切换回填（每个会话单独记忆） |
 | `dsh-kit-webui` | WebUI 主题商店 | **全局界面调整**（叠加在所有主题上，自动适配深/浅色）+ **每主题独立风格**；内置海洋/樱/森林三套预设（各含深色版/浅色版），支持自定义主题的新建/编辑/删除 |
-| `dsh-kit-worktree` | git Worktree 管理 | 封装 `git worktree`：新建/删除/清理多工作树，默认落到仓库内 `.dsh/worktree`（git 忽略），并行分支互不干扰 |
+| `dsh-kit-worktree` | git Worktree 会话归属 | 每个会话按 cwd 判定 `main`（项目主路径）或 `.dsh/worktree/<branch>`；新建会话页可选已有/新建 worktree 并绑定，对话顶部显示归属徽标 |
 | `满血模式`（preset，内置） | 二阶段 agent preset | Minimal 工具引导 → 首次晋升后开放完整工具；dsh-kit 内置导入/删除管理器 |
 | GitHub 生态目录（内置） | `topic:dsh-plugin` 仓库展示 | 按 Star 排序的只读展示；打开仓库查看各自安装方式 |
 | 归档会话管理（内置） | 归档会话恢复 / 删除 | 官方「归档」只隐藏不删；设置页可恢复或彻底删除（含日志文件） |
@@ -152,7 +152,7 @@ pnpm test              # 测试
 
 > 注意：`pnpm build` 已包含 lan-auth / input-history 的 client bundle；聚合包 `dsh-kit` 的 `lib/client.js` 仍需 `pnpm build:client`（或 `pnpm dev`）产出。换机器/重新 clone 后建议两个都跑一遍。
 > `pnpm dev` 常驻双 watch：client 面板改完浏览器自动热更；host 逻辑会自动重编译到 `lib/`，但 dsh host 不支持模块级 HMR，仍需重启 dsh web 生效。
-> `dsh-kit-webui` 已配置 `test` 脚本（9 个测试：预设/持久化/控制器/全局叠加层/host 路由数据），`dsh-kit-worktree` 也已配置（4 个测试：list/create/remove/prune + 默认落盘）；`pnpm test` 会实际执行，后续补充会自动进入 CI 门禁。
+> `dsh-kit-webui` 已配置 `test` 脚本（10 个测试），`dsh-kit-worktree` 也已配置（10 个测试：git 往返 / 归属判定 / client controller）；`pnpm test` 会实际执行，后续补充会自动进入 CI 门禁。
 
 新插件可用官方脚手架生成，再移入 `packages/`：
 

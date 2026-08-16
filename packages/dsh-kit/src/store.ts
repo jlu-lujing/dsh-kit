@@ -52,7 +52,7 @@ export const FEATURES: readonly Feature[] = [
   {
     id: 'dsh-kit-worktree',
     name: 'git Worktree',
-    description: '多工作树管理：新建/删除 git worktree（默认落到仓库内 .dsh/worktree，树外可选），并行分支互不干扰',
+    description: '会话 worktree 归属：新建会话页选择 main 或 .dsh/worktree/<branch>（可新建），对话顶部显示归属徽标',
   },
   {
     id: 'dsh-anchored-standard',

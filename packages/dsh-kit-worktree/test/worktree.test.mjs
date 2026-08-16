@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -80,4 +80,41 @@ test('外部自定义路径：可建在仓库外', () => {
   } finally {
     rmSync(base, { recursive: true, force: true })
   }
+})
+
+test('resolveAttribution：主路径/子目录 → main，linked worktree → 分支归属', () => {
+  const { base, repo } = makeRepo()
+  try {
+    const c = wt.createWorktree({ cwd: repo, branch: 'feat/attr' })
+
+    const main = wt.resolveAttribution(repo)
+    assert.equal(main.mode, 'main')
+    assert.equal(main.root, wt.repoRoot(repo))
+
+    const sub = join(repo, 'src')
+    mkdirSync(sub, { recursive: true })
+    assert.equal(wt.resolveAttribution(sub).mode, 'main')
+
+    const linked = wt.resolveAttribution(c.path)
+    assert.equal(linked.mode, 'worktree')
+    assert.equal(linked.branch, 'feat/attr')
+
+    const linkedSub = join(c.path, 'nested')
+    mkdirSync(linkedSub, { recursive: true })
+    assert.equal(wt.resolveAttribution(linkedSub).mode, 'worktree')
+    assert.equal(wt.resolveAttribution(linkedSub).branch, 'feat/attr')
+
+    // 仓库外 → 兜底 main + unresolved
+    const outside = wt.resolveAttribution(base)
+    assert.equal(outside.mode, 'main')
+    assert.equal(outside.unresolved, true)
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('shortBranch：剥掉 refs/heads/ 前缀', () => {
+  assert.equal(wt.shortBranch('refs/heads/feat/x'), 'feat/x')
+  assert.equal(wt.shortBranch('main'), 'main')
+  assert.equal(wt.shortBranch(undefined), undefined)
 })
