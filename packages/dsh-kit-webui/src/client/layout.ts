@@ -250,7 +250,13 @@ const LAYOUT_CSS = `
   background: var(--dsw-alias-state-business-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
-.dsh-kit-stats-head-title { flex: 1; }
+.dsh-kit-stats-head-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dsh-kit-stats-live {
   display: inline-flex;
   align-items: center;
@@ -258,6 +264,8 @@ const LAYOUT_CSS = `
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
   font-weight: 400;
+  flex: none;
+  white-space: nowrap;
 }
 .dsh-kit-stats-live-dot {
   width: 6px;
