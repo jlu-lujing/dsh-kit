@@ -122,6 +122,38 @@ const LAYOUT_CSS = `
   margin-right: var(--dsh-kit-right-width, 320px);
 }
 
+/* 右侧栏宽度拖拽边缘（贴面板左缘，col-resize） */
+.dsh-kit-right-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+}
+.dsh-kit-right-resizer::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+}
+.dsh-kit-right-resizer:hover::before,
+.dsh-kit-right-resizer:active::before {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
+}
+/* 拖拽中：禁用面板滑入/滑出与滚动区 margin 过渡，宽度跟手 */
+.dsh-kit-right-resizing .dsh-kit-right-panel {
+  transition: transform 0s, visibility 0s;
+}
+.dsh-kit-right-resizing .wSkVaW_scrollBody {
+  transition: margin-right 0s;
+}
+
 /* 右侧栏：内容区内、标题栏下方、右缘贴内容区；transform 滑入/滑出。
    visibility 用延迟过渡：展开立即可见，收起等 transform 滑出后再隐藏，
    这样收起的滑出动画不会被 visibility:hidden 立即吞掉。 */
@@ -524,6 +556,65 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     }
   }
 
+  // 右侧栏宽度：读存储，写回 CSS 变量。
+  const RIGHT_WIDTH_KEY = 'dsh-kit:right-panel-width'
+  const RIGHT_WIDTH_MIN = 260
+  const RIGHT_WIDTH_MAX = 520
+  const readRightWidth = (): number => {
+    try {
+      const v = Number(localStorage.getItem(RIGHT_WIDTH_KEY))
+      if (Number.isFinite(v) && v >= RIGHT_WIDTH_MIN && v <= RIGHT_WIDTH_MAX) return v
+    } catch { /* ignore */ }
+    return 320
+  }
+  const applyRightWidth = (px: number) => {
+    const w = Math.round(Math.min(RIGHT_WIDTH_MAX, Math.max(RIGHT_WIDTH_MIN, px)))
+    root.style.setProperty('--dsh-kit-right-width', `${w}px`)
+    try { localStorage.setItem(RIGHT_WIDTH_KEY, String(w)) } catch { /* ignore */ }
+  }
+
+  // 挂拖拽边缘：按住面板左缘左右拖动调整宽度。
+  const mountResizer = (panel: HTMLElement) => {
+    if (panel.querySelector('.dsh-kit-right-resizer') !== null) return
+    const resizer = document.createElement('div')
+    resizer.className = 'dsh-kit-right-resizer'
+    resizer.setAttribute('aria-hidden', 'true')
+    panel.appendChild(resizer)
+
+    let startX = 0
+    let startW = 0
+    let dragging = false
+
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return
+      // 面板贴右缘，向左拖 = 变宽：宽度 = 起始宽 + (起始X - 当前X)
+      applyRightWidth(startW + (startX - e.clientX))
+      e.preventDefault()
+    }
+    const rootEl = () => document.querySelector('.wSkVaW_root')
+    const onUp = () => {
+      if (!dragging) return
+      dragging = false
+      rootEl()?.classList.remove('dsh-kit-right-resizing')
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+
+    resizer.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return
+      dragging = true
+      startX = e.clientX
+      startW = readRightWidth()
+      rootEl()?.classList.add('dsh-kit-right-resizing')
+      resizer.setPointerCapture?.(e.pointerId)
+      e.preventDefault()
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
+    })
+  }
+
   // 构建内容区内的右侧栏（懒创建，单例）。
   const ensurePanel = (): HTMLElement | null => {
     let panel = document.querySelector('.dsh-kit-right-panel') as HTMLElement | null
@@ -566,7 +657,10 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
     panel.appendChild(header)
     panel.appendChild(body)
+    // 首次创建面板：套用已保存的宽度，再挂拖拽边缘。
+    applyRightWidth(readRightWidth())
     contentRoot.appendChild(panel)
+    mountResizer(panel)
     ensureInfoStats(panes.get('info') ?? null)
     return panel
   }
