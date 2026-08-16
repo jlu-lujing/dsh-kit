@@ -1,17 +1,17 @@
 /** 设置弹窗最上层修复。
  *
- * 侧边栏毛玻璃方案给 .pI_x6G_sidebarCol 加了 position:relative; z-index:1，
- * 这会让设置弹窗（.VOzbGW_overlay，position:fixed）被裁/压在输入框之下。
- * 这里用 JS 监听设置弹窗开关，动态切换 root 上的 class：
- *   - 弹窗打开：加 dsh-kit-settings-open → CSS 把侧边栏列层级回退，弹窗回到最上层
- *   - 弹窗关闭：移除 class，恢复毛玻璃侧边栏于内容之上
- * 不受 :has() 浏览器支持影响（相比纯 CSS 更稳）。
+ * 设置弹窗（.VOzbGW_overlay，position:fixed; z-index:1000）生成长在侧边栏
+ * 内部。毛玻璃给侧边栏列加了 z-index:1 → 设置弹窗被困在 z=1 的堆叠上下文里，
+ * 于是被中心列里 z-index:10 的输入框盖住。
+ *
+ * 修法：弹窗打开时在 root 切 dsh-kit-settings-open，CSS 把侧边栏列抬到
+ * z-index:2000，让弹窗整体高于输入框；关闭后回落 z-index:1。毛玻璃保持。
  */
 
 const OPEN_CLASS = 'dsh-kit-settings-open'
 const OVERLAY_SELECTOR = '.pI_x6G_frame .VOzbGW_overlay'
 
-/** 附加设置弹窗层级修复。幂等。 */
+/** 附加设置弹窗最上层修复。幂等。 */
 export function attachSettingsLayerFix(): void {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return
   const root = document.documentElement
