@@ -46,9 +46,9 @@ const LAYOUT_CSS = `
   position: relative;
 }
 
-/* 滑动过渡时长（与左栏近似） */
+/* 滑动过渡时长（收起时更明显，稍慢一点） */
 .wSkVaW_root {
-  --dsh-kit-right-slow: var(--ds-transition-duration-slow, 0.2s);
+  --dsh-kit-right-slow: 0.28s;
   --dsh-kit-right-ease: var(--ds-ease-in-out, ease-in-out);
 }
 
@@ -60,7 +60,9 @@ const LAYOUT_CSS = `
   margin-right: var(--dsh-kit-right-width, 320px);
 }
 
-/* 右侧栏：内容区内、标题栏下方、右缘贴内容区；transform 滑入/滑出 */
+/* 右侧栏：内容区内、标题栏下方、右缘贴内容区；transform 滑入/滑出。
+   visibility 用延迟过渡：展开立即可见，收起等 transform 滑出后再隐藏，
+   这样收起的滑出动画不会被 visibility:hidden 立即吞掉。 */
 .dsh-kit-right-panel {
   position: absolute;
   top: var(--dsh-kit-titlebar-height, 0px);
@@ -74,7 +76,9 @@ const LAYOUT_CSS = `
   min-width: 0;
   overflow: hidden;
   transform: translateX(102%);
-  transition: transform var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
+  transition:
+    transform var(--dsh-kit-right-slow) var(--dsh-kit-right-ease),
+    visibility 0s linear var(--dsh-kit-right-slow);
   visibility: hidden;
   pointer-events: none;
 }
@@ -82,6 +86,9 @@ const LAYOUT_CSS = `
   transform: translateX(0);
   visibility: visible;
   pointer-events: auto;
+  transition:
+    transform var(--dsh-kit-right-slow) var(--dsh-kit-right-ease),
+    visibility 0s;
 }
 .dsh-kit-right-panel-header {
   flex: none;
