@@ -83,6 +83,10 @@ const LAYOUT_CSS = `
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
 }
+/* 对话标题（含 mode/worktree）整体往右，避开左侧 logo/折叠 */
+.wSkVaW_header .wSkVaW_titleCluster {
+  margin-left: 24px;
+}
 .wSkVaW_header::after {
   display: none !important;
 }
