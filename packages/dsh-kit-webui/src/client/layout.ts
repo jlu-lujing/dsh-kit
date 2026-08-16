@@ -239,9 +239,20 @@ export function installLayoutTweaks(): void {
     const panel = ensurePanel()
     if (panel === null) return
     const contentRoot = document.querySelector('.wSkVaW_root')
-    if (contentRoot) contentRoot.classList.toggle('dsh-kit-right-open', open)
     const btn = toggleBtn()
-    if (btn) btn.setAttribute('aria-pressed', open ? 'true' : 'false')
+    const apply = () => {
+      if (contentRoot) contentRoot.classList.toggle('dsh-kit-right-open', open)
+      if (btn) btn.setAttribute('aria-pressed', open ? 'true' : 'false')
+    }
+    const panelEl = panel as HTMLElement & { __dshkitInited?: boolean }
+    if (open && !panelEl.__dshkitInited) {
+      // 首次：先确保处于收起态（transform 有初始值），下一帧再展开 → 首次也有动画
+      panelEl.__dshkitInited = true
+      if (contentRoot) contentRoot.classList.remove('dsh-kit-right-open')
+      requestAnimationFrame(() => requestAnimationFrame(apply))
+    } else {
+      apply()
+    }
   }
   const toggle = () => {
     const contentRoot = document.querySelector('.wSkVaW_root')
