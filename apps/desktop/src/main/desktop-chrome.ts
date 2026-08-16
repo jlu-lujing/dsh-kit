@@ -17,22 +17,24 @@
 
 /** 注入到页面 <head> 的样式（普通字符串，无模板插值）。 */
 export const DESKTOP_CHROME_CSS = [
-  // 方案二：透明窗口 + CSS 阴影。body 四周留 20px 透明边距（阴影透出），
+  // 方案二：透明窗口 + CSS 阴影。body 四周留 24px 透明边距（阴影透出），
   // #root 内缩成带圆角的“卡片”，box-shadow 投影在透明边距区。
+  // 注意：阴影 blur 必须 ≤ 边距，否则阴影在窗口边界处被硬切、无法自然淡出到透明。
+  // 这里 blur=24px 恰好与边距 24px 相等 —— 阴影衰减到窗口边缘时已接近全透明。
   'html, body { background: transparent !important; }',
   'html, body { height: 100%; box-sizing: border-box; }',
-  'body { padding: 20px; }',
+  'body { padding: 24px; }',
   '#root, [data-slot="root"], .dsh-kit-app-root {',
   '  height: 100%;',
   '  border-radius: 12px;',
   '  overflow: hidden;',
-  '  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);',
+  '  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);',
   '}',
   '',
   '/* 顶部自绘标题栏（拖拽区；从内容边缘开始） */',
   '.dshkit-dragbar {',
   '  position: fixed;',
-  '  top: 20px; left: 20px; right: 20px;',
+  '  top: 24px; left: 24px; right: 24px;',
   '  height: 38px;',
   '  -webkit-app-region: drag;',
   '  z-index: 2147483646;',
@@ -50,7 +52,7 @@ export const DESKTOP_CHROME_CSS = [
   '/* ---- macOS：左上角信号灯（贴内容左上角） ---- */',
   '.dshkit-trafficlights {',
   '  position: fixed;',
-  '  top: calc(20px + 12px); left: calc(20px + 14px);',
+  '  top: calc(24px + 12px); left: calc(24px + 14px);',
   '  height: 20px;',
   '  display: none;',
   '  align-items: center;',
@@ -81,7 +83,7 @@ export const DESKTOP_CHROME_CSS = [
   '/* ---- Windows/Linux：右上角控制按钮（贴内容右上角） ---- */',
   '.dshkit-winctl {',
   '  position: fixed;',
-  '  top: 20px; right: 20px;',
+  '  top: 24px; right: 24px;',
   '  height: 30px;',
   '  display: flex;',
   '  align-items: stretch;',
