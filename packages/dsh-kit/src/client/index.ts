@@ -5,7 +5,7 @@ import { createElement, useEffect, useState } from 'react'
 export const name = 'dsh-kit'
 
 /** Required wire-facing service so the panel can read loopback state (mirrors lan-auth). */
-export const inject = ['connection']
+export const inject = ['connection', 'locale']
 
 interface Feature {
   id: string
@@ -439,13 +439,23 @@ function ArchivePanel() {
  * 把下拉里**恰好**为一个权限名的文本节点换成中文。只替换精确相等的整段文本，
  * 不触碰句子中嵌入的英文（如确认弹窗里的 "启用 Full access？"）。
  */
-function installPermissionNamesLocalizer(): () => void {
+/**
+ * 权限预设名双语化（跟随界面语言切换）。
+ *
+ * 官方 dsh 把权限预设名（read only / workspace-write / Full access 等）由 host
+ * schema 硬编码、经 displayPermissionPreset() 直接显示，不随 UI 语言本地化。
+ * 这里订阅 dsh 的 locale 服务：中文界面把「恰好等于权限名」的文本节点替换成
+ * 中文；切回英文（或卸载插件）时恢复原英文。用 WeakMap 记录被改节点的原始
+ * 文本保证可逆；只处理精确匹配的整段文本，不误伤句子内嵌英文。
+ */
+function installPermissionNamesLocalizer(locale: {
+  getLocale: () => { active: string }
+  subscribe: (fn: () => void) => () => void
+}): () => void {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {}
-  const lang = (document.documentElement.lang || navigator.language || 'en').toLowerCase()
-  if (!lang.startsWith('zh')) return () => {}
 
-  // key 为精确（或 trim 后精确）匹配的英文展示名。value 为中文。
-  const map: Record<string, string> = {
+  // 英文展示名 -> 中文
+  const enToZh: Record<string, string> = {
     'Read Only': '只读',
     'Read only': '只读',
     'read only': '只读',
@@ -458,55 +468,100 @@ function installPermissionNamesLocalizer(): () => void {
     'full access': '完全访问',
     'Danger full access': '完全访问',
   }
+  // 中文 -> 英文（反向，取首个原形，用于无 WeakMap 记录时的恢复兜底）
+  const zhToEn: Record<string, string> = {}
+  for (const en of Object.keys(enToZh)) {
+    const zh = enToZh[en]
+    if (!(zh in zhToEn)) zhToEn[zh] = en
+  }
 
-  const replaceNode = (text: Text): void => {
+  // 记录「被我们改成中文」的文本节点的原始英文（含空白）
+  const rawOriginals = new WeakMap<Text, string>()
+
+  const isZh = (): boolean => locale.getLocale().active.toLowerCase().startsWith('zh')
+
+  const applyNode = (text: Text): void => {
     const v = String(text.nodeValue ?? '')
     if (v === '') return
-    if (Object.prototype.hasOwnProperty.call(map, v)) {
-      text.nodeValue = map[v]
-      return
-    }
-    const trimmed = v.trim()
-    if (trimmed !== '' && Object.prototype.hasOwnProperty.call(map, trimmed)) {
-      // 保留原首尾空白
-      text.nodeValue = v.replace(trimmed, map[trimmed])
+    const trim = v.trim()
+
+    if (isZh()) {
+      // 中文模式：英文名 -> 中文
+      const zh = Object.prototype.hasOwnProperty.call(enToZh, v) ? enToZh[v]
+        : (Object.prototype.hasOwnProperty.call(enToZh, trim) ? enToZh[trim] : undefined)
+      if (zh === undefined) return // 不是权限名（或已是中文），不动
+      if (!rawOriginals.has(text)) rawOriginals.set(text, v)
+      const next = v.replace(trim, zh)
+      if (text.nodeValue !== next) text.nodeValue = next
+    } else {
+      // 英文模式：中文 -> 英文
+      const en = Object.prototype.hasOwnProperty.call(zhToEn, v) ? zhToEn[v]
+        : (Object.prototype.hasOwnProperty.call(zhToEn, trim) ? zhToEn[trim] : undefined)
+      if (en === undefined) {
+        // 已是英文权限名 → 清掉残留记录（若存在）
+        rawOriginals.delete(text)
+        return
+      }
+      // 优先用原始记录（保留原始大小写/空白），否则反向表
+      const orig = rawOriginals.get(text)
+      const target = orig !== undefined && orig.trim() !== '' ? orig : v.replace(trim, en)
+      rawOriginals.delete(text)
+      if (text.nodeValue !== target) text.nodeValue = target
     }
   }
 
   const walk = (root: Node): void => {
-    if (root.nodeType === Node.TEXT_NODE) {
-      replaceNode(root as Text)
-      return
-    }
+    if (root.nodeType === Node.TEXT_NODE) { applyNode(root as Text); return }
     const iter = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     let node: Node | null
-    while ((node = iter.nextNode()) !== null) replaceNode(node as Text)
+    while ((node = iter.nextNode()) !== null) applyNode(node as Text)
   }
 
-  // 首次：现存的权限名（设置页等已挂载内容）
-  if (document.body) walk(document.body)
-  else document.addEventListener('DOMContentLoaded', () => document.body && walk(document.body), { once: true })
+  let mo: MutationObserver | null = null
+  const ensureBody = (): void => {
+    if (!document.body) { setTimeout(ensureBody, 50); return }
+    refresh()
+    mo = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type !== 'childList') continue
+        for (const added of record.addedNodes) walk(added)
+        if (record.target.nodeType === Node.TEXT_NODE) applyNode(record.target as Text)
+        else walk(record.target)
+      }
+    })
+    mo.observe(document.body, { childList: true, subtree: true })
+  }
 
-  // 后续：React 动态挂载的权限下拉/弹窗项
-  const mo = new MutationObserver((records) => {
-    for (const record of records) {
-      if (record.type !== 'childList') continue
-      // 新增节点里的文本
-      for (const added of record.addedNodes) walk(added)
-      // 某些实现会整体替换目标文本（target 为容器）——也扫 target
-      if (record.target.nodeType === Node.TEXT_NODE) replaceNode(record.target as Text)
-      else walk(record.target)
-    }
-  })
-  if (document.body) mo.observe(document.body, { childList: true, subtree: true })
-  return () => mo.disconnect()
+  const refresh = (): void => {
+    if (!document.body) return
+    // 全量扫一遍：按当前语言把整棵文档校正（既能中文化新的，也能在切英文时还原）
+    walk(document.body)
+  }
+
+  // 订阅语言切换：变化时全量校正（这也是「切英文能恢复」的关键）
+  const unsub = locale.subscribe(() => refresh())
+  ensureBody()
+
+  return () => {
+    unsub()
+    if (mo) mo.disconnect()
+    // 卸载时恢复英文
+    if (document.body) walk(document.body)
+  }
 }
 
 /** Registration through the slot system; the shell provides the `settings.section` hole. */
-export function apply(ctx: { get(name: string): unknown }): void {
-  // 权限预设名双语化（中文界面下官方仍显示英文）——插件生命周期内注册，无需 slot。
-  const stopLocalizer = installPermissionNamesLocalizer()
-  ;(ctx as { effect?: (fn: () => unknown, label: string) => void }).effect?.(() => stopLocalizer, 'dsh-kit: permission names localizer')
+export function apply(ctx: {
+  get(name: string): unknown
+  // locale 服务由 inject 提供（dsh-client-locale），用于跟随语言切换
+  locale?: { getLocale: () => { active: string }; subscribe: (fn: () => void) => () => void }
+  effect?: (fn: () => unknown, label: string) => void
+}): void {
+  // 权限预设名双语化：订阅 locale，中文显示中文、切英文/卸载恢复原英文。
+  if (ctx.locale) {
+    const stopLocalizer = installPermissionNamesLocalizer(ctx.locale)
+    ctx.effect?.(() => stopLocalizer, 'dsh-kit: permission names localizer')
+  }
 
   const slots = ctx.get('slots') as { inject(name: string, fn: () => unknown): unknown; register(...a: unknown[]): unknown } | undefined
   if (slots === undefined) return
