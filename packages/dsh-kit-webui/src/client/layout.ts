@@ -24,6 +24,11 @@ const LAYOUT_CSS = `
   display: none !important;
 }
 
+/* 右侧详情列避开标题栏：从标题栏下方开始，与内容区同级 */
+.pI_x6G_detailsCol {
+  padding-top: var(--dsh-kit-titlebar-height, 0px);
+}
+
 /* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
 .dsh-kit-right-toggle {
   cursor: pointer;
@@ -86,6 +91,28 @@ export function installLayoutTweaks(layout?: LayoutLike): void {
     style.id = STYLE_ID
     style.textContent = LAYOUT_CSS
     ;(document.head ?? root).append(style)
+  }
+
+  // 同步标题栏高度到 root，供右侧详情列避开标题栏。
+  const syncTitlebar = () => {
+    const header = document.querySelector('.wSkVaW_header')
+    const h = header ? Math.round(header.getBoundingClientRect().height) : 0
+    root.style.setProperty('--dsh-kit-titlebar-height', `${Math.max(0, h)}px`)
+  }
+  syncTitlebar()
+  if (typeof ResizeObserver !== 'undefined') {
+    const tryObserve = () => {
+      const header = document.querySelector('.wSkVaW_header')
+      if (header === null) return false
+      const ro = new ResizeObserver(syncTitlebar)
+      ro.observe(header)
+      syncTitlebar()
+      return true
+    }
+    if (!tryObserve()) {
+      const mo = new MutationObserver(() => { if (tryObserve()) mo.disconnect() })
+      mo.observe(document.body, { childList: true, subtree: true })
+    }
   }
 
   // 右侧边栏折叠/展开按钮（注入到右侧标题栏）。
