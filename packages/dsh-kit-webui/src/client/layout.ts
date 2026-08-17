@@ -12,6 +12,44 @@ import { SYNC_EVENT } from './stats-panel.ts'
 const STYLE_ID = 'dsh-kit-webui-layout-tweaks'
 
 const LAYOUT_CSS = `
+/* ── 全局：禁止非录入区的文本选取；鼠标默认箭头，不显示 I-beam ── */
+:root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+html, body, :where(body), :where(body) *:not(input):not(textarea):not([contenteditable]):not([role="textbox"]) {
+  cursor: default !important;
+}
+/* 可输入/可编辑/对话框（对话流）区：恢复选词能力 */
+:where(input, textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text !important;
+}
+[data-chat-flow],
+[data-chat-anchor-key] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* 对话流内的可交互控件仍是 pointer，文本仍是箭头 */
+[data-chat-flow] button,
+[data-chat-flow] a,
+[data-chat-flow] select,
+[data-chat-flow] summary,
+[data-chat-flow] [role="button"],
+[data-chat-flow] [role="menuitem"],
+[data-chat-flow] [role="link"] {
+  cursor: pointer !important;
+}
+/* 其余全局交互控件保留 pointer */
+:where(button, a, select, summary, [role="button"], [role="menuitem"], [role="link"], [role="tab"], label) {
+  cursor: pointer !important;
+}
+/* 右栏拖拽柄 */
+.dsh-kit-right-resizer {
+  cursor: col-resize !important;
+}
+
 /* 左栏与内容区分割线：透明（无视觉分割线，宽度保留） */
 .pI_x6G_sidebarCol {
   border-right-color: transparent !important;
