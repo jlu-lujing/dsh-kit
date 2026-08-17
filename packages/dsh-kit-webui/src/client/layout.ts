@@ -113,6 +113,10 @@ html label {
 }
 
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
+/* 带左上/右上 12px 圆角：desktop 透明窗体依赖 #root 的 border-radius 做窗口圆角，
+   而 fixed 标题栏贴 top:0 不会被 #root 的 overflow:hidden 裁剪，必须自己补圆角，
+   否则会盖住窗口上方的两个圆角。最大化时取消（与 desktop 的
+   body.dshkit-maximized #root 规则对齐）。 */
 .wSkVaW_header {
   position: fixed !important;
   top: 0 !important;
@@ -124,9 +128,13 @@ html label {
   box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill) !important;
   border-bottom-color: transparent !important;
+  border-radius: 12px 12px 0 0 !important;
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+body.dshkit-maximized .wSkVaW_header {
+  border-radius: 0 !important;
 }
 /* 下方 frame 整体下移避开 fixed 标题栏；用 height+margin 而非 padding，
    避免 grid 高度超出视口把底部输入框挤出屏幕 */
@@ -526,6 +534,15 @@ html label {
   100% { color: inherit; }
 }
 .dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
+/* ── 临时调试徽标（定位实时更新后移除） ── */
+.dsh-kit-stats-debug {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--dsw-alias-state-warn-primary);
+  font-family: var(--ds-font-family-code, ui-monospace, monospace);
+  opacity: 0.9;
+}
+
 .dsh-kit-accent-good { color: var(--dsw-alias-state-success-primary); }
 .dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
 .dsh-kit-stats-section {

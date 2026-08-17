@@ -11,14 +11,45 @@
  */
 import { useEffect, useLayoutEffect, useState } from 'react'
 
+type SelectorHook = <T, U = unknown>(
+  selector: (value: T) => U,
+  eq?: (a: U, b: U) => boolean,
+) => U
+
 type ProjectionHook = <T = unknown>(
   key: string,
   selector?: (value: unknown) => T,
   eq?: (a: T, b: T) => boolean,
 ) => T | undefined
 
+/** useSession 读出的会话状态（含 legacy 节点流——流式更新引用，驱动实时）。 */
+interface SessionState {
+  chat: {
+    legacy: {
+      nodes: LegacyNode[]
+    }
+  }
+}
+
+/** legacy 节点最小结构（与官方 deriveStats 一致）。 */
+interface LegacyNode {
+  kind: string
+  turn?: number
+  time?: number
+  callTime?: number | null
+  timing?: {
+    stepStartTime?: number | null
+    completedTime?: number | null
+    firstTokenTime?: number | null
+  }
+  usage?: {
+    outputTokens?: number
+  }
+}
+
 export interface StatsPanelEntryProps {
   useProjection: ProjectionHook
+  useSession?: SelectorHook<SessionState>
 }
 
 interface SessionStats {
@@ -44,6 +75,7 @@ export const SYNC_EVENT = 'dsh-kit:stats-sync-request'
 
 const HOLDER_SELECTOR = '.dsh-kit-info-stats'
 const CARD_SELECTOR = '.dsh-kit-stats-card'
+let renderCount = 0
 
 /* ── 与官方 StatsLine 一致的格式化工具（conversation 内部私有，这里复刻） ── */
 
@@ -76,6 +108,47 @@ function billedInputTokens(usage: TokenUsage): number {
 function cacheHitPercent(usage: TokenUsage): number | null {
   const denominator = billedInputTokens(usage)
   return denominator === 0 ? null : Math.round((usage.cacheReadTokens / denominator) * 100)
+}
+
+/**
+ * 从会话 legacy 节点实时派生统计（复刻官方 deriveStats）。
+ * 官方底部 StatsLine 正是靠 useSession 的节点流 + 这里实时更新——节点在
+ * 流式 token / tool 执行时持续产生新引用，因此每帧都重算出新数值。
+ */
+function deriveStatsFromNodes(nodes: LegacyNode[]): SessionStats {
+  const turns = new Set<number>()
+  let steps = 0
+  let llmMs = 0
+  let toolMs = 0
+  let ttftMs = 0
+  let ttftSteps = 0
+  let decodeMs = 0
+  let decodeTokens = 0
+  for (const node of nodes) {
+    if (node.kind === 'tool-result') {
+      if (node.callTime !== null && node.callTime !== undefined && node.time !== undefined) {
+        toolMs += Math.max(0, node.time - node.callTime)
+      }
+      continue
+    }
+    if (node.kind !== 'assistant' || node.turn === undefined) continue
+    turns.add(node.turn)
+    steps += 1
+    const timing = node.timing
+    if (timing !== undefined && timing.stepStartTime !== null && timing.stepStartTime !== undefined && timing.completedTime !== undefined) {
+      llmMs += Math.max(0, timing.completedTime - timing.stepStartTime)
+    }
+    if (timing !== undefined && timing.stepStartTime !== null && timing.stepStartTime !== undefined && timing.firstTokenTime !== null && timing.firstTokenTime !== undefined) {
+      ttftMs += Math.max(0, timing.firstTokenTime - timing.stepStartTime)
+      ttftSteps += 1
+    }
+    const out = node.usage?.outputTokens
+    if (timing !== undefined && timing.firstTokenTime !== undefined && timing.completedTime !== undefined && typeof out === 'number' && timing.firstTokenTime !== null) {
+      decodeMs += Math.max(0, timing.completedTime - timing.firstTokenTime)
+      decodeTokens += out
+    }
+  }
+  return { turns: turns.size, steps, llmMs, toolMs, ttftMs, ttftSteps, decodeMs, decodeTokens }
 }
 
 /* ── DOM 构建（纯 createElement / createElementNS，避免 innerHTML） ── */
@@ -406,11 +479,21 @@ function setDonutTarget(card: HTMLElement, cacheHit: number | null): void {
 
 function StatsPanelEntry(_props: StatsPanelEntryProps): null {
   const useProjection = _props.useProjection
+  const useSession = _props.useSession
   // syncTick 参与 effect 依赖：面板惰性创建后哪怕数据没变也要补写一次。
   const [syncTick, setSyncTick] = useState(0)
+  renderCount += 1
 
-  const stats = useProjection<SessionStats | undefined>('sessionStats')
+  const projected = useProjection<SessionStats | undefined>('sessionStats')
   const usage = useProjection<TokenUsage | undefined>('tokenUsage')
+  // 会话 legacy 节点流：流式 token / tool 执行时不断产生新引用 → 实时派生。
+  // 与官方底部 StatsLine 同源（useSession 节点 + deriveStats）。
+  const nodes = useSession !== undefined
+    ? (useSession((s) => s?.chat?.legacy?.nodes ?? []) ?? [])
+    : []
+  // 优先用节点实时派生（保证流式实时）；无节点时才回退投影。
+  const stats = nodes.length > 0 ? deriveStatsFromNodes(nodes) : projected
+  const statsRef = nodes.length > 0 ? `nodes:${nodes.length}` : `proj:${projected?.steps ?? 0}`
 
   // 监听 layout.ts 派发的“面板就绪”事件：容器出现后立即补写（数据不变也会写）。
   useEffect(() => {
@@ -422,10 +505,26 @@ function StatsPanelEntry(_props: StatsPanelEntryProps): null {
     return () => window.removeEventListener(SYNC_EVENT, onSync)
   }, [stats, usage])
 
-  // 数据变化（或 syncTick 变化）时写一次。
+  // 数据变化（或 syncTick 变化）时写一次；stats 每次节点变化都是新对象 → 实时重写。
   useLayoutEffect(() => {
     writeToPanel(stats, usage)
   }, [stats, usage, syncTick])
+
+  // ── 调试：心跳 + 渲染计数（定位实时更新问题，定位后移除） ──
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const holder = document.querySelector<HTMLElement>(HOLDER_SELECTOR)
+      if (!holder) return
+      let badge = holder.querySelector<HTMLElement>('.dsh-kit-stats-debug')
+      if (!badge) {
+        badge = document.createElement('div')
+        badge.className = 'dsh-kit-stats-debug'
+        holder.appendChild(badge)
+      }
+      badge.textContent = `渲染#${renderCount} ${statsRef}`
+    }, 500)
+    return () => window.clearInterval(t)
+  }, [statsRef])
 
   // 空根：不让官方 slot 在对话框下方渲染任何东西。
   return null
