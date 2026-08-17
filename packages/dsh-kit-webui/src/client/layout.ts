@@ -189,6 +189,8 @@ body.dshkit-maximized .wSkVaW_header {
   box-sizing: border-box;
   height: calc(100% - 60px) !important;
   margin-top: 60px;
+  /* frame 底色与侧边栏同色：折叠后四周留白（6px）露出与侧边栏一致的颜色 */
+  background: var(--dsw-specific-sidebar-fill);
 }
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
