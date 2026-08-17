@@ -318,7 +318,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f26d6d',
       '--dsw-alias-state-warn-primary': '#f2b84b',
       '--dsw-specific-sidebar-fill': '#0e1830',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #0e1830 0%, #0b1733 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #12213f 0%, #05070d 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f4f8fc',
@@ -332,7 +332,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d94b4b',
       '--dsw-alias-state-warn-primary': '#c98a1f',
       '--dsw-specific-sidebar-fill': '#e7eff8',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #eef4fb 0%, #dbe6f2 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f2f7fd 0%, #c9d9ec 100%)',
     },
   ),
   ...family(
@@ -410,7 +410,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f87171',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#0d1320',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #0d1320 0%, #0a0f22 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #16233d 0%, #05070f 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f2f4fb',
@@ -424,7 +424,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d94055',
       '--dsw-alias-state-warn-primary': '#c28718',
       '--dsw-specific-sidebar-fill': '#e7ecf8',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #eef1fa 0%, #dde3f0 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f0f3fc 0%, #c8d2e8 100%)',
     },
   ),
   ...family(
@@ -472,7 +472,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f472b6',
       '--dsw-alias-state-warn-primary': '#fde047',
       '--dsw-specific-sidebar-fill': '#10142a',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #10142a 0%, #150f2e 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #1a1b4d 0%, #080616 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f6f6ff',
@@ -486,7 +486,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#db3f8f',
       '--dsw-alias-state-warn-primary': '#a98c0b',
       '--dsw-specific-sidebar-fill': '#ececff',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #f2f2ff 0%, #e0e0f8 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f4f4ff 0%, #d5d0f5 100%)',
     },
   ),
   ...family(
@@ -504,7 +504,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f9736c',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#1a1512',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #1a1512 0%, #261308 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #2a1d12 0%, #0c0703 100%)',
     },
     {
       '--dsw-alias-bg-base': '#faf6f0',
@@ -518,7 +518,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d24040',
       '--dsw-alias-state-warn-primary': '#b07a00',
       '--dsw-specific-sidebar-fill': '#f1e9dd',
-      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #f7f0e6 0%, #ecdcc8 100%)',
+      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #faf2e7 0%, #e5cba9 100%)',
     },
   ),
 ])
