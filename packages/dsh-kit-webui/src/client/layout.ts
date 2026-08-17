@@ -232,20 +232,7 @@ body.dshkit-maximized .wSkVaW_header {
   z-index: 40;
   touch-action: none;
 }
-/* 指示线正对右缘（对话框左边缘），可点面积 12px、鼠标贴合边缘 */
-.dsh-kit-left-resizer::before {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: transparent;
-}
-.dsh-kit-left-resizer:hover::before,
-.dsh-kit-left-resizer:active::before {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
-}
+/* 不显示指示线：保留 12px 可点面积 + col-resize 光标即可 */
 body.dsh-kit-left-resizing .pI_x6G_sidebarCol,
 body.dsh-kit-left-resizing .wSkVaW_root {
   transition: transform 0s, margin-left 0s !important;
