@@ -1023,15 +1023,27 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       document.body.appendChild(bar)
     }
 
-    // logo（最左）：内置官方 FishLogo SVG，不依赖官方 .hHd-Xa_brand DOM。
-    if (bar.querySelector('.dsh-kit-titlebar-logo') === null) {
-      const logo = document.createElement('button')
+    // logo（最左）：复刻官方 BrandWordmark = 鲸鱼 + DeepSeek Harness 文字（最早 logo）。
+    // 克隆官方 .hHd-Xa_brand 的完整 wordmark；拿不到时 fallback 内置 FishLogo 鲸鱼。
+    let logo = bar.querySelector<HTMLElement>('.dsh-kit-titlebar-logo')
+    if (logo === null) {
+      logo = document.createElement('button')
       logo.type = 'button'
       logo.className = 'dsh-kit-titlebar-logo'
-      logo.appendChild(buildFishLogo(document))
       logo.title = '新建会话'
       logo.addEventListener('click', () => layout.toggleSidebar())
       bar.appendChild(logo)
+    }
+    const brand = document.querySelector<HTMLElement>('.hHd-Xa_brand')
+    const brandSvg = brand ? brand.querySelector('svg') : null
+    // 首挂：克隆官方完整 wordmark；若当前只有 fallback 鱼、而官方 brand 现在可用，则升级为完整版。
+    if (brandSvg && !logo.querySelector('.dsh-kit-titlebar-logo-brand')) {
+      while (logo.firstChild) logo.removeChild(logo.firstChild)
+      const clone = brandSvg.cloneNode(true) as SVGSVGElement
+      clone.classList.add('dsh-kit-titlebar-logo-brand')
+      logo.appendChild(clone)
+    } else if (!brandSvg && logo.firstChild === null) {
+      logo.appendChild(buildFishLogo(document))
     }
 
     // 折叠按钮（logo 右侧）。
