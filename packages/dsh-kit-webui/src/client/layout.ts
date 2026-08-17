@@ -242,6 +242,12 @@ body.dsh-kit-left-resizing .wSkVaW_root {
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   left: calc(-1 * var(--dsh-sidebar-w, 220px));
 }
+/* 折叠瞬间隐藏左栏内容（含官方 rail 窄条）：滑出过程不显示窄条，
+   只有左栏背景整体向左滑出，内容区同步左移——去掉“先窄条再收起”的中间步骤 */
+body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol .hHd-Xa_root {
+  opacity: 0 !important;
+  transition: opacity 0s !important;
+}
 /* 内容区（root）展开时空出 220px，折叠占满；与右栏 margin 一致丝滑 */
 .wSkVaW_root {
   margin-left: var(--dsh-sidebar-w, 220px);
