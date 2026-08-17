@@ -208,9 +208,16 @@ body.dshkit-maximized .wSkVaW_header {
   top: 0;
   bottom: 0;
   width: var(--dsh-sidebar-w, 220px);
+  min-width: 200px;
   transform: translateX(0);
   transition: transform 0.28s var(--ds-ease-in-out, ease-in-out);
   z-index: 30;
+  overflow: hidden;
+}
+/* 官方 sidebar root 有自己的 inline width，覆盖成跟随容器宽度，
+   使内部内容随左栏动态重排（而非固定旧宽度被裁切） */
+.pI_x6G_sidebarCol .hHd-Xa_root {
+  width: 100% !important;
 }
 /* 左栏拖拽边缘：贴左栏右缘 */
 .dsh-kit-left-resizer {
