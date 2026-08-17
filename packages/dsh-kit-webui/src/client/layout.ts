@@ -167,10 +167,12 @@ body.dshkit-maximized .wSkVaW_header {
   display: none !important;
 }
 
-/* 内容区定位上下文（右栏 absolute 用） + 背景与栏一体 */
+/* 内容区定位上下文（右栏 absolute 用） + 背景与栏一体 + 底部留白 */
 .wSkVaW_root {
   position: relative;
   background: var(--dsw-specific-sidebar-fill);
+  /* 底部留出与边栏同色的 margin，让对话区不贴窗口底边 */
+  padding-bottom: 12px;
 }
 
 /* 滑动过渡时长（收起时更明显，稍慢一点） */
@@ -232,7 +234,7 @@ body.dshkit-maximized .wSkVaW_header {
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 0;
+  bottom: 12px;
   width: var(--dsh-kit-right-width, 320px);
   background: var(--dsw-specific-sidebar-fill);
   border-left: 1px solid transparent;
