@@ -152,21 +152,7 @@ html label {
   height: 24px;
   width: auto;
 }
-/* 左栏折叠：只显鲸鱼 FishLogo（24px），不显文字；容器收窄并与折叠钮对齐 */
-.dsh-kit-titlebar-left.is-collapsed {
-  --dsh-kit-left-width: 92px;
-  width: var(--dsh-kit-left-width);
-  padding: 0 12px 0 10px;
-}
-.dsh-kit-titlebar-left.is-collapsed .dsh-kit-titlebar-logo {
-  margin-right: 0;
-  max-width: 28px;
-  overflow: visible;
-}
-.dsh-kit-titlebar-left.is-collapsed .dsh-kit-titlebar-logo svg {
-  height: 24px;
-  width: auto;
-}
+/* 折叠/展开均显示完整 BrandWordmark（鲸鱼+DeepSeek Harness），无需缩小 */
 
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
 /* 带左上/右上 12px 圆角：desktop 透明窗体依赖 #root 的 border-radius 做窗口圆角，
@@ -210,27 +196,15 @@ body.dshkit-maximized .wSkVaW_header {
   margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
   min-width: 0;
 }
-/* 左栏折叠时：标题行也相应左移，跟随收缩后的左侧 logo 区 */
-body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
-  margin-left: calc(92px - 20px);
-}
-/* ── 左栏折叠：完全隐藏左栏 + 左上角按钮，保留左侧留白（与右侧折叠一致） ── */
-body.dsh-kit-sidebar-collapsed .dsh-kit-titlebar-left {
-  display: none !important;
-}
+/* ── 左栏折叠：隐藏左栏本体，保留左上角完整 logo（鲸鱼+DeepSeek Harness）── */
+/* 左栏完全隐藏 */
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   display: none !important;
 }
-/* 左栏折叠后内容区左移；左侧保留 6px 留白（与右侧折叠一致） */
-body.dsh-kit-sidebar-collapsed .pI_x6G_frame {
-  grid-template-columns: 6px minmax(0, 1fr) !important;
-}
-body.dsh-kit-sidebar-collapsed .wSkVaW_header {
-  padding-left: 16px !important;
-}
-/* 左栏折叠：标题从最左（小留白）开始，无需避让左侧 logo */
+/* 折叠后内容区顶到最左（左上角 logo 由 fixed 标题栏覆盖，不受左栏影响）；
+   标题行仍排在 logo 右侧 */
 body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
-  margin-left: 0 !important;
+  margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
 }
 .wSkVaW_header::after {
   display: none !important;
@@ -1104,32 +1078,23 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
     const collapsed = isSidebarCollapsed()
     bar.classList.toggle('is-collapsed', collapsed)
-    // 全局标记：供标题行右移量收缩（折叠时左侧不需要那么宽）
+    // 全局标记：供标题行右移量与左栏隐藏使用
     document.body.classList.toggle('dsh-kit-sidebar-collapsed', collapsed)
     const brand = document.querySelector<HTMLElement>('.hHd-Xa_brand')
     const brandSvg = brand ? brand.querySelector('svg') : null
 
-    if (collapsed) {
-      // 折叠：只显鲸鱼 FishLogo（官方 sidebar 折叠也只用 FishLogo，天然对齐）
-      if (!logo.querySelector('[data-kind="fish"]')) {
-        while (logo.firstChild) logo.removeChild(logo.firstChild)
-        const fish = buildFishLogo(document, 24)
-        fish.dataset.kind = 'fish'
-        logo.appendChild(fish)
-      }
-    } else {
-      // 展开：完整 BrandWordmark（鲸鱼+文字）；拿不到则 fallback 鱼
-      const hasFull = !!logo.querySelector('.dsh-kit-titlebar-logo-brand')
-      if (brandSvg && !hasFull) {
-        while (logo.firstChild) logo.removeChild(logo.firstChild)
-        const clone = brandSvg.cloneNode(true) as SVGSVGElement
-        clone.classList.add('dsh-kit-titlebar-logo-brand')
-        logo.appendChild(clone)
-      } else if (!brandSvg && logo.firstChild === null) {
-        const fish = buildFishLogo(document, 24)
-        fish.dataset.kind = 'fish'
-        logo.appendChild(fish)
-      }
+    // 一律显示完整 BrandWordmark（鲸鱼 + DeepSeek Harness），折叠/展开均保持；
+    // 拿不到官方 brand 时才 fallback 内置鲸鱼 FishLogo。
+    const hasFull = !!logo.querySelector('.dsh-kit-titlebar-logo-brand')
+    if (brandSvg && !hasFull) {
+      while (logo.firstChild) logo.removeChild(logo.firstChild)
+      const clone = brandSvg.cloneNode(true) as SVGSVGElement
+      clone.classList.add('dsh-kit-titlebar-logo-brand')
+      logo.appendChild(clone)
+    } else if (!brandSvg && logo.firstChild === null) {
+      const fish = buildFishLogo(document, 24)
+      fish.dataset.kind = 'fish'
+      logo.appendChild(fish)
     }
 
     // 折叠按钮（logo 右侧）。
