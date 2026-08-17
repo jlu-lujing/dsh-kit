@@ -167,9 +167,10 @@ body.dshkit-maximized .wSkVaW_header {
   display: none !important;
 }
 
-/* 内容区定位上下文（右栏 absolute 用） */
+/* 内容区定位上下文（右栏 absolute 用） + 背景与栏一体 */
 .wSkVaW_root {
   position: relative;
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 /* 滑动过渡时长（收起时更明显，稍慢一点） */
@@ -178,10 +179,14 @@ body.dshkit-maximized .wSkVaW_header {
   --dsh-kit-right-ease: var(--ds-ease-in-out, ease-in-out);
 }
 
-/* 对话区域（中间列：消息+输入框）：始终为「右栏展开」宽度，避免开合时内容跳动；
-   并加四圆角，从左栏/右栏/窗体中独立成圆角卡片。 */
+/* 对话区域（中间列：消息+输入框）：
+   - 始终为「右栏展开」宽度，避免开合时内容跳动
+   - 自身背景 bg-base（与边栏灰区分），在 sidebar-fill 外圈上形成
+     白色圆角矩形；四圆角 + 细边框让形状清晰 */
 .wSkVaW_scrollBody {
   margin-right: var(--dsh-kit-right-width, 320px);
+  background: var(--dsw-alias-bg-base);
+  border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 14px;
   overflow: hidden auto;
 }
