@@ -197,13 +197,12 @@ body.dshkit-maximized .wSkVaW_header {
   min-width: 0;
 }
 /* ── 左栏折叠：隐藏左栏本体，保留左上角完整 logo（鲸鱼+DeepSeek Harness）── */
-/* 左栏完全隐藏 */
-body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
-  display: none !important;
-}
-/* frame 恢复单列（内容区含对话+右栏）占满全宽，避免左侧残留轨道把内容挤窄 */
+/* 左栏宽度过渡到 0（不用 display:none 瞬时消失），内容区/右栏平滑跟随 */
 body.dsh-kit-sidebar-collapsed .pI_x6G_frame {
-  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-columns: 0 minmax(0, 1fr) !important;
+}
+body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
+  overflow: hidden !important;
 }
 /* 折叠后内容区顶到最左（左上角 logo 由 fixed 标题栏覆盖，不受左栏影响）；
    标题行仍排在 logo 右侧 */
