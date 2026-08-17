@@ -210,7 +210,7 @@ body.dshkit-maximized .wSkVaW_header {
   top: 0;
   bottom: 0;
   width: var(--dsh-sidebar-w, 220px);
-  min-width: 200px;
+  min-width: 150px;
   transform: translateX(0);
   transition: transform 0.28s var(--ds-ease-in-out, ease-in-out);
   z-index: 30;
@@ -869,7 +869,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
   // 右侧栏宽度：读存储，写回 CSS 变量。
   const RIGHT_WIDTH_KEY = 'dsh-kit:right-panel-width'
-  const RIGHT_WIDTH_MIN = 260
+  const RIGHT_WIDTH_MIN = 200
   const RIGHT_WIDTH_MAX = 520
   const readRightWidth = (): number => {
     try {
@@ -886,7 +886,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
   // ── 左栏宽度：可拖拽调整，持久化 ──
   const LEFT_WIDTH_KEY = 'dsh-kit:sidebar-width'
-  const LEFT_WIDTH_MIN = 180
+  const LEFT_WIDTH_MIN = 150
   const LEFT_WIDTH_MAX = 400
   const readLeftWidth = (): number => {
     try {
