@@ -182,15 +182,18 @@ body.dshkit-maximized .wSkVaW_header {
 }
 
 /* 对话区域（中间列：消息+输入框）：
-   - 始终为「右栏展开」宽度，避免开合时内容跳动
+   - 展开右侧栏时往左缩窄留出右栏空间，折叠时内容区自动扩展占满
    - 自身背景 bg-base（与边栏灰区分），在 sidebar-fill 外圈上形成
      白色圆角矩形；四圆角 + 细边框让形状清晰 */
 .wSkVaW_scrollBody {
-  margin-right: var(--dsh-kit-right-width, 320px);
   background: var(--dsw-alias-bg-base);
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 14px;
   overflow: hidden auto;
+  transition: margin-right var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
+}
+.wSkVaW_root.dsh-kit-right-open .wSkVaW_scrollBody {
+  margin-right: var(--dsh-kit-right-width, 320px);
 }
 /* 拖拽右栏宽度时，边距平滑跟随（无过渡：跟手） */
 
