@@ -112,6 +112,26 @@ html label {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* 左上角常驻 logo + 左折叠钮：独立 fixed 容器，
+   不受官方 header 隐藏（新会话 blank 页 header display:none）影响，始终显示。 */
+.dsh-kit-titlebar-left {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 0 12px;
+  box-sizing: border-box;
+  z-index: 201;
+  background: transparent;
+  pointer-events: none;
+}
+.dsh-kit-titlebar-left > * {
+  pointer-events: auto;
+}
+
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
 /* 带左上/右上 12px 圆角：desktop 透明窗体依赖 #root 的 border-radius 做窗口圆角，
    而 fixed 标题栏贴 top:0 不会被 #root 的 overflow:hidden 裁剪，必须自己补圆角，
@@ -149,9 +169,9 @@ body.dshkit-maximized .wSkVaW_header {
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
 }
-/* 对话标题（含 mode/worktree）整体往右，避开左侧 logo/折叠 */
+/* 对话标题（含 mode/worktree）整体往右，避开左侧常驻 logo/折叠（固定容器宽约 92px） */
 .wSkVaW_header .wSkVaW_titleCluster {
-  margin-left: 24px;
+  margin-left: 92px;
 }
 .wSkVaW_header::after {
   display: none !important;
@@ -994,23 +1014,28 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   // 不再迁移官方 DOM，避免折叠态 React 重渲染导致图标丢失/无法展开。
   const mountLeftToggle = () => {
     if (typeof layout === 'undefined') return
-    const header = document.querySelector('.wSkVaW_header')
-    const titleRow = header ? header.querySelector('.wSkVaW_titleRow') : null
-    if (!titleRow) return
+    // 常驻左上角容器（logo + 左折叠钮）：
+    // 独立 fixed，不受官方 header 隐藏（新会话 blank 页 header display:none）影响。
+    let bar = document.querySelector('.dsh-kit-titlebar-left') as HTMLElement | null
+    if (bar === null) {
+      bar = document.createElement('div')
+      bar.className = 'dsh-kit-titlebar-left'
+      document.body.appendChild(bar)
+    }
 
-    // logo：内置官方 FishLogo SVG（不依赖官方 .hHd-Xa_brand DOM），
-    // 新会话页/左栏折叠/React 重渲染后都不消失；各自独立挂载、缺了即补。
-    if (document.querySelector('.dsh-kit-titlebar-logo') === null) {
+    // logo（最左）：内置官方 FishLogo SVG，不依赖官方 .hHd-Xa_brand DOM。
+    if (bar.querySelector('.dsh-kit-titlebar-logo') === null) {
       const logo = document.createElement('button')
       logo.type = 'button'
       logo.className = 'dsh-kit-titlebar-logo'
       logo.appendChild(buildFishLogo(document))
       logo.title = '新建会话'
       logo.addEventListener('click', () => layout.toggleSidebar())
-      titleRow.insertBefore(logo, titleRow.firstChild)
+      bar.appendChild(logo)
     }
 
-    if (document.querySelector('.dsh-kit-left-toggle') === null) {
+    // 折叠按钮（logo 右侧）。
+    if (bar.querySelector('.dsh-kit-left-toggle') === null) {
       const toggle = document.createElement('button')
       toggle.type = 'button'
       toggle.className = 'dsh-kit-left-toggle'
@@ -1018,7 +1043,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       toggle.title = '左侧边栏'
       toggle.appendChild(svgIcon(document, LEFT_PANEL_PATH))
       toggle.addEventListener('click', () => layout.toggleSidebar())
-      titleRow.insertBefore(toggle, titleRow.firstChild)
+      bar.appendChild(toggle)
     }
   }
   mountLeftToggle()
