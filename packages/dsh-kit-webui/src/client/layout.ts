@@ -251,43 +251,49 @@ body.dshkit-maximized .wSkVaW_header {
   flex: none;
   height: auto;
   display: flex;
-  align-items: center;
-  padding: 0 8px;
+  align-items: flex-end;
+  padding: 0 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   font-size: 13px;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
-  gap: 2px;
+  gap: 22px;
 }
 
-/* 右侧栏标签页 */
+/* 右侧栏标签页 —— 对齐官方 pbvGtq tabs 风格 */
 .dsh-kit-right-tab {
   flex: none;
   cursor: pointer;
+  font: inherit;
   background: transparent;
-  border: none;
-  color: var(--dsw-alias-label-secondary);
-  padding: 0 10px;
-  height: 40px;
+  border: 0;
+  color: var(--dsw-alias-label-tertiary);
+  padding: 7px 1px 9px;
   font-size: 13px;
   font-weight: 500;
+  line-height: 20px;
   position: relative;
 }
-.dsh-kit-right-tab:hover {
+.dsh-kit-right-tab:hover,
+.dsh-kit-right-tab.is-active {
   color: var(--dsw-alias-label-primary);
 }
-.dsh-kit-right-tab.is-active {
-  color: var(--dsw-alias-state-business-primary);
+.dsh-kit-right-tab:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  color: var(--dsw-alias-label-primary);
+  border-radius: 2px;
 }
-.dsh-kit-right-tab.is-active:after {
+.dsh-kit-right-tab.is-active:after,
+.dsh-kit-right-tab:focus-visible:after {
   content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 0;
+  background: var(--dsw-alias-label-primary);
+  border-radius: 2px 2px 0 0;
   height: 2px;
-  background: var(--dsw-alias-state-business-primary);
-  border-radius: 1px;
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
 }
 .dsh-kit-right-panel-body {
   flex: 1;
