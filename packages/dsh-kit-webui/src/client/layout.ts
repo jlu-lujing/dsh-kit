@@ -12,6 +12,11 @@ import { SYNC_EVENT } from './stats-panel.ts'
 const STYLE_ID = 'dsh-kit-webui-layout-tweaks'
 
 const LAYOUT_CSS = `
+:root {
+  /* 标题栏左侧常驻区（logo+左折叠）总宽，供 titleRow 右移避让 */
+  --dsh-kit-left-width: 246px;
+}
+
 /* ── 全局：禁止非录入区的文本选取；鼠标默认箭头，不显示 I-beam ── */
 :root {
   -webkit-user-select: none;
@@ -117,7 +122,6 @@ html label {
    不受官方 header 隐藏（新会话 blank 页 header display:none）影响，始终显示。
    --dsh-kit-left-width = 官方 wordmark(高24→宽182) + gap + 折叠钮 + padding */
 .dsh-kit-titlebar-left {
-  --dsh-kit-left-width: 246px;
   position: fixed;
   top: 0;
   left: 0;
@@ -135,11 +139,13 @@ html label {
 .dsh-kit-titlebar-left > * {
   pointer-events: auto;
 }
-/* 官方大小：BrandWordmark 高24px（宽按 182:24 → 182px） */
+/* 官方大小：BrandWordmark 高24px（宽按 182:24 → 182px）；
+   margin-right 由容器 gap 控制，去掉通用 18px 以免撑宽。 */
 .dsh-kit-titlebar-left .dsh-kit-titlebar-logo {
   flex: none;
   max-width: 196px;
   overflow: hidden;
+  margin-right: 0;
 }
 .dsh-kit-titlebar-left .dsh-kit-titlebar-logo svg {
   display: block;
@@ -186,7 +192,7 @@ body.dshkit-maximized .wSkVaW_header {
 }
 /* 标题行整体往右：按顺序 logo→折叠→(空)→标题→右侧，避免叠在一起 */
 .wSkVaW_header .wSkVaW_titleRow {
-  margin-left: calc(var(--dsh-kit-left-width, 190px) - 20px);
+  margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
   min-width: 0;
 }
 .wSkVaW_header::after {
