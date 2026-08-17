@@ -192,17 +192,32 @@ function registerWindowControls(): void {
   })
 
   // 用 VS Code 打开指定目录：优先 code/code.cmd，失败回退文件管理器
+  // spawn 的启动失败是异步 error 事件，必须用 Promise + child.on('error') 接住，
+  // 否则会变成主进程 uncaught exception（spawn ENOENT）。
+  const openWithSpawn = (bin: string, path: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const child = spawn(bin, [path], {
+        // Windows 下 code.cmd 是批处理，必须 shell:true 才能经 PATHEXT 找到；
+        // 非 Win 平台用 shell:false 直跑可执行文件。
+        shell: process.platform === 'win32',
+        detached: true,
+        stdio: 'ignore',
+      })
+      child.once('error', () => resolve(false))
+      child.once('spawn', () => {
+        child.unref()
+        resolve(true)
+      })
+    })
+
   ipcMain.handle('open-in-vscode', async (_e, path) => {
     if (typeof path !== 'string' || path === '') return { ok: false, error: 'empty path' }
     const candidates = process.platform === 'win32'
       ? ['code.cmd', 'code']
       : ['code']
     for (const bin of candidates) {
-      try {
-        const child = spawn(bin, [path], { shell: false, detached: true, stdio: 'ignore' })
-        child.unref()
-        return { ok: true, bin }
-      } catch { /* try next */ }
+      const ok = await openWithSpawn(bin, path)
+      if (ok) return { ok: true, bin }
     }
     try {
       if (process.platform === 'win32') await shell.openPath(path)

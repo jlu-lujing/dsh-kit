@@ -156,6 +156,16 @@ html label {
 }
 /* 折叠/展开均显示完整 BrandWordmark（鲸鱼+DeepSeek Harness），无需缩小 */
 
+/* 标题栏 fixed 脱离文档流：根容器钉死视口高度、隐藏溢出，
+   让普通浏览器（127.0.0.1:3443）与桌面一致——不再出现整页滚动条。 */
+html, body {
+  overflow: hidden !important;
+  height: 100% !important;
+}
+#root, [data-slot="root"], .dsh-kit-app-root {
+  height: 100% !important;
+  overflow: hidden !important;
+}
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
 /* 带左上/右上 12px 圆角：desktop 透明窗体依赖 #root 的 border-radius 做窗口圆角，
    而 fixed 标题栏贴 top:0 不会被 #root 的 overflow:hidden 裁剪，必须自己补圆角，
@@ -188,7 +198,7 @@ body.dshkit-maximized .wSkVaW_header {
    避免 grid 高度超出视口把底部输入框挤出屏幕 */
 .pI_x6G_frame {
   box-sizing: border-box;
-  height: calc(100% - 60px) !important;
+  height: calc(100vh - 60px) !important;
   margin-top: 60px;
   /* 外圈底色：默认纯 sidebar-fill；渐变主题通过 token --dsh-kit-frame-grad 注入渐变 */
   background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill));
@@ -775,28 +785,61 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   .dsh-kit-stats-card { padding: 16px; }
   .dsh-kit-stats-body { gap: 18px; }
 }
-/* 右侧边栏折叠/展开按钮：标题栏最右侧、与左侧折叠按钮对称 */
-.dsh-kit-right-toggle {
+/* ── 标题栏工具栏按钮：左折叠 / VS Code / 右折叠，统一圆角矩形 ──
+ * 右侧两个放在同一 group（.dsh-kit-titlebar-actions，见 mountVscodeButton），
+ * VS Code 在折叠按钮左侧。 */
+.dsh-kit-titlebar-actions {
+  flex: none;
+  margin-left: auto; /* 将工具栏推到标题行最右端 */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+body[data-dsh-platform="win32"] .dsh-kit-titlebar-actions,
+body[data-dsh-platform="linux"] .dsh-kit-titlebar-actions {
+  margin-right: 128px;
+}
+.dsh-kit-right-toggle,
+.dsh-kit-left-toggle {
   cursor: pointer;
-  width: 28px;
+  width: 30px;
   height: 28px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  border: none;
-  border-radius: 50%;
+  border: 1px solid transparent;
+  border-radius: 8px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 8px;
+  transition: background-color .15s ease;
 }
 .dsh-kit-right-toggle:hover,
-.dsh-kit-right-toggle[aria-pressed="true"] {
+.dsh-kit-right-toggle[aria-pressed="true"],
+.dsh-kit-left-toggle:hover,
+.dsh-kit-left-toggle[aria-pressed="true"] {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-/* win/linux：左移避让右上角三按钮（与官方 headerUtilities 同宽度让位） */
-body:not([data-dsh-platform="darwin"]) .dsh-kit-right-toggle {
-  margin-right: 128px;
+/* win/linux：工具栏整体让位右上角窗口三键（与官方 Session log 同样 128px）；
+   mac 无窗口控件，不需要。 */
+body[data-dsh-platform="darwin"] .dsh-kit-titlebar-actions {
+  margin-right: 0;
+}
+/* VS Code 按钮：由 vscode-button.tsx 用内联 style 画成圆形，这里覆盖为同款圆角矩形 */
+.dsh-kit-titlebar-actions [data-dsh-kit-vscode="1"] {
+  width: 30px !important;
+  height: 28px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent;
+}
+.dsh-kit-titlebar-actions [data-dsh-kit-vscode="1"]:hover {
+  background: var(--dsw-alias-interactive-bg-hover) !important;
+}
+/* 防闪烁：React 先在 headerActions（mode/分支之间）渲染，DOM 搬运到本工具栏前
+   先隐藏原始槽位的按钮，搬进来后再显示 —— 避免「先出现在中间、再跳右边」。 */
+.wSkVaW_headerActions [data-dsh-kit-vscode="1"] {
+  display: none !important;
 }
 `
 
@@ -1144,13 +1187,28 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     apply()
   }
 
-  // 标题栏右侧折叠按钮。
+  // 标题栏右侧工具栏（VS Code + 右折叠）。先建 group，再按「VS Code 在左、折叠在右」填。
+  const getTitlebarActions = (): HTMLElement | null => {
+    const header = document.querySelector('.wSkVaW_header')
+    if (header === null) return null
+    const titleRow = header.querySelector('.wSkVaW_titleRow')
+    if (titleRow === null) return null
+    let group = titleRow.querySelector<HTMLElement>('.dsh-kit-titlebar-actions')
+    if (group === null) {
+      group = document.createElement('div')
+      group.className = 'dsh-kit-titlebar-actions'
+      group.setAttribute('aria-hidden', 'true')
+      titleRow.appendChild(group)
+    }
+    return group
+  }
+
+  // 标题栏右侧折叠按钮（放进 group 末位）。
   const mountToggle = () => {
     if (isNewSession()) return
     if (document.querySelector('.dsh-kit-right-toggle') !== null) return
-    const header = document.querySelector('.wSkVaW_header')
-    if (header === null) return
-    const titleRow = header.querySelector('.wSkVaW_titleRow')
+    const group = getTitlebarActions()
+    if (group === null) return
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'dsh-kit-right-toggle'
@@ -1158,11 +1216,41 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     btn.title = '右侧边栏'
     btn.appendChild(svgIcon(document, LEFT_PANEL_PATH))
     btn.addEventListener('click', toggle)
-    const host = titleRow ?? header
-    host.appendChild(btn)
+    group.appendChild(btn)
     syncTitlebar()
   }
   mountToggle()
+
+  // 在右侧工具栏里「原生创建」VS Code 按钮（不依赖 React 先在 headerActions 渲染，
+  // 因此不会先出现在 mode/分支之间造成闪烁）。
+  // cwd 由 VscodeOpenButton（React 侧）写到 window.__dshKitVscodeCwd；这里点击时读取。
+  const VSCODE_LOGO: string = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAsTAAALEwEAmpwYAAAfZ0lEQVR4nO2deXAc15HmP2J8yLa0IcVao/VYIm4Qkj3emLBXG7a8q91xhMMbs47dibBi/I+tHUmmSIK477NxAyQIAtBByuIBHuKFsxtAN26CtA6SII7GDRKibmmWSwtANy6SXVVvI19VNQoQTxDdVRD7RWQ0GQSBQn2/l5kvX9YrwDc8NxhbBxPzoz/+5zPssafarv3rj1uv7nqyeaE6rGH6QFijMym8cebH6pebTMzvuSr2Nx68It/w2jDJwqNq+FvfLenNeLC0d/Lf7Zpg3z/whRTUMM9+9DZjT51ibIN17npYw0xdeMP8z5f8X+YDYe2Oqip5FkfXP7wu82TzusIehrSTIhKaRcTZXEhsFR5946Ir3DYnbLDOsSe7GAtvWRDDLI6WMMvMP3LPQYM+u9g3AOXvvrEGRpUyc01tf4eszrPIP8eQ1u5CWoeEtA62LrWDIbGVIc7GfnjwE/Zk8wILa3QKG5pmpac6JRbeeo2FWZxd4ebZf3KHAwKBewQfCMYepq5v8M8UaxiyTo0g/yxDWoeA9A76ZEhtZ0hqZ+uS2xhirex7eWdZuHWObWiaZWHcZoSwxhnpyU6Rhbe7WFiD80xI49zvnuVewAfC2hA/re1nyD79KfLeY8joEJDRydwApLQzJBMEbQxxzewbSZ0sxOJgYdY5BQC3CWFNs2I4gdAh0NfYwxpm/+DfxR7gP4Oxddw7qHmGbxhE/My2XyH79JfIeWdRfBUAmv0cgDY5BMQ2M7+ENhZidlAiuBwAFtZINiOShbcLjGAItcyMhVqcG5+qYg/KP9gHgt5jnVv8jI7fIfv0PLL/QuKLyFTF71x0/ynK7E8gAGzML76NhdRPyyGgcebm1uAUQxtnhPDW61L4SYlyhEsh9TMx/7GePSxfBlvHcw/m8wheHEy+6TTS2jci520BplOSW3wOQMei++cAKLOfAIghAFrvDAAtCA0OMbz1mhR+krGwhplPQi3OtLAG5/d9IHhVe7YOzylLvYz2VOS8y5DZJSK9XXK7fa37T2tfBkDLygBYBsKGlmvSkycZC21wXg6pd+RvMF/5Ox8Inh4mk587+Urv3IG8MwyZJynT/6r42gQwVYn/SRoA4lYIgNsoNDiFDc1XJaolhDXNTIbWO0s3NC8E+EDwiPjMj7t+ivvpnZV8jZ9xUkDGTcS/GQDxLQzRqwGAxiNYHOIG6wIPDaGNs85Qs2PXBvPVDcqVUx3Bzx2yfGMF4znF5Zu6HkRGpxkFJH6Hi8f5W5kaAtQVQFKLAoCV+cW1sJC6abaBMv6GmXs3i1MKa3AKYU3zPDSENc7Oh9Q7D2yov/b38i/BC0pUZvZVFldU2k21PYqMjtO8wJPefnvxVQBSvQSA25xSqMUphDXOSU92MqozXAs1O08EN839VHZkPgjufJiUZV58ayAyT9qRe4ZmtFzduxNzJ4BqDYAAaJYBiPUUAG5TQJiVnuyUWJh1Xgytndr10wb2Xdkh+DzBnYmfavsJMrsu8Ww/re3OxVcBSGuTVwBJXgfAbRyEplnhyVOMhZmdbW4IfOM24qe3/xKZpy4j++27m/lLANAkgLQMJACivAuAO0ewOK8TBKHm2V03+9Xv97HOLX5y62+RdcoJ02maxeJdi+8OAaoHIABa+D4AoppkAGqn2YaGWRZmmfGOmQmCGSmsaUEIrnb8Qu+bbdzqXorteWSduo7Mk4r47WxFxlcAbUtrAARANAHQ7H0ALDMs1Ox0PdnB2Iamqz4vsDg01b3U1lhknWZIPykitU10u/EVmTL73TWA5kUAYgiAKa8DQF5gg/UaC7XMjWtuwH082GLvHlLb85H9DkNaJ4kv3Zv4Gvfv9gAEgE3OAfQCgKxhloVYZq/pfesNVN0z+SGl7Q3knKHYLSBtFcRfAoCSAKoARMoeILh2iosRSq7Z22aeYbivx3Pu6t4DSG+vcq/xV0P4GwLQIgMQSx5AAaBmioVZZrkYXrf6+xkAtbqX0vQI0tvbuPipba5VF3/5CkAFILKR+cXYWHDNtA8A74uvZPpJtseR1tGN7PcYUlpdbsFW00j8lFbNEtC2CEA0AeDzADpV91rCkd4xzhO+lFbBI+JzAFpl9+8DwEDiJ7U8jfTOz5H1F8+Kn9qqAYDcP5WByQNYNSHA5wG8K35K66+RfnIKmadIIA+Kr/UALUr8VwCIsTJsbZBDQPUUCzPP8oTM61Z3V0kg7Rzx/WT5cy2WdpNsv0fGyQVknCRhRM+LrwkBagJIhaA1BwBlzLRO1g7aUzZ8X7qmtJto24KMLgmpHRKSW0VZnDYPmzb+NzMk2OQkkACIJACshgdA7iBRR9mHD2PH0BOo+uQ77n9X19JGbtxMbs3g8T61XURyi8SF8ZYla0MALQGtix4gytAAaGZP2ch/RcWoFeWjkygfWUD5yGcoH96F4p71/N+5izVQWNA2bqa0lMP0DokveF38FMUoAVT7ADgATUoIMCoATCu+PQqvT4j48ycMr45LeHWc4bWLEvZ+zvDK2Bco6fsf/OuM8qiSfA3rYKr6FpJbD8H0LrljASkt3hc+RZn92hVAnAKAGgKqplhY/SwXw+tWeyMAtK6zbCgXb3xEQosoGxZQPixxqxgRUT7swmsTjMNR2p8t5wgEjo4hQb3uRPNDSG1r5AWe5FaXLsKnqO6fPEDzYgJIAEQ3MUSYJb8oqxhcNW0gAOSDCeSNkbLh1/HGJwzlowLKSPgR9hUrG5JQMSZw77BzyIadoz/QLSQ8p3isKMtjSG5/h8/8pBaXWwS9LKlFA4BSBYxqFOWOoDYh+MSkZAwA1NlT2fUAykeP481PSWSa9V8VfolxOFwcgoqxj1HS84+LIWHZysFTQ13mJdiCkdw2hKy36aYLuouf3LIY/2kVEG+TENMkILGTYWvjlW/GWF8Kq5+9HNZwlYXWOiX9AFDjfdHgI6gYacOfufiuWwu/3BsMCzwkvHbRhR32lMVcwsMhQRU/zvwPSG37CJmnFfFbmCEsSTESP84mIOUUeYDzeLEq5NkP2QOhtc6pMMuCjgCoiVvFwOOoGOvmbr9s+O7EX4RARMW4wL9H6VA9Cvoe9WhIUMVPtD2L1PYrSO+im24c8ZMVi7eJSGwTkXySIdKyGxsbeEeuf+XUwyE1zslQ8wILqXFKIbUzzKtWo3qAHYPhqBi/gN0fkXACykjMFdrOYQk7hwW88SlD2ej72N7/DP8Z8uPL61a9upfQ+M9I65xFWifNfNEQgidrZn9is4C0k/REsBNRlufd9wLAU13sQf0BKLH/LSoujGH3x/LMvxfxl4Ig4LX3GV6duIrt/TGrFxKWVPdeQGqnCyntEhKbRbe7NYQ1S0hqEZD5NlUA7Yi1yo9nEbiK191gvvKQ/gC8cqEYb37OsHPk+qqJ7zYKCWMi3viYYcfAMRS9/ci9hQTNEjWxORFpp+jIFRGJNskYoreos17k15VxmiHeWokXzA/JM59fu7KfYhwALuKVC7LrXnUA1JAwIoeEnSNjKOz7T24I7iYk8OqesqpIshbLyV6LiEQ+0wwkvk1AOm02tc8hvmmjfO3L9k2WAOCYDDXPs5AahxRS62RetRonA8pGBewkoTxslFu8domh4sIctvVuuuGNuV3jJs3+JNseeZnXIiCJZn4zM4bZ6Fpkl5/cPIoY889uCroKwF4jAFA+egVlo2ryxjxqpYMiysdEvP4hQ8lgJba9o7jGW5yBp7p8ypwTm2v4DaYbrbvgzYuWaBOR3CYi8y8MCdajMHXJZ/c8a6JE9au/lxaAasdkaP08C6l2SCSIV62aAHh1ogq7PqJKnsvjAHAIhijUuOSl4vAAtvf+5KYzRU0YNx75PhKaO5HBb7ALiTa5sGIES7AJSO0kl38VcY3Ri+HqFp7NUAAUD/0Cr0xcQ/kYiSN6BQIZBDkklI87UdL3/FdCgprpRzWsR7ytF6mnqI7u4nvqqukqvo1WHgIy3qZ+/wkkNP98Mcu/TQXUUADQ2DbwEiouSigbkzgEpSSQF2wHhYRxEa99wFBifwOmHvmRZdrJo7Gl+keIaZpAUidDTKPAN1LirUx3CBLI5bcKskey1SKuQT6l69k7XN0YCgDVzW6z/wsqLiygfFwWxmsQDEkoHRaw6xP683mU9D3Fr2drzTOIsn6BuFaGKIvAt1BjyRQIaGNFDxAS3C7/OuIak1ZU3zAUAKrborG9/9coH5/CKxMkhuA1CEqHJf7zXv+IVglfIPOdXGyq/7+IsjFsqRcRaWGIamCIbpT30gkC8gbcI2gh8KRZJSRaXXxtn9j8MWLN/33Fm17aZSABUDfPQqocEgniVatSAeAQKAcSl/Y/jfKxz/DqJfIE3oRA9jwUhl7/mCHzXQkv10rYVEd75wxbzVRHVyBoXPQGaljgoUEJD6poqwVFAonfIrv8eKsVCU3/4Z4KWoYEQOsJCnrCUTo6jtc+ouWagB0kjpesZEjCjmEXdo5KyO/hrVPYWCNDEGGRIYhqlEGIbWSII2taCsLy8HAvFm8V+AHPVNmLbcpalcYXwwKgzb6Lzz6O0pFuPht3DLm8CoFqO0cZtg8yngdsrGbYXK94AwKBQkKD4g1uBMGyZPHuTUK81YX0U1R0+hyxlt/ctEP6awWAFoKy/odROtKG13mC5sKOIe8CUDLEUEpVxBGGtNMMG2vZV0KCOzdQwoI7N7gHAOJtIhLcLr8DcfVPrOq2tjYJrDIiAEsenf7wAewYOqF4AkGGwNs2SFvLDLnnGLZY5JCwhUICQWCWIYjS5ga38gaaXCHhBhbXJCKpTeLHusVaitxhcTUbW5YDUDvPQk44JBLEq3biVgAs6RFkftgxsJvnBDuGBZQMSl4FoEQx2lMotjPEtjD8qYZh8428QcMyEJoY4lVTxdcmjVbl700S4prkvfuk5suIsfwv90RY7dY2DQDBVY7JkNp5FnzCIQVXOZlX7bYAqBerVudK7Pl45QOCQMT2AcktjLeM8gE1PFBrFXmCl2tpqcgQUS/nBlHKSkFNErUgLPcK8YrFNUmIp108vn37NmKagjzaybSmAFAvWHWBRf2xKJ9gKB0VUTIoeh0C1SgvyD4rJ4aUIBIEZDxBXO4NtImixhvEc/FFJLZKSO4gl7/TXYX0ZC/jmgNgeSfOdvsfsfPCdewcYygZ0BeCon5+8jZeqlJCgmalEKWAEKNNEt0mcZefepK6dicRV/8viy7fww+4rE0AlvXibbP/T+y84MTOCwzbdYJADQklwwxJJxn+VL0sJKi5wfICUqOEOKvAN5hird1IbN6woiaV1QDghGMypGaeBR93SCSIV+343QMgDxWCYvsvUTp2GWUTDNsGBWwnUXQwAqB0lCHrDMOmehkE8gZb6pauFCgkRDWIiKX+wQ6GaMtuxL73nSW/kzfGmgdgCQQ9f4+S0Uuo+IBh24B+EJA3IAgK+/gJXDwkbFIhULzBVrOAeP6+Hie2mv8o/x46POb+tQBAC0He2UCUjNjxykckhks/CBRvQJ+JHTIEL/PlooQt9QLi2ikk2BFRv9ihy3R4qvlrAwANNTGkh0B2DJ/Gqx+TJxB1A2DboPy5Y4Q2lOSl4sYaCdGtDJtqK/HC3qUdunqMrxUA2qphxcVvY9tQtZwTDIhcDL2seIChZERCfi9DRMMC/vDWH3Rz+bcC4LhjMqR6ngUfc0gkiFft2GoD8JvIb+PF6mrk9MjFIj0BkCGQeEjYNriAkiEfAMc9AYAqfmTVo9hcfxqRzQwvVolIe1uOx/pDQNchoeJDhoL+A3fUiezp8bXxAGoS+FJVICIsdsTwOCvwuPviCYbkLmNAsG1AQvGgwJPU4oEBFJy5eSeyN8bXAgBV/M3VP0FU0yW+Z7+lTuDLrs21cvZNEMR3MGxTICjW2YoGBOycoNzAicKer3Yie2useQBU8aPqfomYpsuIa5HX2LTWpjX3ZhWCWoYXj8u7dyTAtiEDQGAXUTIqoux9hoK+3Sj9RN9C0DHHZEjVPAs+6pBIEK/a0XspBcfU/xZxzU7+9otIs8jLrVRxc0NQuwjBC8cZb/AsGpCXaLpDoISECgoJg928BU6vUvDaAUCzGRRt/iPim6/z7dUoi8hLrLzMquzEcQioCkcdPEo4IAi2NlIixrB9WH8IigclOSS8z7B9ZBKFdl02g4KOOSaDq+ZZ0FGHFHTMybxqdw6A5rHsaEsMP/Is1ioi2iIiRhGfm7LxonoCMgoHm2oWIdhsYcjrlfMC8ghFg/paoV3EtlEJpRcpJJTxWgYNT75nd00BoG0IibHkI6mdevNJfImLrxqJr1qUeWk42KSBgHIC8go53TIEhQSB7iaieMiF8g8JiHeQ1xPs0ZCwZgBQW6Dpk3bOkjtpK1VAzDLxl4PA9+FVL0CNGpQU1i2Gg5dOyC1dWWc1nkBvs0sotMshoXj4/yG35397LCRoATjqmAw+Mc+CjjgkEsTbdvOLVF3+85UPILrhBD/gKLpBkLtslouu+XSHgWVJIeUElBSqnoA2al6sYsh410AQDDAU9ovYPiKhZJwhv9fjTaHGBEAVf/ORRxDT2MabLaIsrsVYfwfGvYAmKdy6HIJqGYIXTjCk/oWheEgOB4Ywu4iiQQFlH1DS2om8IY+1hQcdnZ4MPjHHgo5MS0FHHczbdgPxleQntuqHiGk6x5/Mjb5L8bUALE8KVQjIC2xUIPjXYwxJXUaDQELhgAullxiKhj5HXu9vVu1MZMMCoLq7rTXhiG0cR2I7xXJhSYJ3N+aGQEkKI9UagVIsUiH4E0FwVK4aFtHybNCFAi6A/iAU2AVsoyeUxkTknF+dM5ENCYBb/LqnEWP9DAmtJOLKxV8CAbVkEQDUmaP067kTQyUnoDau/3NERGybhFJKxIYkFPQbBIJ+CUVDakiwIb/n3s5ENgoAR1QAVPEj636NWOsUf7gy+h5m/g1B0HgBvjIgU6uFNRI2VguIaKKc4AvEd+SiZPzfsP0CQ36/aBBPIHFvUPoBQ+Hgx8jpuffHwwmAI9OTwcfnWNBb0xIJ4m1bTPgian+PWOuC/DoTpbS72ha5DAKeD9RI2FwrILqZEsNuvFwlHxCRc/4ZFI98ge0XGfLtAgpIBANYPoWEMYbisevIPZ98rwdE6A8An/n1LyHWJiG6UfKY+DeCYEudiMgGkff1v1y1G7FVysbMsPxwRm7/j1A0NIEd75MnMA4EBbRKGJa9QV5fHUw937+rkGAoADZX/wKxtmu8Z97T4msTwq31AmJpI6nBiU3VNz8kytSzHoWDvTwbL+in5JAZw/olDiW/roH3kXn+mZUcEqU/AHHWKiS0UYLmcidrHrV6ia8sEqhD13zrDl0VgsJz/x75Ayf5zc63u5Cvt/j2RSMIKCQUjVxFdk/0HYUEQwEQ1XhFXrebJY+LH1kvIrpR5CuMiLqvnqF7y8fUG76LvIFa7nYpDhMEhrF+EYWDIg9VOX3HYOpXDoq8SUjQAnB4ejL42BwLOjwtBb3lYN42OodPWBKXPWXUMEIuP7ppDltqX76jAxWXHxVLHqHAvgc7yO0SBOSGDQOB5A4J+QOjMPXe0VGxBgCgcYI/N7e1XvKM+Pz7Ki7fMoqIauXGmFZwWLQCS15fMUomGAoGBeT1GQgCOyWFAraNMxQOzyG79+VbHha998pDgYenJ4OOzbHAw9NS4FsO5m0DopqK+TtsIuuvr/6srxf5s3jxbVT8OYro+lufoXu7oY2tuf2J8o0eEpFrNAj6RRRSW/wEQ3ZvJRK1ncia4+INAcCLRx9DdOMYF2lrvWsVxRf4G7Jimq4ioubOztC9286k3N4XUDTqQsGQxG96Ht18g1huv4Qcu4CSSww5djsyer76wghDAKDW/qMaxvmDk1vrBF6yXblJXHxaWUSZJxBZ/QtF/Nsvj1bSm5hz7p9RODqLolFyvwaDwE5JoYCicYbcQSfSzy19ZUwVezDw0PRk0NE5FnhoWgo87GDetsWXRr10+HFEmrtlT1Dn4pW6u7WIOnL5guLy7/4M3bsdKgSm8/8NBcNXUEw3ul8wFAC5dgoDInIHJeSPMaR270Z86/fUl0YFHnLoDMDy/f+t5lZZwLuEIKJeQDR/Lep1RFSvrER6LxBkvPsPyB/6CNsuyrPOKOLn9jPk9DOY+iRk9gnIv8iQ2nMeUW2hz3axBwIPO6b0B2B5B1CE+biSEwi3F79O4rDQgyFbzR9jc83KN0nuFYL0nmDkDQxh+wRDTq/Ab76elqNYNgHQz5DVJyGtR0D2GENK35VvJp97KfAtx+Wgo/MGAIDfSGWvGyY/RNS9ziGItAhc5BvPejrIWXb5W+us2Fj7A4+6/Dt6TP3MY8izv4OS9xly+1zGAKCPPABDVi9DRi9DynkRKf3ML21I8K/8Ugp6y+l14bkdctzm5dERdblyvd4sIqJOQASBQDO+XkRErYvXD6KaRGypMRni5dHuo+/HHkKuvYln4Ln9Ln0B6FsKQHoPhQCGxG7JL6lX9D8wxYIOO7kYethN7qQGgk3VUXzHjh7v2mqWeFtXVIOE+HbyAp9jS9XqnaG7qq+PH/4WcvoOYTt5gn4BuX36A5ChASCpm/kl9zD/SkMCwMciBJFVz2JLrQ1baicRUbuALXWfYkvN69isnqFLhR2dHrW+0dBW3nL6y3lBJtcuILtPcrtlb1i21v33MWT2MqT1rhkAaCw+FEKDKnmbjz3h3rfXQmK0oQ1lpt4MFF1gyBsQkd0r6QZABnkABYDEbuaXZHwAcNPzcvksM4DLv9OqoalnC/JHJOQNSsjpE3X1ACkKAIlrBQB5yDVsuY5tHHd/20FPNqkFo+7fo2B4AflDtEwUdfEANPsJgAQFgP1TLOiQkwUedOhiuG+GG4KeXyNveAr5oySMIIvkYeOzfxkAagjwAeBNCJT3IpnOP43coc9QOMZg6vUsBG737wPAaJ4gHHmD4yi+oECgLNdW224GgC8E6DjUxDDp7OPItXejeIKKNC7PANArF4AytTWAHob4buaX0MPW759iAYecLOCgQxfDfTvUqmHK4CPI7m9D8fskmGvVZ78KgLsIdJ4h+TxD/Dnml3ierd83xQIOOlnAAYcuhvt6PKd5L5KpvwpF78uJIRduFSxLs/xTAUhRAEg4x/wSfADoP0xKwyl9ZvXtRtFF2rkTkNUrrQ4EvYsApC3zAPE+AIwxmOYYnKzeAhSO0zpeRFaPtKoAqB4gSQFAVw9AP9N5Te9bb6DBFkvHWedjkTfCkDMgIqtXvLcQoAFAXQEQAHE6AlBJ/YcLLPDg7Ljed924peOsnueRO3wd2QMkoOiO53dt6gpACQHLAdg7qYriRZtyBZ1gLODw/C6977gRxzp3rSCz+7fIGXIid5ghs+fuIaC1v9v9L/MA8XoBMCWRBwg4NOfyP+j4ud4327jDpECQeva/IGfoMvJGCQLhngAgD5Cs8QDx3gaAxJ+6HlzDWMCBmdf1vsVrCIIzP0G2/RLv6s3ocXG3fjvL1JgKgLoETDzPEHuO+cV5EYD9U0JApUMg8QMrHa0/+PPn39X79q6NYVIbTs8GIstuR/4FgkBYIvDNjITP6JGzf+0SMLGbIfYs84vr9iwA+6clfxL+gEMKOi6ywIMzUsD+yV2Plfwbb0vX5aj8NTmqNO9Fyuw7jYKLJK7rziDQAOD2AN0McWeZX7ynAJiSAvaR8E4p6ITEAg7OXPPf/9cTgXv++vSSd0L7xkqqhl0PIqvfjMIJOSe4Ww+Q1L3UA+yZZAGVDpqtq2Cy8IEHZqSg4xIL2O9YCNg3WRl4YFJ+QYZaAveJf69Vw65vILO3knuCzF4BmT3SjcW/kQfo5juBHIDY1QJgSuTCH5yVZ3ylwxmwZ3J34JuOMPe1M+bn0QOw75th0jzgmt6zg+cE9MRPxjIIVADcs59WAIoHIABiVgMAWfiAg3NS0HFGM/7LgH3Tpf6VUwFL6hokvm94qOE0rScVObRE7BeRfl5anPlK5r8cgESNB1hxCCDhJ8WAQ/OKq5+6vH7vl/mPH/jrD33C61E1TOveiOxhAVl2Cek9oicA8CfbNyX6750SAg8vSEHHRPr7Z/77p1ND9jkf9Qmvd8Np6vnfwTQ0D9MgQ9p5URZfA0DKMgAoBMR1syfenGT++x3Mf9/0zW2vLHzA4atSIAm/Z/LSE/umYvzLph5eAqPeL8S8b4dJheDcr5A58CVMQyS64K7+pWr7ALp5N5CaA9wSAFl4MeDwNRZ4xMXW750aDdg//fJjh5i8jvcJb8CG07RzP0NG/6fIHqGzAAT38s+9AjjH9wEIgL+hUvCeGwCwd0rw3zctBr51nQW8dZ1qBf0Bb07+8XH1DWc+4Q06TOpZBX2hSO8bRQ4/EEKQK4DdSg3gnAxBzHvsOxmDlLkvFX7vlESzPeDwVYLjbOC+qd/99M/sm/z7ys9l6PfGU9+4g+FODHt+gIy+M8gZJ/Fd/JHw5G62TtkJJAD+tvwzFljppJgu+O+dlgKPiCzg4Dxbv/fLU+v3Tv6Tu2/RJ/waG1XqG9a6Hl6X2t2yLneCIblPRPx7ImLfcyH+rPDItg9cAfumBf+9DhZwRGT+lXPi+jcnm9fvnfqV+8krEr6LQotvxq+9YVIy8grbtx/IGcr4Tu7o5Pe2f8IefuWv0g/3zbPg44wFHhWZ/95p1/o9k3Xr93z5zOL/Nfmqdl+3XsMfH2WPBe6feiGocmZXwL7pmvV7JisD3pxKfHzvlz92fz19rZfLtf8fYd+4qBztm8UAAAAASUVORK5CYII='
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'dsh-kit-vscode-open'
+  btn.setAttribute('aria-label', '用 VS Code 打开当前项目')
+  btn.setAttribute('data-dsh-kit-vscode', '1')
+  const img = document.createElement('img')
+  img.src = VSCODE_LOGO
+  img.width = 18
+  img.height = 18
+  img.alt = ''
+  img.draggable = false
+  img.style.cssText = 'display:block;pointer-events:none'
+  btn.appendChild(img)
+  btn.addEventListener('click', () => {
+    const cwd = (window as unknown as { __dshKitVscodeCwd?: string }).__dshKitVscodeCwd
+    const api = (window as unknown as { __dshDesktop?: { openInVscode?: (path: string) => Promise<unknown> } }).__dshDesktop
+    if (cwd && api?.openInVscode) void api.openInVscode(cwd)
+  })
+  const mountVscodeButton = (): void => {
+    const group = getTitlebarActions()
+    if (group === null) return
+    if (group.querySelector('[data-dsh-kit-vscode="1"]') !== null) return
+    const toggle = group.querySelector('.dsh-kit-right-toggle')
+    group.insertBefore(btn, toggle)
+  }
+  mountVscodeButton()
 
   // 标题栏左侧 logo + 左折叠按钮（自己创建，控制 layout.toggleSidebar）。
   // 不再迁移官方 DOM，避免折叠态 React 重渲染导致图标丢失/无法展开。
@@ -1256,6 +1344,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   window.setInterval(() => {
     mountLeftToggle()
     mountLeftResizer()
+    mountVscodeButton()
     ensureOpenState()
   }, 600)
 }
