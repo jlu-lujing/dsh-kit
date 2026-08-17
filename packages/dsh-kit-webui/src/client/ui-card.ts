@@ -1,9 +1,16 @@
-/** 主题卡片：色板预览 + 应用 / 编辑 / 删除。 */
+/** 主题卡片：只展示主题色（关键几色）+ 应用按钮，简洁的预设选择卡。 */
 import { createElement } from 'react'
 import type { WebUITheme } from './themes.ts'
-import { TOKEN_FIELDS } from './themes.ts'
-import { colorSwatches } from './custom-tokens.ts'
 import { tk, cardS, ghostBtn, primaryBtn } from './ui-style.ts'
+
+/** 卡片上展示的「主题色」：取每个主题最有辨识度的几个关键色。 */
+const KEY_TOKENS: Array<{ name: string; label: string }> = [
+  { name: '--dsw-specific-sidebar-fill', label: '侧栏' },
+  { name: '--dsw-alias-bg-base', label: '背景' },
+  { name: '--dsw-alias-brand-primary', label: '强调' },
+  { name: '--dsw-alias-state-success-primary', label: '成功' },
+  { name: '--dsw-alias-state-warn-primary', label: '警告' },
+]
 
 export function ThemeCard(props: {
   theme: WebUITheme
@@ -12,11 +19,9 @@ export function ThemeCard(props: {
   onEdit: (theme: WebUITheme) => void
   onDelete: (id: string) => void
 }) {
-  const { theme, active, onApply, onEdit, onDelete } = props
-  const defaultSwatches = TOKEN_FIELDS.map((f) => ({ name: f.name, value: theme.tokens[f.name] }))
-    .filter((s): s is { name: string; value: string } => typeof s.value === 'string')
-  // 额外 token 里能当颜色的部分，追加到默认色板之后，直观展示深度定制效果。
-  const extraSwatches = colorSwatches(theme.tokens)
+  const { theme, active, onApply } = props
+  const swatches = KEY_TOKENS.map((k) => ({ label: k.label, value: theme.tokens[k.name] }))
+    .filter((s): s is { label: string; value: string } => typeof s.value === 'string')
 
   return createElement('div', {
     style: {
@@ -26,48 +31,28 @@ export function ThemeCard(props: {
     },
   },
     createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+      // 左侧一排主题色条（窄条竖排），右侧主题名
+      createElement('div', { style: { display: 'flex', gap: 4, flex: 'none' } },
+        swatches.map((s) =>
+          createElement('span', {
+            key: s.name,
+            title: `${s.label}: ${s.value}`,
+            style: {
+              width: 10, height: 34, borderRadius: 3,
+              background: s.value, border: '1px solid ' + tk.border,
+            },
+          }),
+        ),
+      ),
       createElement('div', { style: { flex: 1, minWidth: 0 } },
         createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, theme.name),
         createElement('div', { style: { fontSize: 11, color: tk.tertiary, marginTop: 2 } },
-          theme.description + ' · ' + (theme.colorScheme === 'dark' ? '深色底' : '浅色底')
+          theme.colorScheme === 'dark' ? '深色底' : '浅色底'
           + (active ? ' · 使用中' : '')),
-      ),
-      theme.builtin
-        ? createElement('span', { style: { fontSize: 10, color: tk.tertiary } }, '内置')
-        : createElement('div', { style: { display: 'flex', gap: 4 } },
-            createElement('button', {
-              style: { ...ghostBtn, fontSize: 11, padding: '2px 8px' },
-              onClick: () => onEdit(theme),
-            }, '编辑'),
-            createElement('button', {
-              style: { ...ghostBtn, color: tk.danger, borderColor: tk.danger, fontSize: 11, padding: '2px 8px' },
-              onClick: () => onDelete(theme.id),
-            }, '删除'),
-          ),
-    ),
-    createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(18px, 1fr))', gap: 4 } },
-      defaultSwatches.map((s) =>
-        createElement('div', {
-          key: s.name, title: `${s.name}: ${s.value}`,
-          style: { height: 22, borderRadius: 4, background: s.value, border: '1px solid ' + tk.border },
-        }),
-      ),
-      ...(extraSwatches.length > 0
-        ? [createElement('div', {
-            key: 'extra-divider',
-            title: '额外 token',
-            style: { height: 22, width: 2, borderRadius: 1, background: tk.border, margin: '0 3px' },
-          })]
-        : []),
-      extraSwatches.map((s) =>
-        createElement('div', {
-          key: s.key, title: `${s.key}: ${s.value}（额外）`,
-          style: { height: 22, borderRadius: 4, background: s.value, border: '1px solid ' + tk.border },
-        }),
       ),
     ),
     createElement('button', {
-      style: active ? ghostBtn : primaryBtn,
+      style: { width: '100%', ...(active ? ghostBtn : primaryBtn) },
       onClick: () => onApply(theme.id),
     }, active ? '使用中' : '应用这个主题'),
   )

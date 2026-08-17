@@ -16,10 +16,10 @@ function mockStorage() {
   return mem
 }
 
-test('内置预设：3 个家族 x 深/浅两版 = 6 个，token 为单值且字段完整', () => {
-  assert.equal(BUILTIN_THEMES.length, 6)
+test('内置预设：7 个家族 x 深/浅两版 = 14 个，token 为单值且字段完整', () => {
+  assert.equal(BUILTIN_THEMES.length, 14)
   const families = new Set(BUILTIN_THEMES.map((t) => t.id.replace(/-(dark|light)$/, '')))
-  assert.deepEqual([...families].sort(), ['forest', 'ocean', 'sakura'])
+  assert.deepEqual([...families].sort(), ['forest', 'graphite', 'neon', 'ocean', 'sakura', 'solar', 'space'])
   for (const family of families) {
     assert.ok(BUILTIN_THEMES.some((t) => t.id === `${family}-dark` && t.colorScheme === 'dark'))
     assert.ok(BUILTIN_THEMES.some((t) => t.id === `${family}-light` && t.colorScheme === 'light'))
