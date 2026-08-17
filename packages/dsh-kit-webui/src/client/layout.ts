@@ -98,6 +98,7 @@ html label {
   cursor: pointer;
   width: 28px;
   height: 28px;
+  flex: none; /* 不被左容器 flex 压缩，保持正圆 */
   color: var(--dsw-alias-label-secondary);
   background: transparent;
   border: none;
@@ -114,9 +115,9 @@ html label {
 
 /* 左上角常驻 logo + 左折叠钮：独立 fixed 容器，
    不受官方 header 隐藏（新会话 blank 页 header display:none）影响，始终显示。
-   --dsh-kit-left-width = 紧凑 wordmark(高16→宽~122) + gap + 折叠钮 + padding */
+   --dsh-kit-left-width = 官方 wordmark(高24→宽182) + gap + 折叠钮 + padding */
 .dsh-kit-titlebar-left {
-  --dsh-kit-left-width: 190px;
+  --dsh-kit-left-width: 246px;
   position: fixed;
   top: 0;
   left: 0;
@@ -134,13 +135,15 @@ html label {
 .dsh-kit-titlebar-left > * {
   pointer-events: auto;
 }
-/* 紧凑 wordmark：缩小到高16px（宽按 182:24 比例 → 约122px），避免 logo 区过长 */
+/* 官方大小：BrandWordmark 高24px（宽按 182:24 → 182px） */
 .dsh-kit-titlebar-left .dsh-kit-titlebar-logo {
   flex: none;
+  max-width: 196px;
+  overflow: hidden;
 }
 .dsh-kit-titlebar-left .dsh-kit-titlebar-logo svg {
   display: block;
-  height: 16px;
+  height: 24px;
   width: auto;
 }
 
