@@ -166,9 +166,10 @@ html label {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  /* z-index 低于 settings overlay(1000) 等模态层：标题栏不再盖住设置页，
-     同时高于对话区内部最高层级(100)，不会被子元素盖住 */
-  z-index: 200 !important;
+  /* 与左右边栏同层级：标题栏 z-index 设 28（略低于左栏 30）。
+     设置 overlay 挂在左栏 cast 内 z-index 30 > 28 → 设置窗口能盖住标题栏；
+     对话区内部最高 100 也会正常盖过（但那是内容区正常层级）。 */
+  z-index: 28 !important;
   height: 60px !important;
   padding: 0 20px !important;
   box-sizing: border-box;
