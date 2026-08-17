@@ -211,8 +211,9 @@ body.dshkit-maximized .wSkVaW_header {
   bottom: 0;
   width: var(--dsh-sidebar-w, 220px);
   min-width: 150px;
-  transform: translateX(0);
-  transition: transform 0.28s var(--ds-ease-in-out, ease-in-out);
+  /* 用 left 过渡实现滑出（不用 transform，避免创建 containing block，
+     否则官方设置 overlay(fixed,挂在左栏内)会被限制成 220px 左栏宽） */
+  transition: left 0.28s var(--ds-ease-in-out, ease-in-out);
   z-index: 30;
   overflow: hidden;
 }
@@ -238,7 +239,7 @@ body.dsh-kit-left-resizing .wSkVaW_root {
   transition: transform 0s, margin-left 0s !important;
 }
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
-  transform: translateX(-100%);
+  left: calc(-1 * var(--dsh-sidebar-w, 220px));
 }
 /* 内容区（root）展开时空出 220px，折叠占满；与右栏 margin 一致丝滑 */
 .wSkVaW_root {
