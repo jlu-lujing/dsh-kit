@@ -122,7 +122,9 @@ html label {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  z-index: 2147483000 !important;
+  /* z-index 低于 settings overlay(1000) 等模态层：标题栏不再盖住设置页，
+     同时高于对话区内部最高层级(100)，不会被子元素盖住 */
+  z-index: 200 !important;
   height: 60px !important;
   padding: 0 20px !important;
   box-sizing: border-box;
@@ -136,6 +138,7 @@ html label {
 body.dshkit-maximized .wSkVaW_header {
   border-radius: 0 !important;
 }
+
 /* 下方 frame 整体下移避开 fixed 标题栏；用 height+margin 而非 padding，
    避免 grid 高度超出视口把底部输入框挤出屏幕 */
 .pI_x6G_frame {
