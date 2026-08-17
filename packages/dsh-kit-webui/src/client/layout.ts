@@ -219,21 +219,22 @@ body.dshkit-maximized .wSkVaW_header {
 .pI_x6G_sidebarCol .hHd-Xa_root {
   width: 100% !important;
 }
-/* 左栏拖拽边缘：贴左栏右缘 */
+/* 左栏拖拽边缘：正对左栏/对话框交界线（左栏右缘 = 对话框左缘） */
 .dsh-kit-left-resizer {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px;
   cursor: col-resize;
   z-index: 40;
   touch-action: none;
 }
+/* 指示线正对右缘（对话框左边缘），可点面积 12px、鼠标贴合边缘 */
 .dsh-kit-left-resizer::before {
   content: "";
   position: absolute;
-  right: 3px;
+  right: 0;
   top: 0;
   bottom: 0;
   width: 2px;
@@ -241,7 +242,7 @@ body.dshkit-maximized .wSkVaW_header {
 }
 .dsh-kit-left-resizer:hover::before,
 .dsh-kit-left-resizer:active::before {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
 }
 .dsh-kit-left-resizing .pI_x6G_sidebarCol,
 .dsh-kit-left-resizing .wSkVaW_root {
