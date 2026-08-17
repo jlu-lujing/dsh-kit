@@ -362,11 +362,16 @@ html label {
   animation: dsh-kit-stats-pulse 2s ease-in-out infinite;
 }
 .dsh-kit-stats-build {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
   font-size: 10px;
   color: var(--dsw-alias-label-caption);
   font-family: var(--ds-font-family-code, ui-monospace, monospace);
-  opacity: 0.75;
+  opacity: 0.7;
+  pointer-events: none;
 }
+.dsh-kit-stats-card { position: relative; }
 @keyframes dsh-kit-stats-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: .35; }

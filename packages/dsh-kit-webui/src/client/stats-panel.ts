@@ -194,18 +194,30 @@ function buildCard(model: StatsModel): HTMLElement {
   // 标题行
   window.__DSH_KIT_BUILD__ = BUILD_TAG
   const head = el('div', 'dsh-kit-stats-head')
+  // 内联关键布局兜底：不依赖外部 CSS 表是否被应用，保证标题行横排居中
+  head.style.display = 'flex'
+  head.style.flexDirection = 'row'
+  head.style.flexWrap = 'nowrap'
+  head.style.alignItems = 'center'
+  head.style.justifyContent = 'center'
   head.appendChild(el('span', 'dsh-kit-stats-head-dot'))
-  head.appendChild(el('span', 'dsh-kit-stats-head-title', '会话统计'))
+  const titleEl = el('span', 'dsh-kit-stats-head-title', '会话统计')
+  titleEl.style.whiteSpace = 'nowrap'
+  titleEl.style.overflow = 'hidden'
+  titleEl.style.textOverflow = 'ellipsis'
+  titleEl.style.minWidth = '0'
+  head.appendChild(titleEl)
   const live = el('span', 'dsh-kit-stats-live')
+  live.style.flex = 'none'
+  live.style.whiteSpace = 'nowrap'
   live.appendChild(el('span', 'dsh-kit-stats-live-dot'))
   live.appendChild(el('span', null, '实时'))
-  const tag = el('span', 'dsh-kit-stats-build', BUILD_TAG)
-  tag.title = 'bundle 构建标记（诊断用）'
-  live.appendChild(tag)
   head.appendChild(live)
   card.appendChild(head)
 
   const body = el('div', 'dsh-kit-stats-body')
+  body.style.display = 'flex'
+  body.style.flexDirection = 'column'
   card.appendChild(body)
 
   // 缓存命中环形仪表
@@ -279,6 +291,10 @@ function buildCard(model: StatsModel): HTMLElement {
   if (model.tokenPair !== null && model.tokenPair.length > 0) {
     body.appendChild(buildSection('Token 体积', model.tokenPair, 'token'))
   }
+
+  const buildTag = el('div', 'dsh-kit-stats-build', BUILD_TAG)
+  buildTag.title = 'bundle 构建标记（诊断用）'
+  card.appendChild(buildTag)
 
   return card
 }
