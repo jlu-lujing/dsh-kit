@@ -323,6 +323,7 @@ html label {
 .dsh-kit-stats-head {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
@@ -338,7 +339,6 @@ html label {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
 .dsh-kit-stats-head-title {
-  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
