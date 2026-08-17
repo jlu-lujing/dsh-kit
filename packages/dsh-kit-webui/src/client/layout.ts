@@ -201,6 +201,10 @@ body.dshkit-maximized .wSkVaW_header {
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   display: none !important;
 }
+/* frame 恢复单列（内容区含对话+右栏）占满全宽，避免左侧残留轨道把内容挤窄 */
+body.dsh-kit-sidebar-collapsed .pI_x6G_frame {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
 /* 折叠后内容区顶到最左（左上角 logo 由 fixed 标题栏覆盖，不受左栏影响）；
    标题行仍排在 logo 右侧 */
 body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
