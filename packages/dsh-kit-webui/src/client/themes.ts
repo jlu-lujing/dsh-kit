@@ -318,7 +318,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f26d6d',
       '--dsw-alias-state-warn-primary': '#f2b84b',
       '--dsw-specific-sidebar-fill': '#0e1830',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #12213f 0%, #05070d 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #4f9cf9 9%, transparent) 0%, transparent 60%), var(--dsw-specific-sidebar-fill)',
     },
     {
       '--dsw-alias-bg-base': '#f4f8fc',
@@ -332,7 +332,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d94b4b',
       '--dsw-alias-state-warn-primary': '#c98a1f',
       '--dsw-specific-sidebar-fill': '#e7eff8',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f2f7fd 0%, #c9d9ec 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #2f7fd9 11%, transparent) 0%, transparent 62%), var(--dsw-specific-sidebar-fill)',
     },
   ),
   ...family(
@@ -410,7 +410,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f87171',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#0d1320',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #16233d 0%, #05070f 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #7c9cf5 8%, transparent) 0%, transparent 60%), var(--dsw-specific-sidebar-fill)',
     },
     {
       '--dsw-alias-bg-base': '#f2f4fb',
@@ -424,7 +424,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d94055',
       '--dsw-alias-state-warn-primary': '#c28718',
       '--dsw-specific-sidebar-fill': '#e7ecf8',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f0f3fc 0%, #c8d2e8 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #4f6fe0 10%, transparent) 0%, transparent 62%), var(--dsw-specific-sidebar-fill)',
     },
   ),
   ...family(
@@ -472,7 +472,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f472b6',
       '--dsw-alias-state-warn-primary': '#fde047',
       '--dsw-specific-sidebar-fill': '#10142a',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #1a1b4d 0%, #080616 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #a78bfa 10%, transparent) 0%, transparent 60%), var(--dsw-specific-sidebar-fill)',
     },
     {
       '--dsw-alias-bg-base': '#f6f6ff',
@@ -486,7 +486,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#db3f8f',
       '--dsw-alias-state-warn-primary': '#a98c0b',
       '--dsw-specific-sidebar-fill': '#ececff',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #f4f4ff 0%, #d5d0f5 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #8b5cf6 12%, transparent) 0%, transparent 62%), var(--dsw-specific-sidebar-fill)',
     },
   ),
   ...family(
@@ -504,7 +504,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f9736c',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#1a1512',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #2a1d12 0%, #0c0703 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #f59e0b 9%, transparent) 0%, transparent 60%), var(--dsw-specific-sidebar-fill)',
     },
     {
       '--dsw-alias-bg-base': '#faf6f0',
@@ -518,7 +518,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#d24040',
       '--dsw-alias-state-warn-primary': '#b07a00',
       '--dsw-specific-sidebar-fill': '#f1e9dd',
-      '--dsh-kit-frame-grad': 'linear-gradient(180deg, #faf2e7 0%, #e5cba9 100%)',
+      '--dsh-kit-frame-grad': 'radial-gradient(140% 70% at 50% -20%, color-mix(in srgb, #d97706 12%, transparent) 0%, transparent 62%), var(--dsw-specific-sidebar-fill)',
     },
   ),
 ])
