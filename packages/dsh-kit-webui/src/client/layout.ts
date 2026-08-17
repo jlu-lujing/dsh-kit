@@ -528,6 +528,8 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
+  /* drop-shadow 辉光允许画出 SVG 边界，不被默认 overflow:hidden 截断 */
+  overflow: visible;
 }
 .dsh-kit-stats-donut-track {
   stroke: var(--dsw-alias-interactive-bg-hover);
