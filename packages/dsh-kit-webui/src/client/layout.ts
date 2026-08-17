@@ -167,9 +167,11 @@ body.dshkit-maximized .wSkVaW_header {
   display: none !important;
 }
 
-/* 内容区定位上下文（右栏 absolute 用） */
+/* 内容区定位上下文（右栏 absolute 用） + 对话区域四圆角 */
 .wSkVaW_root {
   position: relative;
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 /* 滑动过渡时长（收起时更明显，稍慢一点） */
@@ -233,6 +235,7 @@ body.dshkit-maximized .wSkVaW_header {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  border-radius: 0 14px 14px 0;
   container-type: inline-size;
   container-name: right-panel;
   transform: translateX(102%);
