@@ -196,13 +196,30 @@ body.dshkit-maximized .wSkVaW_header {
   margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
   min-width: 0;
 }
-/* ── 左栏折叠：隐藏左栏本体，保留左上角完整 logo（鲸鱼+DeepSeek Harness）── */
-/* 左栏宽度过渡到 0（不用 display:none 瞬时消失），内容区/右栏平滑跟随 */
-body.dsh-kit-sidebar-collapsed .pI_x6G_frame {
-  grid-template-columns: 0 minmax(0, 1fr) !important;
+/* ── 左栏折叠：与右栏对称——左栏 absolute + transform 滑出，内容区 margin 过渡 ── */
+.pI_x6G_frame {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.pI_x6G_sidebarCol {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 220px;
+  transform: translateX(0);
+  transition: transform 0.28s var(--ds-ease-in-out, ease-in-out);
+  z-index: 30;
 }
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
-  overflow: hidden !important;
+  transform: translateX(-100%);
+}
+/* 内容区（root）展开时空出 220px，折叠占满；与右栏 margin 一致丝滑 */
+.wSkVaW_root {
+  margin-left: 220px;
+  transition: margin-left 0.28s var(--ds-ease-in-out, ease-in-out);
+}
+body.dsh-kit-sidebar-collapsed .wSkVaW_root {
+  margin-left: 0;
 }
 /* 折叠后内容区顶到最左（左上角 logo 由 fixed 标题栏覆盖，不受左栏影响）；
    标题行仍排在 logo 右侧 */
