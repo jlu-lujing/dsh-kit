@@ -172,7 +172,7 @@ body.dshkit-maximized .wSkVaW_header {
   position: relative;
   background: var(--dsw-specific-sidebar-fill);
   /* 底部留出与边栏同色的 margin，让对话区不贴窗口底边 */
-  padding-bottom: 12px;
+  padding-bottom: 6px;
 }
 
 /* 滑动过渡时长（收起时更明显，稍慢一点） */
@@ -237,7 +237,7 @@ body.dshkit-maximized .wSkVaW_header {
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 12px;
+  bottom: 6px;
   width: var(--dsh-kit-right-width, 320px);
   background: var(--dsw-specific-sidebar-fill);
   border-left: 1px solid transparent;
