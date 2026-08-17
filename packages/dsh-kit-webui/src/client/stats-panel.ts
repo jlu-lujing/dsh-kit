@@ -42,13 +42,6 @@ interface TokenUsage {
 /** layout.ts 创建右栏容器后派发，提示组件补写最新数据（面板是惰性创建）。 */
 export const SYNC_EVENT = 'dsh-kit:stats-sync-request'
 
-/** 构建标记：每次改动客户端布局递增，用于快速判断浏览器是否加载到最新 bundle。 */
-export const BUILD_TAG = '20260817-2'
-
-declare global {
-  interface Window { __DSH_KIT_BUILD__?: string }
-}
-
 const HOLDER_SELECTOR = '.dsh-kit-info-stats'
 const CARD_SELECTOR = '.dsh-kit-stats-card'
 
@@ -197,7 +190,6 @@ function buildCard(model: StatsModel): HTMLElement {
   card.style.setProperty('position', 'relative', 'important')
 
   // 标题行
-  window.__DSH_KIT_BUILD__ = BUILD_TAG
   const head = el('div', 'dsh-kit-stats-head')
   // 内联 important：强制标题行横排居中，绝不竖排、绝不被改
   head.style.setProperty('display', 'flex', 'important')
@@ -234,6 +226,13 @@ function buildCard(model: StatsModel): HTMLElement {
       role: 'img',
       'aria-label': `缓存命中 ${model.cacheHit}%`,
     })
+    // 渐变描边：品牌蓝 → 成功绿
+    const defs = svgEl('defs', {})
+    const grad = svgEl('linearGradient', { id: 'dsh-kit-stats-donut-grad', x1: '0', y1: '0', x2: '1', y2: '1' })
+    grad.appendChild(svgEl('stop', { offset: '0%', 'stop-color': 'var(--dsw-alias-state-business-primary)' }))
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': 'var(--dsw-alias-state-success-primary)' }))
+    defs.appendChild(grad)
+
     const track = svgEl('circle', {
       cx: 55, cy: 55, r: DONUT_R,
       class: 'dsh-kit-stats-donut-track', fill: 'none',
@@ -242,6 +241,7 @@ function buildCard(model: StatsModel): HTMLElement {
       cx: 55, cy: 55, r: DONUT_R,
       class: 'dsh-kit-stats-donut-arc', fill: 'none',
     })
+    donut.appendChild(defs)
     donut.appendChild(track)
     donut.appendChild(arc)
     donutWrap.appendChild(donut)
@@ -297,10 +297,6 @@ function buildCard(model: StatsModel): HTMLElement {
     body.appendChild(buildSection('Token 体积', model.tokenPair, 'token'))
   }
 
-  const buildTag = el('div', 'dsh-kit-stats-build', BUILD_TAG)
-  buildTag.title = 'bundle 构建标记（诊断用）'
-  card.appendChild(buildTag)
-
   return card
 }
 
@@ -335,31 +331,37 @@ function buildSection(title: string, pairs: Pair[], prefix: string): HTMLElement
 /* ── 就地更新（数字实时变化时不清空重建） ── */
 
 function updateCard(card: HTMLElement, model: StatsModel, cacheHit: number | null): void {
+  setTextPulse(nodeOf(card, 'cache'), cacheHit !== null ? `${cacheHit}%` : null)
+  setTextPulse(nodeOf(card, 'cache-pct'), cacheHit !== null ? `${cacheHit}%` : null)
+
   for (const t of model.tiles) {
-    const node = nodeOf(card, t.key)
-    if (node) node.textContent = t.value
-  }
-  setDonutTarget(card, cacheHit)
-  if (cacheHit !== null) {
-    const cacheNode = nodeOf(card, 'cache')
-    if (cacheNode) cacheNode.textContent = `${cacheHit}%`
-    const cachePct = nodeOf(card, 'cache-pct')
-    if (cachePct) cachePct.textContent = `${cacheHit}%`
+    setTextPulse(nodeOf(card, t.key), t.value)
   }
 
   if (model.timePair) for (const p of model.timePair) {
     const seg = nodeOf(card, `time-${p.key}-seg`)
     if (seg) seg.style.width = `${Math.max(p.ratio * 100, 2)}%`
-    const val = nodeOf(card, `time-${p.key}-value`)
-    if (val) val.textContent = p.value
+    setTextPulse(nodeOf(card, `time-${p.key}-value`), p.value)
   }
 
   if (model.tokenPair) for (const p of model.tokenPair) {
     const seg = nodeOf(card, `token-${p.key}-seg`)
     if (seg) seg.style.width = `${Math.max(p.ratio * 100, 2)}%`
-    const val = nodeOf(card, `token-${p.key}-value`)
-    if (val) val.textContent = p.value
+    setTextPulse(nodeOf(card, `token-${p.key}-value`), p.value)
   }
+  setDonutTarget(card, cacheHit)
+}
+
+/** 更新文本，若值变化则触发一次短暂高亮脉冲（实时更新的可视反馈）。 */
+function setTextPulse(node: HTMLElement | null, value: string | null): void {
+  if (!node || !value) return
+  if (node.textContent === value) return
+  node.textContent = value
+  node.classList.remove('dsh-kit-flash')
+  // 强制 reflow 让下一次 class 添加重新触发动画
+  void node.offsetWidth
+  node.classList.add('dsh-kit-flash')
+  window.setTimeout(() => node.classList.remove('dsh-kit-flash'), 900)
 }
 
 /** 画环形动画：下一帧把卡片切到 live 态，促使 dashoffset 过渡。 */
