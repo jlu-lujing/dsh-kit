@@ -867,7 +867,11 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   }
 
   // 构建内容区内的右侧栏（懒创建，单例）。
+  /** 是否新会话页（hero）：此时不显示右侧栏与折叠按钮。 */
+  const isNewSession = () => !!document.querySelector('.wSkVaW_root[data-phase="hero"]')
+
   const ensurePanel = (): HTMLElement | null => {
+    if (isNewSession()) return null
     let panel = document.querySelector('.dsh-kit-right-panel') as HTMLElement | null
     if (panel !== null) return panel
     const contentRoot = document.querySelector('.wSkVaW_root')
@@ -1006,6 +1010,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
   // 标题栏右侧折叠按钮。
   const mountToggle = () => {
+    if (isNewSession()) return
     if (document.querySelector('.dsh-kit-right-toggle') !== null) return
     const header = document.querySelector('.wSkVaW_header')
     if (header === null) return
@@ -1075,11 +1080,20 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
 
   if (typeof MutationObserver === 'undefined') return
   const mo = new MutationObserver(() => {
+    // 新会话页：隐藏右侧栏（若残留）且不挂折叠按钮
+    if (isNewSession()) {
+      const cr = document.querySelector('.wSkVaW_root')
+      if (cr && cr.classList.contains('dsh-kit-right-open')) cr.classList.remove('dsh-kit-right-open')
+      const rightToggle = document.querySelector('.dsh-kit-right-toggle')
+      rightToggle?.remove()
+      return
+    }
     mountToggle()
     mountLeftToggle()
     ensureOpenState()
   })
-  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+  // 同时监听 class（折叠态/右栏开合）与 data-phase（新会话↔对话切换）
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-phase'] })
 
   // 立即尝试恢复一次：若 root 已在 DOM（插件晚于 React 挂载），
   // 同步应用存储状态，避免首帧先按默认折叠占满、再跳回展开。
