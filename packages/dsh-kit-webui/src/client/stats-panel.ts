@@ -75,7 +75,6 @@ export const SYNC_EVENT = 'dsh-kit:stats-sync-request'
 
 const HOLDER_SELECTOR = '.dsh-kit-info-stats'
 const CARD_SELECTOR = '.dsh-kit-stats-card'
-let renderCount = 0
 
 /* ── 与官方 StatsLine 一致的格式化工具（conversation 内部私有，这里复刻） ── */
 
@@ -482,7 +481,6 @@ function StatsPanelEntry(_props: StatsPanelEntryProps): null {
   const useSession = _props.useSession
   // syncTick 参与 effect 依赖：面板惰性创建后哪怕数据没变也要补写一次。
   const [syncTick, setSyncTick] = useState(0)
-  renderCount += 1
 
   const projected = useProjection<SessionStats | undefined>('sessionStats')
   const usage = useProjection<TokenUsage | undefined>('tokenUsage')
@@ -493,7 +491,6 @@ function StatsPanelEntry(_props: StatsPanelEntryProps): null {
     : []
   // 优先用节点实时派生（保证流式实时）；无节点时才回退投影。
   const stats = nodes.length > 0 ? deriveStatsFromNodes(nodes) : projected
-  const statsRef = nodes.length > 0 ? `nodes:${nodes.length}` : `proj:${projected?.steps ?? 0}`
 
   // 监听 layout.ts 派发的“面板就绪”事件：容器出现后立即补写（数据不变也会写）。
   useEffect(() => {
@@ -509,22 +506,6 @@ function StatsPanelEntry(_props: StatsPanelEntryProps): null {
   useLayoutEffect(() => {
     writeToPanel(stats, usage)
   }, [stats, usage, syncTick])
-
-  // ── 调试：心跳 + 渲染计数（定位实时更新问题，定位后移除） ──
-  useEffect(() => {
-    const t = window.setInterval(() => {
-      const holder = document.querySelector<HTMLElement>(HOLDER_SELECTOR)
-      if (!holder) return
-      let badge = holder.querySelector<HTMLElement>('.dsh-kit-stats-debug')
-      if (!badge) {
-        badge = document.createElement('div')
-        badge.className = 'dsh-kit-stats-debug'
-        holder.appendChild(badge)
-      }
-      badge.textContent = `渲染#${renderCount} ${statsRef}`
-    }, 500)
-    return () => window.clearInterval(t)
-  }, [statsRef])
 
   // 空根：不让官方 slot 在对话框下方渲染任何东西。
   return null

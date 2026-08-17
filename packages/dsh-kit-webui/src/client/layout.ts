@@ -534,15 +534,6 @@ body.dshkit-maximized .wSkVaW_header {
   100% { color: inherit; }
 }
 .dsh-kit-accent-brand { color: var(--dsw-alias-state-business-primary); }
-/* ── 临时调试徽标（定位实时更新后移除） ── */
-.dsh-kit-stats-debug {
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--dsw-alias-state-warn-primary);
-  font-family: var(--ds-font-family-code, ui-monospace, monospace);
-  opacity: 0.9;
-}
-
 .dsh-kit-accent-good { color: var(--dsw-alias-state-success-primary); }
 .dsh-kit-accent-warn { color: var(--dsw-alias-state-warn-primary); }
 .dsh-kit-stats-section {
