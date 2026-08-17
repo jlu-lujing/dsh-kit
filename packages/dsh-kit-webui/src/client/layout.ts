@@ -173,10 +173,7 @@ html label {
   height: 60px !important;
   padding: 0 20px !important;
   box-sizing: border-box;
-  background:
-    linear-gradient(90deg,
-      var(--dsw-specific-sidebar-fill) 0%,
-      color-mix(in srgb, var(--dsw-specific-sidebar-fill) 88%, black 12%) 100%) !important;
+  background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill)) !important;
   border-bottom-color: transparent !important;
   border-radius: 12px 12px 0 0 !important;
   display: flex;
@@ -193,11 +190,8 @@ body.dshkit-maximized .wSkVaW_header {
   box-sizing: border-box;
   height: calc(100% - 60px) !important;
   margin-top: 60px;
-  /* 外圈渐变：侧栏色从左上角向右下角微深，突出中间的纯白圆角对话卡 */
-  background:
-    linear-gradient(135deg,
-      var(--dsw-specific-sidebar-fill) 0%,
-      color-mix(in srgb, var(--dsw-specific-sidebar-fill) 84%, black 16%) 100%);
+  /* 外圈底色：默认纯 sidebar-fill；渐变主题通过 token --dsh-kit-frame-grad 注入渐变 */
+  background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill));
 }
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
@@ -216,10 +210,7 @@ body.dshkit-maximized .wSkVaW_header {
   left: 0;
   top: 0;
   bottom: 0;
-  background:
-    linear-gradient(135deg,
-      var(--dsw-specific-sidebar-fill) 0%,
-      color-mix(in srgb, var(--dsw-specific-sidebar-fill) 84%, black 16%) 100%);
+  background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill));
   width: var(--dsh-sidebar-w, 220px);
   min-width: 150px;
   /* 用 left 过渡实现滑出（不用 transform，避免创建 containing block，
@@ -363,10 +354,7 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   right: 0;
   bottom: 6px;
   width: var(--dsh-kit-right-width, 320px);
-  background:
-    linear-gradient(135deg,
-      var(--dsw-specific-sidebar-fill) 0%,
-      color-mix(in srgb, var(--dsw-specific-sidebar-fill) 84%, black 16%) 100%);
+  background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill));
   border-left: 1px solid transparent;
   display: flex;
   flex-direction: column;

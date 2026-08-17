@@ -318,6 +318,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f26d6d',
       '--dsw-alias-state-warn-primary': '#f2b84b',
       '--dsw-specific-sidebar-fill': '#0e1830',
+      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #0e1830 0%, #0a1020 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f4f8fc',
@@ -408,6 +409,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f87171',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#0d1320',
+      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #0d1320 0%, #070a12 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f2f4fb',
@@ -468,6 +470,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f472b6',
       '--dsw-alias-state-warn-primary': '#fde047',
       '--dsw-specific-sidebar-fill': '#10142a',
+      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #10142a 0%, #0a0c1c 100%)',
     },
     {
       '--dsw-alias-bg-base': '#f6f6ff',
@@ -498,6 +501,7 @@ export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
       '--dsw-alias-state-error-primary': '#f9736c',
       '--dsw-alias-state-warn-primary': '#fbbf24',
       '--dsw-specific-sidebar-fill': '#1a1512',
+      '--dsh-kit-frame-grad': 'linear-gradient(135deg, #1a1512 0%, #100c08 100%)',
     },
     {
       '--dsw-alias-bg-base': '#faf6f0',
