@@ -214,6 +214,24 @@ body.dshkit-maximized .wSkVaW_header {
 body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   margin-left: calc(92px - 20px);
 }
+/* ── 左栏折叠：完全隐藏左栏 + 左上角按钮，保留左侧留白（与右侧折叠一致） ── */
+body.dsh-kit-sidebar-collapsed .dsh-kit-titlebar-left {
+  display: none !important;
+}
+body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
+  display: none !important;
+}
+/* 左栏折叠后内容区左移；左侧保留 6px 留白（与右侧折叠一致） */
+body.dsh-kit-sidebar-collapsed .pI_x6G_frame {
+  grid-template-columns: 6px minmax(0, 1fr) !important;
+}
+body.dsh-kit-sidebar-collapsed .wSkVaW_header {
+  padding-left: 16px !important;
+}
+/* 左栏折叠：标题从最左（小留白）开始，无需避让左侧 logo */
+body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
+  margin-left: 0 !important;
+}
 .wSkVaW_header::after {
   display: none !important;
 }
