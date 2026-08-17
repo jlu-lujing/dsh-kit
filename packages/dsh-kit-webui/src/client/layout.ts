@@ -15,6 +15,8 @@ const LAYOUT_CSS = `
 :root {
   /* 标题栏左侧常驻区（logo+左折叠）总宽，供 titleRow 右移避让 */
   --dsh-kit-left-width: 246px;
+  /* 左栏宽度（可拖拽调整） */
+  --dsh-sidebar-w: 220px;
 }
 
 /* ── 全局：禁止非录入区的文本选取；鼠标默认箭头，不显示 I-beam ── */
@@ -205,17 +207,45 @@ body.dshkit-maximized .wSkVaW_header {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 220px;
+  width: var(--dsh-sidebar-w, 220px);
   transform: translateX(0);
   transition: transform 0.28s var(--ds-ease-in-out, ease-in-out);
   z-index: 30;
+}
+/* 左栏拖拽边缘：贴左栏右缘 */
+.dsh-kit-left-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 40;
+  touch-action: none;
+}
+.dsh-kit-left-resizer::before {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+}
+.dsh-kit-left-resizer:hover::before,
+.dsh-kit-left-resizer:active::before {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
+}
+.dsh-kit-left-resizing .pI_x6G_sidebarCol,
+.dsh-kit-left-resizing .wSkVaW_root {
+  transition: transform 0s, margin-left 0s;
 }
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   transform: translateX(-100%);
 }
 /* 内容区（root）展开时空出 220px，折叠占满；与右栏 margin 一致丝滑 */
 .wSkVaW_root {
-  margin-left: 220px;
+  margin-left: var(--dsh-sidebar-w, 220px);
   transition: margin-left 0.28s var(--ds-ease-in-out, ease-in-out);
 }
 body.dsh-kit-sidebar-collapsed .wSkVaW_root {
@@ -857,6 +887,66 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     try { localStorage.setItem(RIGHT_WIDTH_KEY, String(w)) } catch { /* ignore */ }
   }
 
+  // ── 左栏宽度：可拖拽调整，持久化 ──
+  const LEFT_WIDTH_KEY = 'dsh-kit:sidebar-width'
+  const LEFT_WIDTH_MIN = 180
+  const LEFT_WIDTH_MAX = 400
+  const readLeftWidth = (): number => {
+    try {
+      const v = Number(localStorage.getItem(LEFT_WIDTH_KEY))
+      if (Number.isFinite(v) && v >= LEFT_WIDTH_MIN && v <= LEFT_WIDTH_MAX) return v
+    } catch { /* ignore */ }
+    return 220
+  }
+  const applyLeftWidth = (px: number) => {
+    const w = Math.round(Math.min(LEFT_WIDTH_MAX, Math.max(LEFT_WIDTH_MIN, px)))
+    root.style.setProperty('--dsh-sidebar-w', `${w}px`)
+    try { localStorage.setItem(LEFT_WIDTH_KEY, String(w)) } catch { /* ignore */ }
+  }
+
+  /** 挂左栏拖拽边缘：贴左栏右缘，左右拖动改宽度（与右栏对称）。 */
+  const mountLeftResizer = () => {
+    const col = document.querySelector<HTMLElement>('.pI_x6G_sidebarCol')
+    if (col === null) return
+    if (col.querySelector('.dsh-kit-left-resizer') !== null) return
+    const resizer = document.createElement('div')
+    resizer.className = 'dsh-kit-left-resizer'
+    resizer.setAttribute('aria-hidden', 'true')
+    col.appendChild(resizer)
+
+    let startX = 0
+    let startW = 0
+    let dragging = false
+    const rootEl = () => document.querySelector('.wSkVaW_root')
+
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return
+      // 左栏贴左缘，向右拖 = 变宽：宽度 = 起始宽 + (当前X - 起始X)
+      applyLeftWidth(startW + (e.clientX - startX))
+      e.preventDefault()
+    }
+    const onUp = () => {
+      if (!dragging) return
+      dragging = false
+      rootEl()?.classList.remove('dsh-kit-left-resizing')
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+    resizer.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return
+      dragging = true
+      startX = e.clientX
+      startW = readLeftWidth()
+      rootEl()?.classList.add('dsh-kit-left-resizing')
+      resizer.setPointerCapture?.(e.pointerId)
+      e.preventDefault()
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
+    })
+  }
+
   // 右侧栏展开/收起状态：持久化，切换对话/刷新都不自动折叠。
   const OPEN_KEY = 'dsh-kit:right-panel-open'
   const readOpen = (): boolean => localStorage.getItem(OPEN_KEY) === '1'
@@ -1130,6 +1220,8 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     }
   }
   mountLeftToggle()
+  applyLeftWidth(readLeftWidth())
+  mountLeftResizer()
 
   if (typeof MutationObserver === 'undefined') return
   const mo = new MutationObserver(() => {
@@ -1143,6 +1235,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     }
     mountToggle()
     mountLeftToggle()
+    mountLeftResizer()
     ensureOpenState()
   })
   // 同时监听 class（折叠态/右栏开合）与 data-phase（新会话↔对话切换）
@@ -1156,6 +1249,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   // 定期复核展开状态与存储一致（用户最后意图优先）。
   window.setInterval(() => {
     mountLeftToggle()
+    mountLeftResizer()
     ensureOpenState()
   }, 600)
 }
