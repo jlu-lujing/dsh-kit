@@ -228,7 +228,7 @@ body.dshkit-maximized .wSkVaW_header {
   top: 0;
   bottom: 0;
   width: 12px;
-  cursor: col-resize;
+  cursor: col-resize !important;
   z-index: 40;
   touch-action: none;
 }
