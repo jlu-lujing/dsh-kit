@@ -113,16 +113,19 @@ html label {
 }
 
 /* 左上角常驻 logo + 左折叠钮：独立 fixed 容器，
-   不受官方 header 隐藏（新会话 blank 页 header display:none）影响，始终显示。 */
+   不受官方 header 隐藏（新会话 blank 页 header display:none）影响，始终显示。
+   --dsh-kit-left-width = 紧凑 wordmark(高16→宽~122) + gap + 折叠钮 + padding */
 .dsh-kit-titlebar-left {
+  --dsh-kit-left-width: 190px;
   position: fixed;
   top: 0;
   left: 0;
   height: 60px;
+  width: var(--dsh-kit-left-width);
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 16px 0 12px;
+  padding: 0 14px 0 12px;
   box-sizing: border-box;
   z-index: 201;
   background: transparent;
@@ -130,6 +133,15 @@ html label {
 }
 .dsh-kit-titlebar-left > * {
   pointer-events: auto;
+}
+/* 紧凑 wordmark：缩小到高16px（宽按 182:24 比例 → 约122px），避免 logo 区过长 */
+.dsh-kit-titlebar-left .dsh-kit-titlebar-logo {
+  flex: none;
+}
+.dsh-kit-titlebar-left .dsh-kit-titlebar-logo svg {
+  display: block;
+  height: 16px;
+  width: auto;
 }
 
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
@@ -169,9 +181,10 @@ body.dshkit-maximized .wSkVaW_header {
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
 }
-/* 对话标题（含 mode/worktree）整体往右，避开左侧常驻 logo/折叠（固定容器宽约 92px） */
-.wSkVaW_header .wSkVaW_titleCluster {
-  margin-left: 92px;
+/* 标题行整体往右：按顺序 logo→折叠→(空)→标题→右侧，避免叠在一起 */
+.wSkVaW_header .wSkVaW_titleRow {
+  margin-left: calc(var(--dsh-kit-left-width, 190px) - 20px);
+  min-width: 0;
 }
 .wSkVaW_header::after {
   display: none !important;
