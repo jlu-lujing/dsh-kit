@@ -48,6 +48,8 @@ const dshDesktop = {
   onMaximizedChange: (cb: (isMax: boolean) => void) => {
     ipcRenderer.on('window:maximized-changed', (_e, isMax: boolean) => cb(Boolean(isMax)))
   },
+  /** 用 VS Code 打开指定目录（渲染层通过 __dshDesktop.openInVscode(path) 调用）。 */
+  openInVscode: (path: string) => ipcRenderer.invoke('open-in-vscode', path),
 }
 
 contextBridge.exposeInMainWorld('__dshDesktop', dshDesktop)

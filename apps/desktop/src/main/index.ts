@@ -10,6 +10,7 @@
 import { app, BrowserWindow, shell, dialog, Tray, ipcMain, screen } from 'electron'
 import type { Rectangle } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DESKTOP_CHROME_CSS, DESKTOP_CHROME_JS } from './desktop-chrome'
@@ -188,6 +189,27 @@ function registerWindowControls(): void {
   })
   ipcMain.on('window:drag-end', () => {
     dragState = null
+  })
+
+  // 用 VS Code 打开指定目录：优先 code/code.cmd，失败回退文件管理器
+  ipcMain.handle('open-in-vscode', async (_e, path) => {
+    if (typeof path !== 'string' || path === '') return { ok: false, error: 'empty path' }
+    const candidates = process.platform === 'win32'
+      ? ['code.cmd', 'code']
+      : ['code']
+    for (const bin of candidates) {
+      try {
+        const child = spawn(bin, [path], { shell: false, detached: true, stdio: 'ignore' })
+        child.unref()
+        return { ok: true, bin }
+      } catch { /* try next */ }
+    }
+    try {
+      if (process.platform === 'win32') await shell.openPath(path)
+      return { ok: false, error: 'vscode not found' }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
   })
 }
 

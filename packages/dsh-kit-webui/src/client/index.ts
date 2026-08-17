@@ -13,6 +13,7 @@ import { ThemeStoreController } from './controller.ts'
 import { ThemeStorePanel } from './panel.ts'
 import { installLayoutTweaks } from './layout.ts'
 import { StatsPanelEntry, SYNC_EVENT } from './stats-panel.ts'
+import { VscodeOpenButton } from './vscode-button.tsx'
 
 export const name = 'dsh-kit-webui'
 
@@ -44,6 +45,15 @@ export function apply(ctx: { get(name: string): unknown }): void {
       { name: 'conversation.composer.dock', id: 'stats', order: 0, priority: -1 },
       StatsPanelEntry,
     ),
+  )
+
+  // 标题栏右侧：用 VS Code 打开当前项目目录按钮（取当前会话 cwd）。
+  slots.inject('conversation.session.header.actions', () =>
+    slots.register({
+      name: 'conversation.session.header.actions',
+      id: 'dsh-kit-vscode-open',
+      priority: -10,
+    }, VscodeOpenButton),
   )
 
   // 官方设置页「主题商店」面板（id 专属 → 官方设置页多一项）。
