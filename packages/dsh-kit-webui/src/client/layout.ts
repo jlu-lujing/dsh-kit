@@ -219,7 +219,7 @@ body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   transition: margin-left 0.28s var(--ds-ease-in-out, ease-in-out);
 }
 body.dsh-kit-sidebar-collapsed .wSkVaW_root {
-  margin-left: 0;
+  margin-left: 6px;
 }
 /* 折叠后内容区顶到最左（左上角 logo 由 fixed 标题栏覆盖，不受左栏影响）；
    标题行仍排在 logo 右侧 */
