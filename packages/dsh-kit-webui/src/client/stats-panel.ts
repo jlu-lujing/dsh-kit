@@ -190,34 +190,39 @@ const DONUT_C = 2 * Math.PI * DONUT_R
 
 function buildCard(model: StatsModel): HTMLElement {
   const card = el('div', 'dsh-kit-stats-card')
+  // 强锁（important 级内联）：卡片整体块级纵向，压过任何外部 stylesheet 的横向规则
+  card.style.setProperty('display', 'block', 'important')
+  card.style.setProperty('flex-direction', 'column', 'important')
+  card.style.setProperty('flex-wrap', 'nowrap', 'important')
+  card.style.setProperty('position', 'relative', 'important')
 
   // 标题行
   window.__DSH_KIT_BUILD__ = BUILD_TAG
   const head = el('div', 'dsh-kit-stats-head')
-  // 内联关键布局兜底：不依赖外部 CSS 表是否被应用，保证标题行横排居中
-  head.style.display = 'flex'
-  head.style.flexDirection = 'row'
-  head.style.flexWrap = 'nowrap'
-  head.style.alignItems = 'center'
-  head.style.justifyContent = 'center'
+  // 内联 important：强制标题行横排居中，绝不竖排、绝不被改
+  head.style.setProperty('display', 'flex', 'important')
+  head.style.setProperty('flex-direction', 'row', 'important')
+  head.style.setProperty('flex-wrap', 'nowrap', 'important')
+  head.style.setProperty('align-items', 'center', 'important')
+  head.style.setProperty('justify-content', 'center', 'important')
   head.appendChild(el('span', 'dsh-kit-stats-head-dot'))
   const titleEl = el('span', 'dsh-kit-stats-head-title', '会话统计')
-  titleEl.style.whiteSpace = 'nowrap'
-  titleEl.style.overflow = 'hidden'
-  titleEl.style.textOverflow = 'ellipsis'
-  titleEl.style.minWidth = '0'
+  titleEl.style.setProperty('white-space', 'nowrap', 'important')
+  titleEl.style.setProperty('overflow', 'hidden', 'important')
+  titleEl.style.setProperty('text-overflow', 'ellipsis', 'important')
+  titleEl.style.setProperty('min-width', '0', 'important')
   head.appendChild(titleEl)
   const live = el('span', 'dsh-kit-stats-live')
-  live.style.flex = 'none'
-  live.style.whiteSpace = 'nowrap'
+  live.style.setProperty('flex', 'none', 'important')
+  live.style.setProperty('white-space', 'nowrap', 'important')
   live.appendChild(el('span', 'dsh-kit-stats-live-dot'))
   live.appendChild(el('span', null, '实时'))
   head.appendChild(live)
   card.appendChild(head)
 
   const body = el('div', 'dsh-kit-stats-body')
-  body.style.display = 'flex'
-  body.style.flexDirection = 'column'
+  body.style.setProperty('display', 'block', 'important')
+  body.style.setProperty('width', '100%', 'important')
   card.appendChild(body)
 
   // 缓存命中环形仪表

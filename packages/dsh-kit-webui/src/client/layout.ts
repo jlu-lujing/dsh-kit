@@ -309,6 +309,8 @@ html label {
   padding: 8px 0;
 }
 .dsh-kit-stats-card {
+  display: block !important;
+  flex-direction: column !important;
   border: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
   border-radius: 14px;
@@ -321,7 +323,9 @@ html label {
   to { opacity: 1; transform: translateY(0); }
 }
 .dsh-kit-stats-head {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -377,9 +381,15 @@ html label {
   50% { opacity: .35; }
 }
 .dsh-kit-stats-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: block !important;
+  width: 100% !important;
+}
+.dsh-kit-stats-body > * + * {
+  margin-top: 16px;
+}
+/* 窄容器收窄间距 */
+@container right-panel (max-width: 319px) {
+  .dsh-kit-stats-body > * + * { margin-top: 12px; }
 }
 .dsh-kit-stats-donut-wrap {
   position: relative;
