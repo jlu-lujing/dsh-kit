@@ -195,6 +195,10 @@ body.dshkit-maximized .wSkVaW_header {
 .wSkVaW_root.dsh-kit-right-open .wSkVaW_scrollBody {
   margin-right: var(--dsh-kit-right-width, 320px);
 }
+/* 启动/刷新恢复展开状态时：禁用过渡，避免对话区先占满再收回 */
+.wSkVaW_root.dsh-kit-right-boot .wSkVaW_scrollBody {
+  transition: none !important;
+}
 /* 拖拽右栏宽度时，边距平滑跟随（无过渡：跟手） */
 
 
@@ -915,23 +919,35 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   // （切换对话等）：用户最后意图以存储为准，class 丢了就补回来。
   // 防抖：observer 高频触发时合并到下一帧，避免反复改 class。
   let syncScheduled = false
+  /** 本次会话是否已把存储状态完整应用到首个面板（用于首帧免过渡）。 */
+  let bootApplied = false
   const ensureOpenState = () => {
     if (syncScheduled) return
     const contentRoot = document.querySelector('.wSkVaW_root')
     if (contentRoot === null) return
     syncScheduled = true
-    requestAnimationFrame(() => {
+    const apply = () => {
       syncScheduled = false
       const wantOpen = readOpen()
       const isOpen = contentRoot.classList.contains('dsh-kit-right-open')
       if (wantOpen !== isOpen) {
+        // 首次恢复（启动/刷新）：禁用过渡，直接切到目标宽度，
+        // 避免对话区先占满再平滑收回的闪烁。
+        if (!bootApplied) contentRoot.classList.add('dsh-kit-right-boot')
         contentRoot.classList.toggle('dsh-kit-right-open', wantOpen)
         const btn = toggleBtn()
         if (btn) btn.setAttribute('aria-pressed', wantOpen ? 'true' : 'false')
-        // 面板可能还没建：强制确保（展开时）
         if (wantOpen) ensurePanel()
       }
-    })
+      if (!bootApplied) {
+        bootApplied = true
+        // 下一帧移除 boot 类，恢复后续正常过渡
+        requestAnimationFrame(() => requestAnimationFrame(() => contentRoot.classList.remove('dsh-kit-right-boot')))
+      }
+    }
+    // 同步应用：MutationObserver 在 DOM 变化后、浏览器绘制前的微任务里触发，
+    // 此时给 root 加 class 能让首帧就是目标的展开/收起宽度，避免先占满再跳变。
+    apply()
   }
 
   // 标题栏右侧折叠按钮。
@@ -996,6 +1012,10 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     ensureOpenState()
   })
   mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+
+  // 立即尝试恢复一次：若 root 已在 DOM（插件晚于 React 挂载），
+  // 同步应用存储状态，避免首帧先按默认折叠占满、再跳回展开。
+  ensureOpenState()
 
   // 兜底：切换左侧会话后，无论 React 如何重渲染/重挂载 root，
   // 定期复核展开状态与存储一致（用户最后意图优先）。
