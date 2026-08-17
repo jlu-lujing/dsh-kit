@@ -17,32 +17,47 @@ const LAYOUT_CSS = `
   -webkit-user-select: none;
   user-select: none;
 }
-html, body, :where(body), :where(body) *:not(input):not(textarea):not([contenteditable]):not([role="textbox"]) {
+/* 最广覆盖：所有元素默认箭头。后续用 html 前缀提特异性豁免。 */
+html,
+body,
+body * {
   cursor: default !important;
 }
-/* 可输入/可编辑/对话框（对话流）区：恢复选词能力 */
-:where(input, textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"]) {
+/* 可输入/可编辑/对话框（对话流）区：恢复选词能力 + text 光标 */
+html input,
+html textarea,
+html [contenteditable="true"],
+html [contenteditable=""],
+html [role="textbox"] {
   -webkit-user-select: text;
   user-select: text;
   cursor: text !important;
 }
-[data-chat-flow],
-[data-chat-anchor-key] {
+html [data-chat-flow],
+html [data-chat-anchor-key] {
   -webkit-user-select: text;
   user-select: text;
 }
-/* 对话流内的可交互控件仍是 pointer，文本仍是箭头 */
-[data-chat-flow] button,
-[data-chat-flow] a,
-[data-chat-flow] select,
-[data-chat-flow] summary,
-[data-chat-flow] [role="button"],
-[data-chat-flow] [role="menuitem"],
-[data-chat-flow] [role="link"] {
+/* 对话流内可交互控件：pointer（文本本身仍是箭头，data-chat-flow 已豁免选词） */
+html [data-chat-flow] button,
+html [data-chat-flow] a,
+html [data-chat-flow] select,
+html [data-chat-flow] summary,
+html [data-chat-flow] [role="button"],
+html [data-chat-flow] [role="menuitem"],
+html [data-chat-flow] [role="link"] {
   cursor: pointer !important;
 }
-/* 其余全局交互控件保留 pointer */
-:where(button, a, select, summary, [role="button"], [role="menuitem"], [role="link"], [role="tab"], label) {
+/* 其余全局交互控件：pointer */
+html button,
+html a,
+html select,
+html summary,
+html [role="button"],
+html [role="menuitem"],
+html [role="link"],
+html [role="tab"],
+html label {
   cursor: pointer !important;
 }
 /* 右栏拖拽柄 */
