@@ -175,10 +175,6 @@ html label {
   box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill) !important;
   border-bottom-color: transparent !important;
-  /* 顶栏底部一条细腻的主题色光晕线 */
-  box-shadow:
-    0 1px 0 color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent),
-    0 2px 14px -6px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
   border-radius: 12px 12px 0 0 !important;
   display: flex;
   flex-direction: column;
@@ -194,10 +190,8 @@ body.dshkit-maximized .wSkVaW_header {
   box-sizing: border-box;
   height: calc(100% - 60px) !important;
   margin-top: 60px;
-  /* 高级感氛围：sidebar-fill 为主 + 主题 brand 色从顶部中央径向渗出光晕 */
-  background:
-    radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent), transparent 55%),
-    linear-gradient(180deg, color-mix(in srgb, var(--dsw-specific-sidebar-fill) 96%, var(--dsw-alias-brand-primary) 4%), var(--dsw-specific-sidebar-fill) 40%);
+  /* frame 底色与侧边栏同色：折叠后四周留白（6px）露出与侧边栏一致的颜色 */
+  background: var(--dsw-specific-sidebar-fill);
 }
 .wSkVaW_header .wSkVaW_titleRow {
   min-height: 0;
@@ -271,18 +265,6 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   display: none !important;
 }
 
-/* 输入框卡片：高级氛围——细渐变边框 + 品牌色辉光（随主题色） */
-[data-composer-seat] .uV2eYG_card,
-[data-conversation-composer-overlay] .uV2eYG_card {
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent);
-  background:
-    radial-gradient(110% 120% at 50% -20%, color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent), transparent 60%),
-    var(--dsw-specific-input-major);
-  box-shadow:
-    0 8px 28px -14px color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent);
-}
-
 /* 禁用官方窗口层右侧 grid 列：右栏由我们放内容区内 */
 .pI_x6G_detailsCol {
   display: none !important;
@@ -318,10 +300,6 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   border-radius: 14px;
   overflow: hidden auto;
   margin-right: 6px;
-  /* 高级浮起：柔和多层投影，阴影带一点主题品牌色 */
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent),
-    0 8px 24px -12px color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent);
   transition: margin-right var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
 }
 .wSkVaW_root.dsh-kit-right-open .wSkVaW_scrollBody {
