@@ -175,13 +175,13 @@ body.dshkit-maximized .wSkVaW_header {
   --dsh-kit-right-ease: var(--ds-ease-in-out, ease-in-out);
 }
 
-/* 右侧栏展开时：对话滚动区往左挤窄，并平滑过渡（模拟左栏 grid 动画） */
+/* 对话区域始终为「右栏展开」的宽度：预留右栏宽度，避免开合时内容跳动。
+   右栏收起时面板本身滑出，但对话区保持缩窄后的尺寸不变。 */
 .wSkVaW_scrollBody {
-  transition: margin-right var(--dsh-kit-right-slow) var(--dsh-kit-right-ease);
-}
-.wSkVaW_root.dsh-kit-right-open .wSkVaW_scrollBody {
   margin-right: var(--dsh-kit-right-width, 320px);
 }
+/* 拖拽右栏宽度时，边距平滑跟随（无过渡：跟手） */
+
 
 /* 右侧栏宽度拖拽边缘（贴面板左缘，col-resize） */
 .dsh-kit-right-resizer {
