@@ -244,9 +244,9 @@ body.dshkit-maximized .wSkVaW_header {
 .dsh-kit-left-resizer:active::before {
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
 }
-.dsh-kit-left-resizing .pI_x6G_sidebarCol,
-.dsh-kit-left-resizing .wSkVaW_root {
-  transition: transform 0s, margin-left 0s;
+body.dsh-kit-left-resizing .pI_x6G_sidebarCol,
+body.dsh-kit-left-resizing .wSkVaW_root {
+  transition: transform 0s, margin-left 0s !important;
 }
 body.dsh-kit-sidebar-collapsed .pI_x6G_sidebarCol {
   transform: translateX(-100%);
@@ -925,8 +925,6 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     let startX = 0
     let startW = 0
     let dragging = false
-    const rootEl = () => document.querySelector('.wSkVaW_root')
-
     const onMove = (e: PointerEvent) => {
       if (!dragging) return
       // 左栏贴左缘，向右拖 = 变宽：宽度 = 起始宽 + (当前X - 起始X)
@@ -936,7 +934,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     const onUp = () => {
       if (!dragging) return
       dragging = false
-      rootEl()?.classList.remove('dsh-kit-left-resizing')
+      document.body.classList.remove('dsh-kit-left-resizing')
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
@@ -946,7 +944,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       dragging = true
       startX = e.clientX
       startW = readLeftWidth()
-      rootEl()?.classList.add('dsh-kit-left-resizing')
+      document.body.classList.add('dsh-kit-left-resizing')
       resizer.setPointerCapture?.(e.pointerId)
       e.preventDefault()
       window.addEventListener('pointermove', onMove)
