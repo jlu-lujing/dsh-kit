@@ -42,6 +42,13 @@ interface TokenUsage {
 /** layout.ts 创建右栏容器后派发，提示组件补写最新数据（面板是惰性创建）。 */
 export const SYNC_EVENT = 'dsh-kit:stats-sync-request'
 
+/** 构建标记：每次改动客户端布局递增，用于快速判断浏览器是否加载到最新 bundle。 */
+export const BUILD_TAG = '20260817-2'
+
+declare global {
+  interface Window { __DSH_KIT_BUILD__?: string }
+}
+
 const HOLDER_SELECTOR = '.dsh-kit-info-stats'
 const CARD_SELECTOR = '.dsh-kit-stats-card'
 
@@ -185,12 +192,16 @@ function buildCard(model: StatsModel): HTMLElement {
   const card = el('div', 'dsh-kit-stats-card')
 
   // 标题行
+  window.__DSH_KIT_BUILD__ = BUILD_TAG
   const head = el('div', 'dsh-kit-stats-head')
   head.appendChild(el('span', 'dsh-kit-stats-head-dot'))
   head.appendChild(el('span', 'dsh-kit-stats-head-title', '会话统计'))
   const live = el('span', 'dsh-kit-stats-live')
   live.appendChild(el('span', 'dsh-kit-stats-live-dot'))
   live.appendChild(el('span', null, '实时'))
+  const tag = el('span', 'dsh-kit-stats-build', BUILD_TAG)
+  tag.title = 'bundle 构建标记（诊断用）'
+  live.appendChild(tag)
   head.appendChild(live)
   card.appendChild(head)
 
