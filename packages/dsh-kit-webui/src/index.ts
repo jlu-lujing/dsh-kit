@@ -3,7 +3,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
-  loadThemes, saveThemes, defaultStateDir, type ThemeRecord,
+  loadStoreState, saveStoreState, defaultStateDir,
+  type ThemeRecord, type ThemeStoreState,
 } from './store.ts'
 
 /** Cordis plugin name. */
@@ -41,6 +42,12 @@ export interface DshKitWebUiService {
   saveTheme(theme: ThemeRecord): void
   /** Delete a custom theme. Builtins are immutable (returns false). */
   deleteTheme(id: string): boolean
+  /** Current active theme + global layer (shared across origins). */
+  getState(): ThemeStoreState
+  /** Persist active theme id (null = follow official). */
+  setActive(active: string | null): void
+  /** Persist the global layer. */
+  setGlobal(global: Record<string, { light: string; dark: string }>): void
 }
 
 /**
@@ -56,7 +63,8 @@ export interface DshKitWebUiService {
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const stateDir = config.stateDir ?? defaultStateDir()
-  const themes = loadThemes(stateDir)
+  const state = loadStoreState(stateDir)
+  const themes = state.themes
 
   const service: DshKitWebUiService = {
     listThemes: () => [...themes],
@@ -64,17 +72,26 @@ export function apply(ctx: Context, config: Config = {}): void {
       const i = themes.findIndex((t) => t.id === theme.id)
       if (i === -1) themes.push(theme)
       else themes[i] = theme
-      saveThemes(stateDir, themes)
+      saveStoreState(stateDir, { themes, active: state.active, global: state.global })
     },
     deleteTheme: (id: string): boolean => {
       const t = themes.find((x) => x.id === id)
       if (!t || t.builtin) return false
       const next = themes.filter((x) => x.id !== id)
-      saveThemes(stateDir, next)
       // mutate in place so in-memory stays authoritative
       themes.length = 0
       themes.push(...next)
+      saveStoreState(stateDir, { themes, active: state.active, global: state.global })
       return true
+    },
+    getState: () => ({ active: state.active, global: { ...state.global } }),
+    setActive: (active: string | null) => {
+      state.active = active ?? null
+      saveStoreState(stateDir, { themes, active: state.active, global: state.global })
+    },
+    setGlobal: (global) => {
+      state.global = global ?? {}
+      saveStoreState(stateDir, { themes, active: state.active, global: state.global })
     },
   }
 
@@ -96,7 +113,11 @@ export function apply(ctx: Context, config: Config = {}): void {
       path: '/dsh-kit-webui/themes',
       handler: (req, res) => {
         if (req.method === 'GET') {
-          return sendJson(res, 200, { themes: service.listThemes() })
+          return sendJson(res, 200, {
+            themes: service.listThemes(),
+            active: state.active,
+            global: state.global,
+          })
         }
         if (req.method === 'POST') {
           return void readBody(req).then((raw) => {
@@ -107,6 +128,36 @@ export function apply(ctx: Context, config: Config = {}): void {
                 return
               }
               service.saveTheme(theme)
+              sendJson(res, 200, { ok: true })
+            } catch {
+              sendJson(res, 400, { error: 'invalid JSON' })
+            }
+          })
+        }
+        return sendJson(res, 405, { error: 'method not allowed' })
+      },
+    }),
+    webServer.register({
+      kind: 'exact',
+      path: '/dsh-kit-webui/state',
+      handler: (req, res) => {
+        if (req.method === 'GET') {
+          return sendJson(res, 200, service.getState())
+        }
+        if (req.method === 'POST') {
+          return void readBody(req).then((raw) => {
+            try {
+              const body = JSON.parse(raw) as { active?: unknown; global?: unknown }
+              if ('active' in body) {
+                if (body.active !== null && typeof body.active !== 'string') {
+                  sendJson(res, 400, { error: 'invalid active' })
+                  return
+                }
+                service.setActive(body.active as string | null)
+              }
+              if (body.global !== undefined) {
+                service.setGlobal(body.global as Record<string, { light: string; dark: string }>)
+              }
               sendJson(res, 200, { ok: true })
             } catch {
               sendJson(res, 400, { error: 'invalid JSON' })

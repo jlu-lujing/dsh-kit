@@ -23,14 +23,26 @@ function mergeThemes(custom: WebUITheme[], fromHost: WebUITheme[]): WebUITheme[]
   return out
 }
 
-async function fetchHostThemes(): Promise<WebUITheme[]> {
+async function fetchHostThemes(): Promise<{
+  themes: WebUITheme[]
+  active: string | null
+  global: Record<string, TokenModes>
+}> {
   try {
     const res = await fetch('/dsh-kit-webui/themes')
-    if (!res.ok) return []
-    const data = (await res.json()) as { themes?: WebUITheme[] }
-    return Array.isArray(data.themes) ? data.themes : []
+    if (!res.ok) return { themes: [], active: null, global: {} }
+    const data = (await res.json()) as {
+      themes?: WebUITheme[]
+      active?: string | null
+      global?: Record<string, TokenModes>
+    }
+    return {
+      themes: Array.isArray(data.themes) ? data.themes : [],
+      active: data.active ?? null,
+      global: data.global ?? {},
+    }
   } catch {
-    return []
+    return { themes: [], active: null, global: {} }
   }
 }
 
@@ -50,6 +62,16 @@ function postHostDelete(id: string): void {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
+    }).catch(() => undefined)
+  } catch { /* 离线忽略 */ }
+}
+
+function postHostState(state: { active?: string | null; global?: Record<string, TokenModes> }): void {
+  try {
+    fetch('/dsh-kit-webui/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
     }).catch(() => undefined)
   } catch { /* 离线忽略 */ }
 }
@@ -107,18 +129,31 @@ export class ThemeStoreController {
   /** 启动：恢复本地/远端主题，注册全部主题，应用全局层，恢复 active。 */
   async init(): Promise<void> {
     const stored = loadStored()
-    this.globalTokens = stored.global
-    this.applyGlobalLayer(stored.global)
+    const host = await fetchHostThemes()
 
-    const hostThemes = await fetchHostThemes()
-    this.themes = mergeThemes(stored.custom, hostThemes)
+    // 选中主题 / 全局层以上收 host 为准（桌面与 LAN 浏览器共享同一份），
+    // 本地 localStorage 只兜底首次离线 / 尚未迁移的旧值。
+    this.globalTokens = host.global && Object.keys(host.global).length > 0 ? host.global : stored.global
+    this.applyGlobalLayer(this.globalTokens)
+
+    this.themes = mergeThemes(stored.custom, host.themes)
     this.registerAll()
 
-    if (stored.active && this.themes.some((t) => t.id === stored.active)) {
-      this.activeId = stored.active
-      try { this.theme?.setTheme(stored.active) } catch { /* ignore */ }
+    const active = host.active ?? stored.active ?? null
+    if (active && this.themes.some((t) => t.id === active)) {
+      this.activeId = active
+      try { this.theme?.setTheme(active) } catch { /* ignore */ }
+      // 若 host 尚未记录这个 active（旧版本只存了本地 localStorage），
+      // 现在把用户的选中项同步到 host —— 这样桌面和浏览器（3443/3080）
+      // 共享同一份主题，两个入口显示一致。
+      if (host.active !== active) postHostState({ active })
     } else {
       this.activeId = this.theme?.getTheme()?.active?.id ?? null
+      if (host.active === null && stored.active) {
+        // 迁移旧 localStorage 的选中项到 host，让另一入口也能看到。
+        // 注意必须是用户存的 stored.active，而不是官方回退的 this.activeId。
+        postHostState({ active: stored.active })
+      }
     }
     this.ready = true
     this.emit()
@@ -129,6 +164,7 @@ export class ThemeStoreController {
     this.applyGlobalLayer(next)
     const stored = loadStored()
     saveStored({ ...stored, global: next })
+    postHostState({ global: next })
     this.emit()
   }
 
@@ -146,6 +182,7 @@ export class ThemeStoreController {
     try { this.theme?.setTheme(id) } catch { /* ignore */ }
     const stored = loadStored()
     saveStored({ ...stored, active: id })
+    postHostState({ active: id })
     this.emit()
   }
 
@@ -174,6 +211,7 @@ export class ThemeStoreController {
     this.persistCustom()
     const stored = loadStored()
     saveStored({ ...stored, active: null })
+    postHostState({ active: null })
     this.emit()
   }
 
