@@ -167,11 +167,9 @@ body.dshkit-maximized .wSkVaW_header {
   display: none !important;
 }
 
-/* 内容区定位上下文（右栏 absolute 用） + 对话区域四圆角 */
+/* 内容区定位上下文（右栏 absolute 用） */
 .wSkVaW_root {
   position: relative;
-  border-radius: 14px;
-  overflow: hidden;
 }
 
 /* 滑动过渡时长（收起时更明显，稍慢一点） */
@@ -180,10 +178,12 @@ body.dshkit-maximized .wSkVaW_header {
   --dsh-kit-right-ease: var(--ds-ease-in-out, ease-in-out);
 }
 
-/* 对话区域始终为「右栏展开」的宽度：预留右栏宽度，避免开合时内容跳动。
-   右栏收起时面板本身滑出，但对话区保持缩窄后的尺寸不变。 */
+/* 对话区域（中间列：消息+输入框）：始终为「右栏展开」宽度，避免开合时内容跳动；
+   并加四圆角，从左栏/右栏/窗体中独立成圆角卡片。 */
 .wSkVaW_scrollBody {
   margin-right: var(--dsh-kit-right-width, 320px);
+  border-radius: 14px;
+  overflow: hidden auto;
 }
 /* 拖拽右栏宽度时，边距平滑跟随（无过渡：跟手） */
 
@@ -235,7 +235,6 @@ body.dshkit-maximized .wSkVaW_header {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  border-radius: 0 14px 14px 0;
   container-type: inline-size;
   container-name: right-panel;
   transform: translateX(102%);
