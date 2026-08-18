@@ -47,8 +47,6 @@ let dshUrl: string | null = null
 const manualMaximized = new WeakMap<BrowserWindow, boolean>()
 /** 最大化前的正常窗口 bounds（手动恢复用），每窗口独立。 */
 const normalBoundsByWin = new WeakMap<BrowserWindow, Rectangle>()
-/** 手动拖动状态（记录起始窗口位置 + 起始光标位置），每窗口独立。 */
-const dragStateByWin = new WeakMap<BrowserWindow, { winX: number; winY: number; winW: number; winH: number; cursorX: number; cursorY: number }>()
 
 function sendMaximizedState(win: BrowserWindow, isMax: boolean): void {
   manualMaximized.set(win, isMax)
@@ -76,8 +74,18 @@ function appendLog(line: string): void {
   } catch { /* 忽略 */ }
 }
 
-/** 新建一个窗口（多开：所有窗口共享同一 dsh 后台，各自独立 UI 状态）。 */
+/** 新建一个窗口（多开：所有窗口共享同一 dsh 后台，各自独立 UI 状态）。
+ *
+ * 无边框策略（为同时拿到系统窗口能力 + 自绘外观）：
+ *   - **不透明**（去掉 transparent）：恢复系统边缘缩放 / Windows Aero Snap /
+ *     shadow；视觉圆角由 #root 的 border-radius + overflow:hidden 保持。
+ *   - **macOS**：titleBarStyle:'hidden' → 系统仍管理标题栏，原生红绿灯 +
+ *     全屏/分屏/双击最大化回归；trafficLightPosition 把灯放到左上角想要的位置。
+ *   - **Windows/Linux**：frame:false（无系统边框）+ 自绘右上角按钮；
+ *     非透明时系统保留 8px 边缘 resize 热区 + Aero Snap。
+ */
 function createWindow(url: string): BrowserWindow {
+  const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -85,13 +93,22 @@ function createWindow(url: string): BrowserWindow {
     minWidth: 360,
     minHeight: 620,
     show: false,
-    // 无边框自绘窗口：frame:false 去掉系统标题栏/边框；
-    // transparent + hasShadow 在 Windows 下让圆角外的区域透明（配合注入的
-    // 根容器 border-radius），是社区通行的 frameless 圆角方案。
     frame: false,
-    transparent: true,
+    // 关键：不透明。无边框 + 不透明才能保留系统缩放与贴靠；
+    // 圆角由注入 CSS（#root border-radius + overflow:hidden）呈现。
+    transparent: false,
     hasShadow: true,
     roundedCorners: true,
+    ...(isMac
+      ? {
+          // macOS：隐藏系统标题栏但保留系统窗口管理（红绿灯/全屏/双击）
+          titleBarStyle: 'hidden' as const,
+          trafficLightPosition: { x: 14, y: 14 },
+        }
+      : {
+          // Windows/Linux：完全无边框，自绘右上角按钮
+          titleBarStyle: undefined,
+        }),
     title: `DeepSeek Harness App v${appVersion()}`,
     icon: windowIconPath(), // 非 darwin 平台窗口图标
     webPreferences: {
@@ -133,7 +150,6 @@ function createWindow(url: string): BrowserWindow {
 
   win.on('closed', () => {
     windows.delete(win)
-    dragStateByWin.delete(win)
     manualMaximized.delete(win)
     normalBoundsByWin.delete(win)
   })
@@ -205,26 +221,6 @@ function registerWindowControls(): void {
     return true
   })
 
-  // 手动拖动窗口（替代 -webkit-app-region: drag，避免吞掉 DOM 事件导致双击失效）
-  ipcMain.on('window:drag-start', (e) => {
-    const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win || isMaxed(win)) return
-    const p = win.getPosition()
-    const c = screen.getCursorScreenPoint()
-    const b = win.getBounds()
-    dragStateByWin.set(win, { winX: p[0], winY: p[1], winW: b.width, winH: b.height, cursorX: c.x, cursorY: c.y })
-  })
-  ipcMain.on('window:drag-move', (e, _dx, _dy) => {
-    const win = BrowserWindow.fromWebContents(e.sender)
-    const state = win ? dragStateByWin.get(win) : undefined
-    if (!win || !state) return
-    const c = screen.getCursorScreenPoint()
-    win.setBounds({ x: state.winX + (c.x - state.cursorX), y: state.winY + (c.y - state.cursorY), width: state.winW, height: state.winH })
-  })
-  ipcMain.on('window:drag-end', (e) => {
-    const win = BrowserWindow.fromWebContents(e.sender)
-    if (win) dragStateByWin.delete(win)
-  })
 
   // 用 VS Code 打开指定目录：优先 code/code.cmd，失败回退文件管理器
   // spawn 的启动失败是异步 error 事件，必须用 Promise + child.on('error') 接住，

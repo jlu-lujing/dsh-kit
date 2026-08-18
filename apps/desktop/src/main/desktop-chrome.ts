@@ -1,57 +1,56 @@
 /**
- * 无边框窗口自绘 chrome：向 dsh web UI 页面注入的 CSS 与 JS。
+ * 无边框窗口 chrome：向 dsh web UI 页面注入的 CSS 与 JS。
  *
- * 独立成文件、用普通字符串拼接（避免在主逻辑中嵌多层模板字符串）。
- *
- * 负责：
- *  - 窗口圆角（transparent + 根容器 border-radius）
- *  - 窗口拖动/双击最大化：交给右侧标题栏（conversation header）
- *  - 右上角自定义最小化/最大化/关闭按钮（Windows/Linux）
- *  - 左上角 macOS 信号灯（红黄绿），并给左侧栏顶部让位
- *  - Session log 按钮左移，给窗口控制按钮让位
- *  - 最大化时取消圆角
+ * 窗口框架策略（配合主进程 createWindow）：
+ *  - 不透明窗口 + CSS 圆角（#root border-radius + overflow:hidden）
+ *  - 标题栏用系统原生 -webkit-app-region: drag → Windows Aero Snap、macOS
+ *    全屏/分屏/双击最大化全部回归，不再手算拖动。
+ *  - macOS：titleBarStyle:hidden + trafficLightPosition 提供系统红绿灯，
+ *    不再自绘信号灯。
+ *  - Windows/Linux：自绘右上角 最小化/最大化/关闭 按钮。
  *
  * 平台判定：window.__DSH_DESKTOP__.platform（preload 注入，darwin/win32/linux）。
  * 注入代码是给「浏览器页面」执行的，window.__dshDesktop 由 preload 暴露。
  */
 
-/** 注入到页面 <head> 的样式（普通字符串，无模板插值）。 */
 export const DESKTOP_CHROME_CSS = [
-  // 无阴影版：透明窗口 + 圆角。内容铺满（#root），窗口控制控件贴在窗口边缘。
-  'html, body { background: transparent !important; }',
+  // 不透明窗口 + CSS 圆角：内容铺满（#root overflow:hidden 裁出圆角）。
   '#root, [data-slot="root"], .dsh-kit-app-root { border-radius: 12px; overflow: hidden; }',
-  '',
-  '',
-  '/* ---- macOS：左上角信号灯 ---- */',
-  '.dshkit-trafficlights {',
-  '  position: fixed;',
-  '  top: 12px; left: 14px;',
-  '  height: 20px;',
-  '  display: none;',
-  '  align-items: center;',
-  '  gap: 8px;',
+  'html, body { background: transparent !important; }',
+
+  /* --- 窗口拖拽区：隐藏系统标题栏后，标题栏交给系统原生拖动（Snap/边缘贴靠回归） --- */
+  /* macOS：系统红绿灯由 titleBarStyle:hidden + trafficLightPosition 提供，让出左侧空间 */
+  'body[data-dsh-platform="darwin"] .wSkVaW_header {',
+  '  -webkit-app-region: drag;',
+  '  padding-left: 84px !important;',
+  '}',
+  'body[data-dsh-platform="darwin"] .wSkVaW_header button,',
+  'body[data-dsh-platform="darwin"] .wSkVaW_header a,',
+  'body[data-dsh-platform="darwin"] .wSkVaW_header input,',
+  'body[data-dsh-platform="darwin"] .dsh-kit-titlebar-actions,',
+  'body[data-dsh-platform="darwin"] [data-dsh-kit-vscode="1"],',
+  'body[data-dsh-platform="darwin"] .dsh-kit-right-toggle,',
+  'body[data-dsh-platform="darwin"] .dsh-kit-new-window {',
   '  -webkit-app-region: no-drag;',
-  '  z-index: 2147483647;',
   '}',
-  '.dshkit-trafficlights button {',
-  '  width: 12px;',
-  '  height: 12px;',
-  '  border: none;',
-  '  border-radius: 50%;',
-  '  padding: 0;',
-  '  cursor: default;',
-  '  display: block;',
+  /* 非 mac：标题栏整条可拖（系统原生拖动 → 保留 Aero Snap） */
+  'body:not([data-dsh-platform="darwin"]) .wSkVaW_header {',
+  '  -webkit-app-region: drag;',
   '}',
-  '.dshkit-trafficlights button.dshkit-tl-close { background: #ff5f57; }',
-  '.dshkit-trafficlights button.dshkit-tl-min { background: #febc2e; }',
-  '.dshkit-trafficlights button.dshkit-tl-max { background: #28c840; }',
-  '',
-  '/* 平台开关 */',
+  'body:not([data-dsh-platform="darwin"]) .wSkVaW_header button,',
+  'body:not([data-dsh-platform="darwin"]) .wSkVaW_header a,',
+  'body:not([data-dsh-platform="darwin"]) .wSkVaW_header input,',
+  'body:not([data-dsh-platform="darwin"]) .dsh-kit-titlebar-actions,',
+  'body:not([data-dsh-platform="darwin"]) [data-dsh-kit-vscode="1"],',
+  'body:not([data-dsh-platform="darwin"]) .dsh-kit-right-toggle,',
+  'body:not([data-dsh-platform="darwin"]) .dsh-kit-new-window {',
+  '  -webkit-app-region: no-drag;',
+  '}',
+
+  /* mac：不显示自绘右上角控制按钮（系统红绿灯接管） */
   'body[data-dsh-platform="darwin"] .dshkit-winctl { display: none; }',
-  'body[data-dsh-platform="darwin"] .dshkit-trafficlights { display: flex; }',
-  /* 不再给左栏加 padding-top（避免遮挡顶部按钮；mac 信号灯用 fixed 覆盖即可） */
-  '',
-  '/* ---- Windows/Linux：右上角控制按钮 ---- */',
+
+  /* ---- Windows/Linux：右上角控制按钮 ---- */
   '.dshkit-winctl {',
   '  position: fixed;',
   '  top: 0; right: 0;',
@@ -79,17 +78,17 @@ export const DESKTOP_CHROME_CSS = [
   '  cursor: default;',
   '  transition: background-color .12s ease;',
   '}',
-  '/* 与窗口轮廓一致：关闭按钮右上角跟随卡片 12px 圆角，其余直角 */',
+  /* 与窗口轮廓一致：关闭按钮右上角跟随卡片 12px 圆角，其余直角 */
   '.dshkit-winctl button.dshkit-close { border-radius: 0 12px 0 0; }',
   '.dshkit-winctl button:hover { background: rgba(127,127,127,.18); }',
   '.dshkit-winctl button.dshkit-close:hover { background: rgba(232,17,35,.85); color: #fff; }',
-  '',
-  '/* Session log 按钮往左移：给右上角控制按钮让位（仅非 mac 需要） */',
+
+  /* Session log 按钮往左移：给右上角控制按钮让位（仅非 mac 需要） */
   'body:not([data-dsh-platform="darwin"]) [class*="headerUtilities"] {',
   '  margin-right: 128px;',
   '}',
-  '',
-  '/* 最大化时取消圆角（贴满屏幕，避免露出桌面） */',
+
+  /* 最大化时取消圆角（贴满屏幕，避免露边） */
   'body.dshkit-maximized #root,',
   'body.dshkit-maximized [data-slot="root"] {',
   '  border-radius: 0 !important;',
@@ -98,7 +97,9 @@ export const DESKTOP_CHROME_CSS = [
   'body.dshkit-maximized .dshkit-winctl button.dshkit-close { border-radius: 0; }',
 ].join('\n')
 
-/** 注入到页面执行的脚本（普通字符串，无模板插值）。 */
+/** 注入到页面执行的脚本（平台标记 + 最大化同步 + 非 mac 控制按钮）。
+ *  窗口拖动/双击/缩放均由系统 titlebar 机制处理（见 CSS -webkit-app-region），
+ *  这里不再自绘拖动逻辑；macOS 用系统红绿灯，也不自绘信号灯。 */
 export const DESKTOP_CHROME_JS = [
   '(function () {',
   '  if (window.__dshKitDesktopChrome__) return',
@@ -114,41 +115,6 @@ export const DESKTOP_CHROME_JS = [
   '  document.body.setAttribute("data-dsh-platform", platform)',
   '  var isMac = platform === "darwin"',
   '',
-  '',
-  '/* 窗口拖动/双击最大化：交给右侧标题栏（conversation header）。点击交互元素不触发 */',
-  '  function isInteractive(el) { return !!el && !!el.closest && !!el.closest("button, a, input, select, textarea, [role=button], [data-no-drag]") }',
-  '  function bindHeaderDrag(header) {',
-  '    if (header.__dshkitDragBound) return',
-  '    header.__dshkitDragBound = true',
-  '    header.addEventListener("dblclick", function (e) {',
-  '      if (isInteractive(e.target)) return',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl) window.__dshDesktop.windowControl.toggleMaximize()',
-  '    })',
-  '    var dragging = false',
-  '    header.addEventListener("mousedown", function (e) {',
-  '      if (e.button !== 0 || isInteractive(e.target)) return',
-  '      dragging = true',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl) window.__dshDesktop.windowControl.startDrag()',
-  '    })',
-  '    window.addEventListener("mousemove", function (e) {',
-  '      if (!dragging) return',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl && window.__dshDesktop.windowControl.dragBy) window.__dshDesktop.windowControl.dragBy(e.movementX || 0, e.movementY || 0)',
-  '    })',
-  '    window.addEventListener("mouseup", function () {',
-  '      if (!dragging) return',
-  '      dragging = false',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl && window.__dshDesktop.windowControl.endDrag) window.__dshDesktop.windowControl.endDrag()',
-  '    })',
-  '  }',
-  '  function wireDragTargets() {',
-  '    var els = document.querySelectorAll(".wSkVaW_header")',
-  '    for (var i = 0; i < els.length; i++) bindHeaderDrag(els[i])',
-  '  }',
-  '  wireDragTargets()',
-  '  if (window.MutationObserver) {',
-  '    var mo = new MutationObserver(wireDragTargets)',
-  '    mo.observe(document.body, { childList: true, subtree: true })',
-  '  }',
   '  var SVG_NS = "http://www.w3.org/2000/svg"',
   '  function makeSvg(inner) {',
   '    var s = document.createElementNS(SVG_NS, "svg")',
@@ -160,7 +126,7 @@ export const DESKTOP_CHROME_JS = [
   '    return s',
   '  }',
   '',
-  '  /* 最大化状态同步通用函数 */',
+  '  /* 最大化状态同步通用函数（非 mac 控制按钮用） */',
   '  function reflectMax(isMax, maxBtn, maxSvg, restoreSvg) {',
   '    var first = maxBtn.firstChild',
   '    if (first && maxSvg) maxBtn.replaceChild(makeSvg(isMax ? restoreSvg : maxSvg), first)',
@@ -169,39 +135,7 @@ export const DESKTOP_CHROME_JS = [
   '    document.body.classList.toggle("dshkit-maximized", isMax)',
   '  }',
   '',
-  '  if (isMac) {',
-  '    /* macOS：左上角信号灯（红=关闭 黄=最小化 绿=最大化/还原） */',
-  '    var tl = document.createElement("div")',
-  '    tl.className = "dshkit-trafficlights"',
-  '    function mkDot(cls, title) {',
-  '      var b = document.createElement("button")',
-  '      b.type = "button"',
-  '      b.className = "dshkit-tl-" + cls',
-  '      b.title = title',
-  '      b.setAttribute("aria-label", title)',
-  '      tl.appendChild(b)',
-  '      return b',
-  '    }',
-  '    var closeBtn = mkDot("close", "关闭")',
-  '    var minBtn = mkDot("min", "最小化")',
-  '    var maxBtn = mkDot("max", "最大化")',
-  '    closeBtn.addEventListener("click", function () {',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl) window.__dshDesktop.windowControl.close()',
-  '    })',
-  '    minBtn.addEventListener("click", function () {',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl) window.__dshDesktop.windowControl.minimize()',
-  '    })',
-  '    maxBtn.addEventListener("click", function () {',
-  '      if (window.__dshDesktop && window.__dshDesktop.windowControl) window.__dshDesktop.windowControl.toggleMaximize()',
-  '    })',
-  '    if (window.__waitDshDesktop) {',
-  '      window.__waitDshDesktop(function (api) {',
-  '        if (api.windowControl && api.windowControl.isMaximized) api.windowControl.isMaximized().then(function (v) { reflectMax(v, maxBtn, "", "") })',
-  '        if (api.onMaximizedChange) api.onMaximizedChange(function (v) { reflectMax(v, maxBtn, "", "") })',
-  '      })',
-  '    }',
-  '    document.body.appendChild(tl)',
-  '  } else {',
+  '  if (!isMac) {',
   '    /* Windows/Linux：右上角控制按钮 */',
   '    var wrap = document.createElement("div")',
   '    wrap.className = "dshkit-winctl"',
@@ -239,6 +173,4 @@ export const DESKTOP_CHROME_JS = [
   '  }',
   '})()',
 ].join('\n')
-
-
 

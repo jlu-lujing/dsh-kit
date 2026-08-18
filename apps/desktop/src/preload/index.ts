@@ -42,10 +42,6 @@ const dshDesktop = {
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
     // 多开：新开一个共享同一 dsh 后台的窗口（工具栏按钮 / 快捷键均走这里）
     newWindow: () => ipcRenderer.invoke('window:new-window'),
-    // 手动拖动窗口（app-region drag 会吞掉 DOM 事件 → 双击失效，改用手动拖动）
-    startDrag: () => { ipcRenderer.send('window:drag-start') },
-    dragBy: (dx: number, dy: number) => { ipcRenderer.send('window:drag-move', dx, dy) },
-    endDrag: () => { ipcRenderer.send('window:drag-end') },
   },
   onMaximizedChange: (cb: (isMax: boolean) => void) => {
     ipcRenderer.on('window:maximized-changed', (_e, isMax: boolean) => cb(Boolean(isMax)))

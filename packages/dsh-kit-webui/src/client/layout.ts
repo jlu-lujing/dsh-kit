@@ -195,6 +195,16 @@ html button.primary:disabled {
 .dsh-kit-titlebar-left > * {
   pointer-events: auto;
 }
+/* 标题栏现在是系统原生 drag 区：左上角 logo/折叠按钮必须 no-drag 才能被点击 */
+.dsh-kit-titlebar-left,
+.dsh-kit-titlebar-left button {
+  -webkit-app-region: no-drag;
+}
+/* macOS：系统红绿灯（titleBarStyle:hidden + trafficLightPosition）在左上角占位。
+   把 logo 区右移让出红绿灯，避免重叠。 */
+body[data-dsh-platform="darwin"] .dsh-kit-titlebar-left {
+  left: 78px;
+}
 /* 官方大小：BrandWordmark 高24px（宽按 182:24 → 182px）；
    margin-right 由容器 gap 控制，去掉通用 18px 以免撑宽。 */
 .dsh-kit-titlebar-left .dsh-kit-titlebar-logo {
@@ -269,6 +279,10 @@ body.dshkit-maximized .wSkVaW_header {
 .wSkVaW_header .wSkVaW_titleRow {
   margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
   min-width: 0;
+}
+/* macOS：logo 区右移让红绿灯后，标题行同步右移对齐 */
+body[data-dsh-platform="darwin"] .wSkVaW_header .wSkVaW_titleRow {
+  margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px + 78px);
 }
 /* ── 左栏折叠：与右栏对称——左栏 absolute + transform 滑出，内容区 margin 过渡 ── */
 .pI_x6G_frame {
