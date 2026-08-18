@@ -1573,6 +1573,10 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     if (cwd && api?.openInVscode) void api.openInVscode(cwd)
   })
   const mountVscodeButton = (): void => {
+    // 仅在桌面端显示：只有 Electron preload 暴露了 __dshDesktop.openInVscode
+    // 才挂载按钮；纯 web 浏览器没有这个桥，标题栏不出现 VS Code 按钮。
+    const desktopApi = (window as unknown as { __dshDesktop?: { openInVscode?: (path: string) => Promise<unknown> } }).__dshDesktop
+    if (typeof desktopApi?.openInVscode !== 'function') return
     const group = getTitlebarActions()
     if (group === null) return
     if (group.querySelector('[data-dsh-kit-vscode="1"]') !== null) return
