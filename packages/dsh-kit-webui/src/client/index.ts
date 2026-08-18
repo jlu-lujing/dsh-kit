@@ -36,6 +36,17 @@ export function apply(ctx: { get(name: string): unknown }): void {
   // 布局微调：去掉分割线颜色 + 右侧标题栏 + 右侧边栏折叠/展开按钮。
   installLayoutTweaks(ctx.get('layout') as { toggleSidebar: () => void } | undefined)
 
+  // 隐藏官方「外观」主题行（settings.general.item / appearance）：用更低
+  // priority(-1) 注册同 id 空组件 shadow 掉它，让主题入口统一到本店主题商店
+  // （我们已接管官方 system/light/dark + 预设；官方 boot-theme 首帧仍按
+  // 官方 preference 设底色，防闪烁，最终由我们的 controller 保持一致）。
+  slots.inject('settings.general.item', () =>
+    slots.register(
+      { name: 'settings.general.item', id: 'appearance', priority: -1 },
+      () => null,
+    ),
+  )
+
   // 右侧栏「信息」页：实时会话统计。注册进官方 composer.dock 槽位，
   // 用更低 priority (-1) shadow 掉官方 StatsLine（同 id 'stats'）：
   //   - 原对话框下方不再渲染官方统计行；
