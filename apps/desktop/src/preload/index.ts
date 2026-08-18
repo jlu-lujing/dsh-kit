@@ -48,6 +48,11 @@ const dshDesktop = {
   },
   /** 用 VS Code 打开指定目录（渲染层通过 __dshDesktop.openInVscode(path) 调用）。 */
   openInVscode: (path: string) => ipcRenderer.invoke('open-in-vscode', path),
+  /** dsh 运行时版本 / 更新：设置页「dsh 版本」面板。 */
+  runtime: {
+    getVersion: () => ipcRenderer.invoke('dsh-runtime:get-version'),
+    checkUpdate: () => ipcRenderer.invoke('dsh-runtime:check-update'),
+  },
 }
 
 contextBridge.exposeInMainWorld('__dshDesktop', dshDesktop)

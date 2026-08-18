@@ -550,6 +550,64 @@ function installPermissionNamesLocalizer(locale: {
   }
 }
 
+/** 桌面 preload 注入的 dsh 运行时桥（__dshDesktop.runtime）。 */
+declare global {
+  interface Window {
+    __dshDesktop?: {
+      runtime?: {
+        getVersion: () => Promise<{ current: string | null; feedLatest: string | null; feedUrl: string }>
+        checkUpdate: () => Promise<{ started: boolean }>
+      }
+    }
+  }
+}
+
+/** 设置页「dsh 版本」面板：显示当前 runtime 版本 + feed 最新 + 检查/更新按钮。
+ *  仅桌面端（有 __dshDesktop.runtime）显示；纯浏览器隐藏。 */
+function VersionPanel(): unknown {
+  const [info, setInfo] = useState<{ current: string | null; feedLatest: string | null; feedUrl: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string>('')
+
+  const hasRuntime = !!(window as Window & { __dshDesktop?: { runtime?: unknown } }).__dshDesktop?.runtime
+  const reload = () => {
+    const rt = (window as Window & { __dshDesktop?: { runtime?: { getVersion: () => Promise<typeof info> } } }).__dshDesktop?.runtime
+    if (rt) void rt.getVersion().then(setInfo)
+  }
+  useEffect(() => { reload() }, [])
+  if (!hasRuntime) return null
+
+  const updatable = info !== null && info.current !== null && info.feedLatest !== null && info.current !== info.feedLatest
+  const doCheck = async () => {
+    const rt = (window as Window & { __dshDesktop?: { runtime?: { checkUpdate: () => Promise<unknown> } } }).__dshDesktop?.runtime
+    if (!rt) return
+    setBusy(true); setMsg('开始更新…（下载→校验→应用→重启，日志见桌面日志）')
+    try { await rt.checkUpdate(); setMsg('已触发更新，请稍候观察版本变化。') }
+    catch (e) { setMsg(String((e && (e as Error).message) || e)) }
+    finally { setBusy(false); setTimeout(reload, 5000) }
+  }
+
+  return createElement('div', { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520, color: tk.text } },
+    createElement('div', { style: { fontSize: 15, fontWeight: 600 } }, 'dsh 版本'),
+    createElement('div', { style: { ...cardS, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 } },
+      createElement('div', { style: { display: 'flex', justifyContent: 'space-between' } },
+        createElement('span', { style: { color: tk.secondary } }, '当前版本'),
+        createElement('span', { style: { fontWeight: 600 } }, info?.current ?? '读取中…')),
+      createElement('div', { style: { display: 'flex', justifyContent: 'space-between' } },
+        createElement('span', { style: { color: tk.secondary } }, '最新版本'),
+        createElement('span', { fontWeight: 600 as const, color: updatable ? tk.success : 'inherit' }, info?.feedLatest ?? '未知')),
+      createElement('div', { style: { fontSize: 11, color: tk.tertiary, wordBreak: 'break-all' } },
+        info?.feedUrl ?? ''),
+      updatable
+        ? createElement('div', { style: { fontSize: 12, color: tk.success } }, '发现新版本，可更新。')
+        : createElement('div', { style: { fontSize: 12, color: tk.tertiary } }, '已是最新或暂无更新源。'),
+      msg ? createElement('div', { style: { fontSize: 12, color: tk.secondary } }, msg) : null,
+      createElement('button', { style: { ...(updatable ? primaryBtn : ghostBtn), alignSelf: 'flex-start' }, disabled: busy, onClick: doCheck },
+        updatable ? (busy ? '更新中…' : '检查并更新 dsh') : (busy ? '检查中…' : '重新检查')),
+    ),
+  )
+}
+
 /** Registration through the slot system; the shell provides the `settings.section` hole. */
 export function apply(ctx: {
   get(name: string): unknown
@@ -570,5 +628,9 @@ export function apply(ctx: {
   )
   slots.inject('settings.section', () =>
     slots.register({ name: 'settings.section', id: 'dsh-kit-archive', priority: 41, label: () => '归档会话' }, () => createElement(ArchivePanel, null)),
+  )
+  // dsh 版本：仅桌面端显示（浏览器隐藏），检查/更新内置 dsh-runtime。
+  slots.inject('settings.section', () =>
+    slots.register({ name: 'settings.section', id: 'dsh-kit-version', priority: 42, label: () => 'dsh 版本' }, () => createElement(VersionPanel, null)),
   )
 }

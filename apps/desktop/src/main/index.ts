@@ -265,6 +265,30 @@ function registerWindowControls(): void {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
   })
+
+  // ── dsh 版本检查 / 更新（设置页「dsh 版本」面板用） ──
+  ipcMain.handle('dsh-runtime:get-version', async () => {
+    const current = (() => {
+      try {
+        const meta = resolveRuntime(app.getPath('userData'))?.meta
+        return meta?.dshVersion ?? null
+      } catch { return null }
+    })()
+    let feedLatest: string | null = null
+    let feedUrl = ''
+    try {
+      feedUrl = updateFeedUrl()
+      const feed = await fetchFeed(feedUrl)
+      feedLatest = feed.dshVersion
+    } catch { /* feed 拿不到就只给当前 */ }
+    return { current, feedLatest, feedUrl }
+  })
+
+  ipcMain.handle('dsh-runtime:check-update', async () => {
+    // 触发后台完整更新链路；结果经 appendLog 记录（设置页刷新 get-version 看结果）。
+    void checkForUpdates()
+    return { started: true }
+  })
 }
 
 /** 只放行同 origin（当前 dsh loopback URL）；其余一律当作外部链接 */
@@ -414,11 +438,12 @@ function showErrorPage(message: string): void {
   }
 }
 
-/** 更新 feed 的默认地址（发布时可覆盖；本地测试用 file:）。 */
-function updateFeedUrl(): string {
+  /** 更新 feed 的默认地址：优先环境变量（本地测试 file:），否则 GitHub Releases。
+   *  feed.json 由 apps/dsh-runtime/scripts/release.mjs 生成并随 Release 上传。 */
+  function updateFeedUrl(): string {
   return (
     process.env.DSH_DESKTOP_FEED_URL ??
-    'https://update.dsh-kit.dev/desktop/feed.json'
+    'https://github.com/jlu-lujing/dsh-kit/releases/latest/download/feed.json'
   )
 }
 
