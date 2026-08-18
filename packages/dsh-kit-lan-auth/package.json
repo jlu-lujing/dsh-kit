@@ -22,7 +22,8 @@
     "build": "tsc -b && tsdown",
     "build:host": "tsc -b",
     "build:client": "tsdown",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test": "tsx --test test/*.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

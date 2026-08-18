@@ -117,7 +117,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' })
         try {
           const body = JSON.parse((await readBody(req)) || '{}') as { username?: string; password?: string }
-          const created = store.createUser(String(body.username ?? ''), String(body.password ?? ''))
+          const created = await store.createUser(String(body.username ?? ''), String(body.password ?? ''))
           if (!created) return sendJson(res, 400, { error: 'invalid or duplicate username' })
           return sendJson(res, 200, { ok: true, user: created })
         } catch {

@@ -219,9 +219,15 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       try {
         const body = JSON.parse(await readBody(req)) as { profile?: unknown }
-        const profile = typeof body.profile === 'string' && body.profile.trim()
+        const requested = typeof body.profile === 'string' && body.profile.trim()
           ? body.profile.trim()
           : installProfile
+        // Profile names become a `dsh --profile` argument one level below; keep
+        // them to the same safe charset as the feature ids we accept on routes.
+        if (!/^[A-Za-z0-9._-]+$/.test(requested)) {
+          return sendJson(res, 400, { error: `invalid profile name: "${requested}"` })
+        }
+        const profile = requested
         const dshArgs = ['plugin', '--profile', profile, 'add', '-w', INSTALL_PACKAGE]
         const result = await new Promise<{ ok: boolean; code: string | number | null; stderr: string }>((resolve) => {
           execFile('dsh', dshArgs, { timeout: 180_000 }, (error, _stdout, stderr) => {

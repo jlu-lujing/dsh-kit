@@ -1,13 +1,14 @@
 /** Persistent user + token store for dsh-kit-lan-auth. */
 
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 interface StoredUser {
   id: string
   username: string
-  /** sha256 of the raw password; never stored in plaintext. */
+  /** scrypt of the raw password; legacy trailing hex ('sha256:' marker) auto-upgraded on login. */
   passwordHash: string
   createdAt: string
 }
@@ -50,17 +51,17 @@ interface LoginThrottle {
 export interface Store {
   load(): void
   listUsers(): Array<{ id: string; username: string; createdAt: string }>
-  createUser(username: string, password: string): { id: string; username: string } | undefined
+  createUser(username: string, password: string): Promise<{ id: string; username: string } | undefined>
   removeUser(id: string): boolean
   listTokens(): TokenRecord[]
   createToken(name: string, ttlMs?: number): { id: string; name: string; token: string; expiresAt: string }
   removeToken(id: string): boolean
   /** Validate raw password against a username. */
-  checkLogin(username: string, password: string): boolean
+  checkLogin(username: string, password: string): Promise<boolean>
   /** Validate a raw bearer token; updates lastUsedAt on success. */
   checkToken(raw: string): boolean
   /** Validate a username+password login; returns a fresh session token. */
-  loginToken(username: string, password: string, ttlMs?: number): string | undefined
+  loginToken(username: string, password: string, ttlMs?: number): Promise<string | undefined>
   /** Revoke a token by its raw value (logout): removes it so it can no longer be used. */
   revokeToken(raw: string): boolean
   /** Register one failed login attempt; returns whether the identity is now throttled. */
@@ -71,7 +72,44 @@ export interface Store {
   resetLoginFailures(identity: string): void
 }
 
+/** Token hashing (random high-entropy values — a fast hash is appropriate). */
 const hash = (v: string) => createHash('sha256').update(v).digest('hex')
+
+/** Minimum scrypt cost: N=16384 / r=8 / p=1, matching Node's default. */
+const SCRYPT_KEYLEN = 32
+const scryptAsync = promisify(scrypt) as (password: string | Buffer, salt: Buffer, keylen: number, options: { N: number; r: number; p: number }) => Promise<Buffer>
+
+async function scryptPassword(password: string, salt: Buffer): Promise<string> {
+  const key = await scryptAsync(password, salt, SCRYPT_KEYLEN, { N: 16384, r: 8, p: 1 })
+  return `${salt.toString('base64')}:${key.toString('base64')}`
+}
+
+const isLegacyPasswordHash = (value: string): boolean => /^[0-9a-f]{64}$/.test(value)
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  if (isLegacyPasswordHash(stored)) {
+    // Pre-scrypt state file: sha256 with no salt. Compare in constant time
+    // (hashes equal length — timingSafeEqual is safe).
+    return timingSafeEqual(createHash('sha256').update(password).digest(), Buffer.from(stored, 'hex'))
+  }
+  const [saltB64, keyB64, keyLen, n] = stored.split(':')
+  if (!saltB64 || !keyB64 || (keyLen && Number(keyLen) !== SCRYPT_KEYLEN)) return false
+  const salt = Buffer.from(saltB64, 'base64')
+  const expected = Buffer.from(keyB64, 'base64')
+  const cost = n ? Number(n) : 16384
+  const key = await scryptAsync(password, salt, SCRYPT_KEYLEN, { N: cost, r: 8, p: 1 })
+  return key.length === expected.length && timingSafeEqual(key, expected)
+}
+
+async function rehashPassword(password: string, stored: string): Promise<string | null> {
+  // Upgrade a legacy / non-default-cost hash only after the password verified.
+  if (isLegacyPasswordHash(stored)) return scryptPassword(password, randomBytes(16))
+  const [saltB64, , keyLen, n] = stored.split(':')
+  if ((keyLen && Number(keyLen) !== SCRYPT_KEYLEN) || (n && Number(n) !== 16384)) {
+    return scryptPassword(password, Buffer.from(saltB64 ?? '', 'base64'))
+  }
+  return null
+}
 const newId = (p: string) => `${p}_${randomBytes(6).toString('hex')}`
 
 /**
@@ -178,12 +216,12 @@ export function createStore(stateDir?: string): Store {
     listUsers() {
       return data.users.map(u => ({ id: u.id, username: u.username, createdAt: u.createdAt }))
     },
-    createUser(username, password) {
+    async createUser(username, password) {
       const uname = username.trim()
       if (!uname || !password) return undefined
       if (data.users.some(u => u.username === uname)) return undefined
       const user: StoredUser = {
-        id: newId('u'), username: uname, passwordHash: hash(password), createdAt: new Date().toISOString(),
+        id: newId('u'), username: uname, passwordHash: await scryptPassword(password, randomBytes(16)), createdAt: new Date().toISOString(),
       }
       data.users.push(user)
       persist()
@@ -215,16 +253,23 @@ export function createStore(stateDir?: string): Store {
       if (data.tokens.length !== before) { persist(); return true }
       return false
     },
-    checkLogin(username, password) {
+    async checkLogin(username, password) {
       const user = data.users.find(u => u.username === username)
       if (!user) return false
-      return hash(password) === user.passwordHash
+      return verifyPassword(password, user.passwordHash)
     },
     /** Validate a username+password login; returns a fresh token on success. */
-    loginToken(username, password, ttlMs) {
+    async loginToken(username, password, ttlMs) {
       const user = data.users.find(u => u.username === username)
       if (!user) return undefined
-      if (hash(password) !== user.passwordHash) return undefined
+      if (!(await verifyPassword(password, user.passwordHash))) return undefined
+      // Verified credentials: transparently upgrade a legacy (sha256) hash or a
+      // non-default cost to the current scrypt params.
+      const upgraded = await rehashPassword(password, user.passwordHash)
+      if (upgraded !== null) {
+        user.passwordHash = upgraded
+        persist()
+      }
       const raw = randomBytes(24).toString('base64url')
       const token: StoredToken = {
         id: newId('t'), name: `session:${username}`, tokenHash: hash(raw),

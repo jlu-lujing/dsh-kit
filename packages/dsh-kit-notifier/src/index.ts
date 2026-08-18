@@ -42,17 +42,25 @@ function notify(title: string, body: string): void {
   }
   // Windows toast via PowerShell + Windows.UI.Notifications (Win10+).
   if (plat === 'win32') {
+    // Title/body are carried through environment variables, NOT interpolated
+    // into the -Command string: $ and backtick are PowerShell metacharacters,
+    // so inlining strings (even JSON-escaped) is an injection surface and
+    // `$env:PATH`-style variable expansion would leak into the toast text.
     const ps = [
       '[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] | Out-Null',
       '[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] | Out-Null',
       '$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)',
       '$texts = $template.GetElementsByTagName("text")',
-      `$texts.Item(0).AppendChild($template.CreateTextNode(${JSON.stringify(title)})) | Out-Null`,
-      `$texts.Item(1).AppendChild($template.CreateTextNode(${JSON.stringify(body)})) | Out-Null`,
+      '$title = [Environment]::GetEnvironmentVariable("DSH_KIT_TOAST_TITLE")',
+      '$body = [Environment]::GetEnvironmentVariable("DSH_KIT_TOAST_BODY")',
+      '$texts.Item(0).AppendChild($template.CreateTextNode([string]$title)) | Out-Null',
+      '$texts.Item(1).AppendChild($template.CreateTextNode([string]$body)) | Out-Null',
       '$toast = New-Object Windows.UI.Notifications.ToastNotification($template)',
       '[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("dsh-kit").Show($toast)',
     ].join('; ')
-    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], () => {})
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+      env: { ...process.env, DSH_KIT_TOAST_TITLE: title, DSH_KIT_TOAST_BODY: body },
+    }, () => {})
     return
   }
   // Unsupported platform: silently skip (nothing to do).

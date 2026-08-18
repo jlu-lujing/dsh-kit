@@ -31,4 +31,5 @@ coverage/
 .cache/
 
 # J-Space skill workspace
+.jspace/
 .scratch-*/
