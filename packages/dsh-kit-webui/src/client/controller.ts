@@ -14,17 +14,6 @@ const GLOBAL_SOURCE = 'dsh-kit-webui.global'
 /** 当前选中「预设/自定义」主题的 override 层 source（不改官方 preference）。 */
 const ACTIVE_SOURCE = 'dsh-kit-webui.active'
 
-/** 诊断（开发用）：把 init 关键路径/错误写到 window.__dshKitThemeDiag。 */
-declare global {
-  interface Window { __dshKitThemeDiag?: Record<string, unknown> }
-}
-function diag(key: string, value: unknown): void {
-  try {
-    const w = window as Window & { __dshKitThemeDiag?: Record<string, unknown> }
-    w.__dshKitThemeDiag = w.__dshKitThemeDiag ?? {}
-    w.__dshKitThemeDiag[key] = value
-  } catch { /* 忽略 */ }
-}
 
 /** 官方可持久化的主题 id（跟随系统 / 深色 / 浅色）。 */
 const OFFICIAL_IDS = new Set(OFFICIAL_THEMES.map((t) => t.id))
@@ -202,11 +191,8 @@ export class ThemeStoreController {
 
   /** 启动：恢复本地/远端主题，注册全部主题，应用全局层，恢复 active。 */
   async init(): Promise<void> {
-    diag('init.start', new Date().toISOString())
     const stored = loadStored()
     const host = await fetchHostThemes()
-    diag('host.active', host.active)
-    diag('stored.active', stored.active)
 
     // 选中主题 / 全局层以上收 host 为准（桌面与 LAN 浏览器共享同一份），
     // 本地 localStorage 只兜底首次离线 / 尚未迁移的旧值。
@@ -214,13 +200,9 @@ export class ThemeStoreController {
     this.applyGlobalLayer(this.globalTokens)
 
     this.themes = mergeThemes(stored.custom, host.themes)
-    diag('themes.count', this.themes.length)
-    diag('themes.hasActive', this.themes.some((t) => t.id === (host.active ?? stored.active)))
     // 官方三个主题（system/dark/light）在列表里但由官方注册，注册阶段只注册
     // 非官方主题；随后按权威 active 恢复。
     this.registerAll()
-    diag('theme.servicePresent', !!this.theme)
-    diag('theme.getTheme', this.theme ? JSON.stringify(this.theme.getTheme()) : null)
 
     // 当前 selector 权威顺序：host.active（跨 origin 持久）> stored.active
     // （localStorage 兜底）> 官方 preference（首次 / 都没记录时，跟随官方）。
