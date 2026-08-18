@@ -35,7 +35,7 @@ function arg(list, name) {
 }
 
 // 1) 构建（含 tar.gz）
-const buildArgs = ['build.mjs']
+const buildArgs = [join(pkgRoot, 'scripts', 'build.mjs')]
 if (skipNode) buildArgs.push('--skip-node-download')
 buildArgs.push('--tar-gz')
 const r = spawnSync('node', buildArgs, { cwd: pkgRoot, stdio: 'inherit' })
