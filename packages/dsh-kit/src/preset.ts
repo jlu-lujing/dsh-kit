@@ -5,7 +5,7 @@
  * xiaobright/dsh-anchored-standard（MIT，含 DeepSeek 声明，见 README「借鉴」）
  * 提供了「Minimal 工具对引导 → 首次晋升后开放完整工具」的二阶段算法与 preset
  * 文件。dsh-kit 只负责把这些 preset 文件打包分发，并对用户的
- * `~/.dsh/.agent-presets/anchored-standard` 目录做导入(install)/删除(uninstall)。
+ * `~/.dsh/.agent-presets/boost-mode` 目录做导入(install)/删除(uninstall)。
  *
  * 同时管理随 preset 一起分发的 **j-space 认知协议 skill**：
  * 安装 preset 时把内置的 `j-space/` 目录装入 `~/.dsh/skills/j-space/`，让它在
@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** Cordis row id / 功能 id（保持与既有 dsh-kit store.ts / 状态文件一致）。 */
-export const PRESET_ID = 'anchored-standard'
+export const PRESET_ID = 'boost-mode'
 
 /** 内置的 j-space skill 目录名（位于 preset 源根下，也作为 skill 的 name 根）。 */
 export const JSPACE_SKILL_ID = 'j-space'

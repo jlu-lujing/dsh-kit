@@ -10,7 +10,7 @@
 # resolvable by the Loader, and the bundle's own patch declares the rows.
 #
 # The preset feature (TurboBoost Mode / 满血模式, formerly the separate
-# dsh-anchored-standard package) is NOT a loader row anymore: dsh-kit bundles
+# dsh-anchored-standard/boost-mode package) is NOT a loader row anymore: dsh-kit bundles
 # the preset files and
 # manages them inline (auto-install on enable + store import/delete routes),
 # so it needs no resolvable npm package and has no row here.

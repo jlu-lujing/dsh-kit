@@ -114,7 +114,7 @@ dsh plugin --profile web add -w \
 
 - 发布版 `pnpm add dsh-kit` → pnpm 把 5 个功能包作为传递依赖 hoist 进 profile **顶层** node_modules（已验证：`nodeLinker: hoisted` 下从 profile 根可 `require.resolve`）→ reconcile 只看到直接依赖 `dsh-kit`（已是 layer）→ 层栈稳定为 `[dsh-base, dsh-kit]`。
 - 满血模式 preset / 生态目录 / 归档由 dsh-kit 内置分发，无需额外包。
-- dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务；若「满血模式」启用且未导入，自动把内置 preset 导入到 `~/.dsh/.agent-presets/anchored-standard`。
+- dsh-kit apply：读取默认状态，注册 `dshKit.store` 服务；若「满血模式」启用且未导入，自动把内置 preset 导入到 `~/.dsh/.agent-presets/boost-mode`。
 
 ### 5.2 行的唯一归属（聚合包持有全部行）
 
@@ -166,7 +166,7 @@ dsh-kit 的 host（`src/index.ts`）除了提供 store 服务，还注册了以�
 | 能力 | 路由 | 说明 |
 |---|---|---|
 | 功能商店 | `GET /dsh-kit/store` · `POST /dsh-kit/store/{id}` · `POST /dsh-kit/store/install` | 清单/状态、启停、一键安装全家桶 |
-| 满血模式 preset | `POST /dsh-kit/store/dsh-anchored-standard/install` · `.../delete` | 导入/删除 preset（幂等、删除即禁用） |
+| 满血模式 preset | `POST /dsh-kit/store/dsh-boost-mode/install` · `.../delete` | 导入/删除 preset（幂等、删除即禁用） |
 | GitHub 生态目录 | `GET /dsh-kit/store/ecosystem[?refresh=1]` | 只读展示 `topic:dsh-plugin` 仓库 |
 | 归档会话 | `GET /dsh-kit/archive/sessions` · `POST /dsh-kit/archive/{id}/restore` · `.../delete` | 恢复 / 彻底删除归档会话 |
 | 定时任务 | `GET/POST /dsh-kit-scheduler/tasks` · `PATCH/DELETE .../tasks/{id}` | scheduler 包自持 |
@@ -181,10 +181,10 @@ dsh-kit 的 host（`src/index.ts`）除了提供 store 服务，还注册了以�
 
 ### 6.2 满血模式（TurboBoost Mode）preset（内置）
 
-- **形态**：DSH **agent preset**（`~/.dsh/.agent-presets/anchored-standard`），不是 Cordis bundle；
+- **形态**：DSH **agent preset**（`~/.dsh/.agent-presets/boost-mode`），不是 Cordis bundle；
 - **来源**：算法与文件集合随 dsh-kit 内置打包分发；
 - **接入**：preset 文件内置在 `packages/dsh-kit/preset/`，`src/preset.ts` 负责导入/删除（幂等、非破坏；目标已存在不覆盖；staging + rename 原子落位）；
-- **开关**：store 清单里的功能 id 为 `dsh-anchored-standard`，默认开启；启用即自动导入，删除即禁用；
+- **开关**：store 清单里的功能 id 为 `dsh-boost-mode`，默认开启；启用即自动导入，删除即禁用；
 - **名称**：DSH 预设选择器里显示 `TurboBoost Mode`（`preset.yml` 的 `name` 字段；中文语境为「满血模式」）。
 - **J-Space 认知协议 skill**：随 preset 一起内置（`packages/dsh-kit/preset/j-space/`）。安装 preset 时自动装入 `~/.dsh/skills/j-space/`（可被 `skill_search`/`skill_load` 发现）；满血 persona 轻量引导模型在深度推理/长任务/工具重任务/验证恢复时用 `skill_load j-space` 按需加载。遵循 J-Space 官方「选择性加载」，不注入每轮上下文。
 

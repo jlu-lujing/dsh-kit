@@ -232,7 +232,7 @@ pnpm -r publish --access public --no-git-checks
 - **J-Space 认知协议 skill**：随满血模式一起内置分发（`packages/dsh-kit/preset/j-space/`），安装 preset 时自动装入 `~/.dsh/skills/j-space/`；满血 persona 轻量引导模型在深度推理/长任务/工具重任务时用 `skill_load j-space` 按需加载（遵循官方选择性加载，不注入每轮上下文）。
 - **GitHub 生态目录**的分片抓取 / 缓存思路参考 [0xKcyzz/dsh-plugin-store](https://github.com/0xKcyzz/dsh-plugin-store)（MIT）；dsh-kit 只取展示能力，不做安装。
   - 简介：首次请求用 Minimal 工具对（`bash` / `str_replace_editor`），首次持久晋升信号后开放完整工具目录。
-  - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/anchored-standard`；功能商店可手动导入/删除。
+  - 全家桶接入：内置 `packages/dsh-kit/preset/`，默认开启，自动导入到 `~/.dsh/.agent-presets/boost-mode`；功能商店可手动导入/删除。
 
 ## License
 

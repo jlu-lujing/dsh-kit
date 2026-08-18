@@ -55,9 +55,9 @@ export const FEATURES: readonly Feature[] = [
     description: '会话 worktree 归属：新建会话页选择 main 或 .dsh/worktree/<branch>（可新建），对话顶部显示归属徽标',
   },
   {
-    id: 'dsh-anchored-standard',
+    id: 'dsh-boost-mode',
     name: 'TurboBoost Mode',
-    description: 'TurboBoost Mode（满血模式）：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/anchored-standard，并安装 J-Space 认知协议 skill（~/.dsh/skills/j-space，长任务/深度推理可 skill_load j-space）',
+    description: 'TurboBoost Mode（满血模式）：Minimal 工具引导（bash/str_replace_editor）→ 首次晋升后开放完整工具；导入 preset 到 ~/.dsh/.agent-presets/boost-mode，并安装 J-Space 认知协议 skill（~/.dsh/skills/j-space，长任务/深度推理可 skill_load j-space）',
     defaultEnabled: true,
     installable: true,
     togglable: false,

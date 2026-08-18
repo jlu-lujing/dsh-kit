@@ -46,7 +46,7 @@ export interface StoreRow {
   name: string
   description: string
   enabled: boolean
-  /** Only the anchored-standard preset feature exposes install/delete actions. */
+  /** Only the boost-mode (TurboBoost) preset feature exposes install/delete actions. */
   installable: boolean
   /** Whether the store offers an enable/disable toggle (false for preset installers). */
   togglable: boolean
@@ -114,7 +114,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   const home = dshHome()
 
-  // The bundled preset feature (previously a separate dsh-anchored-standard
+  // The bundled preset feature (previously a separate dsh-anchored-standard / boost-mode
   // package) is now managed inline by dsh-kit. When enabled, install the
   // bundled preset files idempotently (non-destructive: never overwrite an
   // existing target). Disabling does not auto-remove, so user data is kept.
@@ -250,7 +250,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
     // POST /dsh-kit/store/{id}/install  — install an installable feature's
     // on-disk artifact (only dsh-anchored-standard currently): copies the
-    // bundled preset into ~/.dsh/.agent-presets/anchored-standard.
+    // bundled preset into ~/.dsh/.agent-presets/boost-mode.
     const installRoute = /^\/dsh-kit\/store\/([A-Za-z0-9._-]+)\/install$/.exec(pathname)
     if (req.method === 'POST' && installRoute !== null) {
       const id = installRoute[1]

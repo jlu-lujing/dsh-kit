@@ -252,7 +252,7 @@ function StorePanel() {
   }
 
   const deleteArtifact = (f: Feature) => {
-    if (!window.confirm(`确定删除 ${f.name} 的已安装文件（~/.dsh/.agent-presets/anchored-standard）？`)) return
+    if (!window.confirm(`确定删除 ${f.name} 的已安装文件（~/.dsh/.agent-presets/boost-mode）？`)) return
     setErr(''); setBusy(f.id)
     api(`/dsh-kit/store/${f.id}/delete`, {})
       .then(refresh)
