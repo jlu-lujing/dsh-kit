@@ -21,14 +21,16 @@ export const name = 'dsh-kit-webui'
 export const inject = ['theme', 'connection']
 
 /*────────────────────────────── 装配 ───────────────────────────────*/
-export function apply(ctx: { get(name: string): unknown }): void {
+export function apply(ctx: { get(name: string): unknown; theme?: ThemeService }): void {
   const slots = ctx.get('slots') as {
     inject(name: string, fn: () => unknown): unknown
     register(...a: unknown[]): unknown
   } | undefined
   if (slots === undefined) return
 
-  const theme = ctx.get('theme') as ThemeService | undefined
+  // 主题服务：优先官方标准注入的 ctx.theme（与官方 apply/getTheme 一致）；
+  // 兜底用 ctx.get('theme')。
+  const theme = (ctx.theme ?? ctx.get('theme')) as ThemeService | undefined
   // 控制器在插件 apply 作用域存活，不随设置页开合而注销主题/全局层。
   const controller = new ThemeStoreController(theme)
   void controller.init()

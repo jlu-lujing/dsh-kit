@@ -35,6 +35,13 @@ if (!gotLock) {
   app.quit()
 }
 
+// 开发期调试：DSH_DESKTOP_REMOTE_DEBUG=1 时给 Chromium 开 9223 调试端口，
+// 便于用 CDP 连接真实 Electron 页面（排查主题/渲染问题时用）。
+if (process.env.DSH_DESKTOP_REMOTE_DEBUG === '1') {
+  app.commandLine.appendSwitch('remote-debugging-port', '9223')
+  app.commandLine.appendSwitch('remote-allow-origins', '*')
+}
+
 /** 本次壳管理的 dsh 子进程（external 时为 null → 退出不杀） */
 let managed: DshProcess | null = null
 /** 所有打开的窗口（多开：共享同一个 dsh 后台，各自独立 UI 状态）。 */
