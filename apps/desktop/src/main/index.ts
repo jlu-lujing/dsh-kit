@@ -103,7 +103,8 @@ function createWindow(url: string): BrowserWindow {
       ? {
           // macOS：隐藏系统标题栏但保留系统窗口管理（红绿灯/全屏/双击）
           titleBarStyle: 'hidden' as const,
-          trafficLightPosition: { x: 14, y: 14 },
+          // mac 信号灯垂直对齐 logo（titlebar 高 60 居中 → 灯中心 30px，顶部取 24）
+          trafficLightPosition: { x: 14, y: 24 },
         }
       : {
           // Windows/Linux：完全无边框，自绘右上角按钮
