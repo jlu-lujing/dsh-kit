@@ -3,8 +3,9 @@
  *
  * User-level cron scheduled tasks: each task holds a five-field cron
  * expression ((minute hour day month weekday)) and a shell command; the
- * plugin ticks every second, fires due tasks via child_process.execFile
- * (no shell), and records the last run time. Tasks persist to
+ * plugin ticks every second and fires due tasks via child_process.exec
+ * (full /bin/sh — intentional: operator-provided commands may use pipes /
+ * redirection / &&), recording the last run time. Tasks persist to
  * ~/.dsh/dsh-kit-scheduler/tasks.json and survive restarts. A small
  * management route set (/dsh-kit-scheduler/tasks) backs the store panel.
  *
@@ -15,7 +16,7 @@
  */
 
 import { exec } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -32,7 +33,7 @@ export interface Task {
   id: string
   /** Five-field cron expression, e.g. "0 9 * * *" (daily 09:00). */
   cron: string
-  /** Shell command to run when the task fires (no shell wrappers; argv split by spaces). */
+  /** Shell command to run when the task fires (executed via /bin/sh -c). */
   command: string
   /** Human-friendly label. */
   label: string
@@ -47,20 +48,28 @@ interface TaskStoreFile {
 
 const DEFAULT_FILE: TaskStoreFile = { tasks: [] }
 
-/** Split a cron field: tokens include '*', 'n', 'a-b', step forms like '*\/60', comma lists. */
-function parseField(field: string, min: number, max: number): Set<number> {
+/**
+ * Split a cron field: tokens include '*', 'n', 'a-b', step forms like
+ * '*\/60', comma lists. Returns undefined for structurally invalid input
+ * (empty token, non-numeric bound, inverted range, zero/negative step) —
+ * and can never loop forever (a step of 0 used to hang the event loop).
+ */
+function parseField(field: string, min: number, max: number): Set<number> | undefined {
   const values = new Set<number>()
   for (const raw of field.split(',')) {
     const part = raw.trim()
     if (part === '*') { for (let i = min; i <= max; i++) values.add(i); continue }
+    if (part === '') return undefined
     const stepMatch = /^(.*)\/(\d+)$/.exec(part)
     const step = stepMatch ? Number(stepMatch[2]) : 1
+    if (!(step >= 1)) return undefined
     const base = stepMatch ? stepMatch[1] : part
     let lo = min; let hi = max
     if (base === '*') { lo = min; hi = max }
     else {
       const range = base.split('-').map(Number)
       lo = range[0] ?? min; hi = range[1] ?? range[0] ?? max
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) return undefined
     }
     for (let i = lo; i <= hi; i += step) if (i >= min && i <= max) values.add(i)
   }
@@ -77,6 +86,9 @@ export function parseCron(cron: string): Array<Set<number>> | undefined {
     const day = parseField(fields[2]!, 1, 31)
     const month = parseField(fields[3]!, 1, 12)
     const weekday = parseField(fields[4]!, 0, 6)
+    if (minute === undefined || hour === undefined || day === undefined || month === undefined || weekday === undefined) {
+      return undefined
+    }
     return [minute, hour, day, month, weekday]
   } catch {
     return undefined
@@ -103,8 +115,12 @@ function loadTasks(dir: string): Task[] {
 }
 
 function saveTasks(dir: string, tasks: Task[]): void {
-  mkdirSync(dirname(join(dir, 'dsh-kit-scheduler', 'tasks.json')), { recursive: true })
-  writeFileSync(join(dir, 'dsh-kit-scheduler', 'tasks.json'), JSON.stringify({ tasks }, null, 2))
+  const file = join(dir, 'dsh-kit-scheduler', 'tasks.json')
+  mkdirSync(dirname(file), { recursive: true })
+  // Atomic write (tmp + rename): a crash mid-write must never leave a torn
+  // tasks file behind.
+  writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify({ tasks }, null, 2))
+  renameSync(`${file}.${process.pid}.tmp`, file)
 }
 
 const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
@@ -113,11 +129,25 @@ const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
   res.end(JSON.stringify(body))
 }
 
+/** Max request body (management routes only ever carry small JSON). */
+const MAX_BODY_BYTES = 256 * 1024
+
+/** Read the request body; rejects (and aborts the request) above MAX_BODY_BYTES. */
 const readBody = (req: IncomingMessage) =>
-  new Promise<string>((resolve) => {
+  new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('payload too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
   })
 
 export function apply(ctx: Context, config: { stateDir?: string } = {}): void {

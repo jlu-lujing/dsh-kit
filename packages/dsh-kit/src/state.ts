@@ -1,12 +1,19 @@
 /** Persistent store of per-feature on/off state. */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import type { FeatureId } from './store.ts'
 
 interface StateFile {
   features: Partial<Record<FeatureId, boolean>>
+}
+
+/** Atomic write (tmp + rename): a crash mid-write never leaves a torn state file. */
+function atomicWriteJson(path: string, value: unknown): void {
+  const tmp = `${path}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify(value, null, 2))
+  renameSync(tmp, path)
 }
 
 export interface Store {
@@ -38,7 +45,7 @@ export function createStore(stateDir?: string, defaults?: Partial<Record<Feature
     setEnabled(id, enabled) {
       state.features[id] = enabled
       mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, JSON.stringify(state, null, 2))
+      atomicWriteJson(file, state)
     },
   }
 }

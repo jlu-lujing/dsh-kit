@@ -17,7 +17,7 @@
  * 注册表重新读取——因此设置页操作后提示"重启后生效"。
  */
 
-import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 /** workspace.json 的磁盘结构（只取本模块关心的字段）。 */
@@ -58,7 +58,11 @@ function load(home: string): WorkspaceFile {
 function save(home: string, state: WorkspaceFile): void {
   const target = workspaceFile(home)
   mkdirSync(dirname(target), { recursive: true })
-  writeFileSync(target, JSON.stringify(state, null, 2) + '\n')
+  // Atomic write (tmp + rename): this file is dsh's own workspace registry —
+  // a torn write would corrupt official dsh data, so never write in place.
+  const tmp = `${target}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify(state, null, 2) + '\n')
+  renameSync(tmp, target)
 }
 
 /** 定位一个归档会话在 ~/.dsh/sessions 下的真实目录。 */

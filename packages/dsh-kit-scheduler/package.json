@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test": "tsx --test test/*.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
@@ -29,6 +30,9 @@
     "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
     "@types/node": "^26.2.0",
     "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "license": "MIT"
 }

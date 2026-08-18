@@ -1,6 +1,6 @@
 /** dsh-kit-webui host store: 主题定义的权威数据层（JSON 落盘）。 */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 /** 与 client/src/client/themes.ts 的 WebUITheme 同构：tokens 是单值 CSS 字符串（官方 ThemeDefinition 形状）。 */
@@ -58,7 +58,11 @@ export function loadThemes(stateDir: string): ThemeRecord[] {
 export function saveStoreState(stateDir: string, state: StoreState): void {
   const p = themeFile(stateDir)
   mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(p, JSON.stringify(state, null, 2))
+  // Atomic write (tmp + rename): a crash mid-write must never leave a torn
+  // themes file behind.
+  const tmp = `${p}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify(state, null, 2))
+  renameSync(tmp, p)
 }
 
 export function saveThemes(stateDir: string, themes: ThemeRecord[]): void {

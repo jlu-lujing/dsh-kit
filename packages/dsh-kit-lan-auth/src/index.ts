@@ -31,11 +31,25 @@ export interface Config {
   stateDir?: string
 }
 
+/** Max request body (management routes only ever carry small JSON). */
+const MAX_BODY_BYTES = 256 * 1024
+
+/** Read the request body; rejects (and aborts the request) above MAX_BODY_BYTES. */
 const readBody = (req: IncomingMessage) =>
-  new Promise<string>((resolve) => {
+  new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('payload too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
   })
 
 const sendJson = (res: ServerResponse, status: number, body: unknown) => {

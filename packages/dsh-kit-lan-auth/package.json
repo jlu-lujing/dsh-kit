@@ -46,5 +46,8 @@
   "bin": {
     "dsh-kit-lan-auth": "bin/dsh-kit-lan-auth.mjs"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT"
 }

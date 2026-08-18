@@ -10,7 +10,7 @@
  * - 网络失败 / 无缓存时回退到包内置的 ecosystem-fallback.json 快照。
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -81,7 +81,11 @@ function readDiskCache(): CacheShape | null {
 
 function writeDiskCache(cache: CacheShape): void {
   try {
-    writeFileSync(cacheFile(), JSON.stringify(cache), 'utf8')
+    // Atomic write (tmp + rename): a torn cache file would only force a
+    // re-fetch, but an atomic swap costs nothing.
+    const file = cacheFile()
+    writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify(cache), 'utf8')
+    renameSync(`${file}.${process.pid}.tmp`, file)
   } catch {
     // best-effort: 缓存只是加速，写失败不影响展示
   }

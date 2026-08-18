@@ -24,12 +24,33 @@ const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
   res.end(JSON.stringify(body))
 }
 
+/** Max request body (management routes only ever carry small JSON). */
+const MAX_BODY_BYTES = 256 * 1024
+
+/** Read the request body; rejects (and aborts the request) above MAX_BODY_BYTES. */
 const readBody = (req: IncomingMessage) =>
-  new Promise<string>((resolve) => {
+  new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('payload too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
   })
+
+/** readBody rejection handler: 413 for oversized payloads, 400 for other socket errors. */
+const onBodyError = (res: ServerResponse, error: unknown): void => {
+  if (res.headersSent) return
+  const tooLarge = (error as { message?: unknown })?.message === 'payload too large'
+  sendJson(res, tooLarge ? 413 : 400, { error: tooLarge ? 'payload too large' : 'bad request' })
+}
 
 /**
  * Host service surface. The client panel calls it through the loopback
@@ -132,7 +153,7 @@ export function apply(ctx: Context, config: Config = {}): void {
             } catch {
               sendJson(res, 400, { error: 'invalid JSON' })
             }
-          })
+          }).catch((error) => onBodyError(res, error))
         }
         return sendJson(res, 405, { error: 'method not allowed' })
       },
@@ -162,7 +183,7 @@ export function apply(ctx: Context, config: Config = {}): void {
             } catch {
               sendJson(res, 400, { error: 'invalid JSON' })
             }
-          })
+          }).catch((error) => onBodyError(res, error))
         }
         return sendJson(res, 405, { error: 'method not allowed' })
       },
@@ -188,7 +209,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           } catch {
             sendJson(res, 400, { error: 'invalid JSON' })
           }
-        })
+        }).catch((error) => onBodyError(res, error))
       },
     }),
   ]

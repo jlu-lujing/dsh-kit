@@ -1,7 +1,7 @@
 /** Persistent user + token store for dsh-kit-lan-auth. */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 interface StoredUser {
@@ -106,8 +106,35 @@ export function createStore(stateDir?: string): Store {
 
   const persist = () => {
     mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, JSON.stringify(data, null, 2))
+    // Atomic write (tmp + rename): a crash mid-write must never leave a torn
+    // users/tokens file behind.
+    const tmp = `${file}.${process.pid}.tmp`
+    writeFileSync(tmp, JSON.stringify(data, null, 2))
+    renameSync(tmp, file)
   }
+
+  // Hot-path persistence: checkToken runs on every proxied gateway request,
+  // and a full file write per request was an I/O hotspot (and a crash window).
+  // In-memory stays authoritative; the hot path only schedules a debounced
+  // write, and mutations (create/revoke/login) persist immediately as before.
+  let persistTimer: ReturnType<typeof setTimeout> | undefined
+  const schedulePersist = () => {
+    if (persistTimer !== undefined) return
+    persistTimer = setTimeout(() => {
+      persistTimer = undefined
+      persist()
+    }, 2_000)
+    persistTimer.unref()
+  }
+  // Flush any pending hot-path write on a clean exit (atomic writes already
+  // make crashes loss-bounded to the debounce window).
+  process.on('exit', () => {
+    if (persistTimer !== undefined) {
+      clearTimeout(persistTimer)
+      persistTimer = undefined
+      persist()
+    }
+  })
 
   const normalizeToken = (t: StoredToken): TokenRecord => ({
     id: t.id, name: t.name, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt, expiresAt: t.expiresAt,
@@ -216,7 +243,8 @@ export function createStore(stateDir?: string): Store {
       // Session tokens slide (idle cap); static tokens do not.
       if (t.name.startsWith('session:')) slideToken(t)
       else t.lastUsedAt = isoNow()
-      persist()
+      // Hot path: debounce the disk write (see schedulePersist).
+      schedulePersist()
       return true
     },
     revokeToken(raw) {

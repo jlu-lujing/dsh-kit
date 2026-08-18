@@ -318,16 +318,33 @@ function loginPage(params: { displayLogin: boolean; err?: string; mode?: string 
     .replace('class="err"', err ? 'class="err show"' : 'class="err"')
 }
 
+/** Max login request body (credential/token posts are tiny). */
+const MAX_BODY_BYTES = 256 * 1024
+
+/** Read the request body; rejects (and aborts the request) above MAX_BODY_BYTES. */
 function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('payload too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
   })
 }
 
 function setSessionCookie(res: ServerResponse, token: string): void {
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax`)
+  // `Secure`: the gateway is always HTTPS, so never ship the session token
+  // over a cleartext connection (e.g. a user hitting the login flow via http
+  // on a misconfigured port-forward).
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`)
 }
 
 /** Clear the session cookie (logout): same name/path, Max-Age=0 expires it. */
@@ -438,7 +455,14 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
 
     // Internal login endpoint lives on the gateway itself (not proxied).
     if (pathname === '/__dsh_kit_lan_login') {
-      void handleLogin(req, res)
+      // readBody can reject (oversized payload / socket error) — answer it
+      // instead of letting it become an unhandled rejection in the host.
+      void handleLogin(req, res).catch((error: unknown) => {
+        if (res.headersSent) return
+        const tooLarge = (error as { message?: unknown })?.message === 'payload too large'
+        res.writeHead(tooLarge ? 413 : 400, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ error: tooLarge ? 'payload too large' : 'bad request' }))
+      })
       return
     }
 
