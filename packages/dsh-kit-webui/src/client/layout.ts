@@ -202,6 +202,15 @@ html button.primary:disabled {
 .dsh-kit-titlebar-left button {
   -webkit-app-region: no-drag;
 }
+/* 标题栏中央的会话标题/面包屑：属于整条拖拽区，不显示手型、不可误触。
+   （官方 .wSkVaW_crumb 是 button，全局 button 规则会把它变手型 → 归回 default） */
+html .wSkVaW_header .wSkVaW_crumb,
+html .wSkVaW_header .wSkVaW_crumbCurrent,
+html .wSkVaW_header .wSkVaW_titleCluster,
+html .wSkVaW_header [class*="crumb"] {
+  cursor: default !important;
+  pointer-events: none !important;
+}
 /* macOS：系统红绿灯（titleBarStyle:hidden + trafficLightPosition）在左上角占位。
    直接给 logo / 折叠按钮 margin-left 右移避开红绿灯（容器布局不动，最直接生效）。 */
 body[data-dsh-platform="darwin"] .dsh-kit-titlebar-left {
