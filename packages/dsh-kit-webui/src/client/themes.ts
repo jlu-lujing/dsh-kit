@@ -44,7 +44,12 @@ export interface WebUITheme {
   description: string
   colorScheme: 'light' | 'dark'
   builtin: boolean
-  /** --dsw-alias-* → CSS 值（该主题自己的风格）。 */
+  /**
+   * 主题种类：official = 官方内置（无 token，直接用官方 base palette）；
+   * preset = 我们的内置预设；custom = 用户自定义。
+   */
+  kind?: 'official' | 'preset' | 'custom'
+  /** --dsw-alias-* → CSS 值（该主题自己的风格；official 主题为空，用官方默认）。 */
   tokens: Record<string, string>
 }
 
@@ -289,6 +294,7 @@ function family(
       description: `${name} 风格的深色版`,
       colorScheme: 'dark' as const,
       builtin: true,
+      kind: 'preset' as const,
       tokens: deriveThemeTokens(darkTokens, 'dark'),
     },
     {
@@ -297,12 +303,47 @@ function family(
       description: `${name} 风格的浅色版`,
       colorScheme: 'light' as const,
       builtin: true,
+      kind: 'preset' as const,
       tokens: deriveThemeTokens(lightTokens, 'light'),
     },
   ]
 }
 
+/** 官方内置主题：跟随系统 / 深色 / 浅色（直接用官方 base palette，无 token 覆盖）。 */
+export const OFFICIAL_THEMES: readonly WebUITheme[] = Object.freeze([
+  {
+    id: 'system',
+    name: '官方 · 跟随系统',
+    description: '浅色/深色跟随系统设置（官方默认）',
+    colorScheme: 'light' as const,
+    builtin: true,
+    kind: 'official' as const,
+    tokens: {},
+  },
+  {
+    id: 'dark',
+    name: '官方 · 深色',
+    description: 'DeepSeek 官方深色主题',
+    colorScheme: 'dark' as const,
+    builtin: true,
+    kind: 'official' as const,
+    tokens: {},
+  },
+  {
+    id: 'light',
+    name: '官方 · 浅色',
+    description: 'DeepSeek 官方浅色主题',
+    colorScheme: 'light' as const,
+    builtin: true,
+    kind: 'official' as const,
+    tokens: {},
+  },
+])
+
 export const BUILTIN_THEMES: readonly WebUITheme[] = Object.freeze([
+  // 注意：此处故意只含「预设风格」（14 = 7 家族 × 深浅），官方主题由
+  // OFFICIAL_THEMES 单独提供，controller 合并后再进面板 —— 保证 BUILTIN
+  // 语义 = 可自定义的预设（无官方空 tokens，测试/派生逻辑不受影响）。
   ...family(
     'ocean',
     '海洋 Ocean',

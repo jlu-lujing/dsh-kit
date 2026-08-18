@@ -20,19 +20,23 @@ export function ThemeCard(props: {
   onDelete: (id: string) => void
 }) {
   const { theme, active, onApply } = props
-  const swatches = KEY_TOKENS.map((k) => ({ label: k.label, value: theme.tokens[k.name] }))
+  const isOfficial = theme.kind === 'official'
+  const swatches = isOfficial ? [] : KEY_TOKENS
+    .map((k) => ({ label: k.label, value: theme.tokens[k.name] }))
     .filter((s): s is { label: string; value: string } => typeof s.value === 'string')
 
-  return createElement('div', {
-    style: {
-      ...cardS, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-      borderColor: active ? tk.accent : tk.border,
-      boxShadow: active ? `0 0 0 1px ${tk.accent} inset` : undefined,
-    },
-  },
-    createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-      // 左侧一排主题色条（窄条竖排），右侧主题名
-      createElement('div', { style: { display: 'flex', gap: 4, flex: 'none' } },
+  // 官方主题：左侧显示模式图标（跟随系统=⚙ 切换 / 深色=🌙 / 浅色=☀）
+  const officialGlyph = theme.id === 'system' ? '跟随' : theme.colorScheme === 'dark' ? '深' : '浅'
+  const leftSwatch = isOfficial
+    ? createElement('div', {
+        style: {
+          width: 34, height: 34, borderRadius: 8, flex: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700,
+          background: tk.cardBg, border: '1px solid ' + tk.border, color: tk.secondary,
+        },
+      }, officialGlyph)
+    : createElement('div', { style: { display: 'flex', gap: 4, flex: 'none' } },
         swatches.map((s) =>
           createElement('span', {
             key: s.name,
@@ -43,11 +47,21 @@ export function ThemeCard(props: {
             },
           }),
         ),
-      ),
+      )
+
+  return createElement('div', {
+    style: {
+      ...cardS, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
+      borderColor: active ? tk.accent : tk.border,
+      boxShadow: active ? `0 0 0 1px ${tk.accent} inset` : undefined,
+    },
+  },
+    createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+      leftSwatch,
       createElement('div', { style: { flex: 1, minWidth: 0 } },
         createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, theme.name),
         createElement('div', { style: { fontSize: 11, color: tk.tertiary, marginTop: 2 } },
-          theme.colorScheme === 'dark' ? '深色底' : '浅色底'
+          (isOfficial ? '官方主题' : (theme.colorScheme === 'dark' ? '深色底' : '浅色底'))
           + (active ? ' · 使用中' : '')),
       ),
     ),

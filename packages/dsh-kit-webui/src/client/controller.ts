@@ -6,14 +6,25 @@
  * ThemeStoreController（整个插件生命周期存活），面板只订阅并调用它。
  */
 import {
-  BUILTIN_THEMES, loadStored, saveStored,
+  BUILTIN_THEMES, OFFICIAL_THEMES, loadStored, saveStored,
   type ThemeService, type TokenModes, type WebUITheme,
 } from './themes.ts'
 
 const GLOBAL_SOURCE = 'dsh-kit-webui.global'
 
+/** 官方可持久化的主题 id（跟随系统 / 深色 / 浅色）。 */
+const OFFICIAL_IDS = new Set(OFFICIAL_THEMES.map((t) => t.id))
+/** 是否为官方内置主题（id ∈ system/dark/light）。 */
+function isOfficialId(id: string): boolean {
+  return OFFICIAL_IDS.has(id)
+}
+
 function mergeThemes(custom: WebUITheme[], fromHost: WebUITheme[]): WebUITheme[] {
-  const out: WebUITheme[] = [...BUILTIN_THEMES.map((t) => ({ ...t, tokens: { ...t.tokens } }))]
+  // 起步 = 官方主题 + 内置预设
+  const out: WebUITheme[] = [
+    ...OFFICIAL_THEMES.map((t) => ({ ...t, tokens: { ...t.tokens } })),
+    ...BUILTIN_THEMES.map((t) => ({ ...t, tokens: { ...t.tokens } })),
+  ]
   const seen = new Set(out.map((t) => t.id))
   for (const t of [...fromHost, ...custom]) {
     if (!t || typeof t.id !== 'string' || seen.has(t.id)) continue
@@ -106,7 +117,10 @@ export class ThemeStoreController {
     for (const d of this.disposers.splice(0)) {
       try { d() } catch { /* no-op */ }
     }
+    // 只注册「非官方」主题：官方 system/dark/light 已由官方 ui-theme 注册，
+    // 重复 register 会抛 duplicate/“system not registrable”，跳过即可。
     for (const t of this.themes) {
+      if (isOfficialId(t.id)) continue
       try {
         this.disposers.push(this.theme.register({
           id: t.id,
@@ -137,23 +151,31 @@ export class ThemeStoreController {
     this.applyGlobalLayer(this.globalTokens)
 
     this.themes = mergeThemes(stored.custom, host.themes)
+    // 官方三个主题（system/dark/light）在列表里但由官方注册，注册阶段只注册
+    // 非官方主题；随后按权威 active 恢复。
     this.registerAll()
 
-    const active = host.active ?? stored.active ?? null
-    if (active && this.themes.some((t) => t.id === active)) {
+    // 当前 selector 权威顺序：host.active（跨 origin 持久）> stored.active
+    // （localStorage 兜底）> 官方 preference（首次 / 都没记录时，跟随官方）。
+    const officialPref = this.theme?.getTheme()?.preference ?? null
+    const active = host.active ?? stored.active ?? officialPref ?? null
+
+    if (active === null) {
+      // 完全无记录：跟随官方当前 preference（可能是 system/light/dark）
+      this.activeId = null
+    } else if (this.themes.some((t) => t.id === active)) {
       this.activeId = active
+      // setTheme：官方 id（system/dark/light）会同步写官方 settings；
+      // 自定义 id 只切内存，持久化依赖下面我们自己的 host/localStorage 记录。
       try { this.theme?.setTheme(active) } catch { /* ignore */ }
-      // 若 host 尚未记录这个 active（旧版本只存了本地 localStorage），
-      // 现在把用户的选中项同步到 host —— 这样桌面和浏览器（3443/3080）
-      // 共享同一份主题，两个入口显示一致。
+      // host 未记录时回写（迁移：把旧 localStorage 或官方 preference 上收到 host，
+      // 让桌面与浏览器共享同一份）
       if (host.active !== active) postHostState({ active })
     } else {
-      this.activeId = this.theme?.getTheme()?.active?.id ?? null
-      if (host.active === null && stored.active) {
-        // 迁移旧 localStorage 的选中项到 host，让另一入口也能看到。
-        // 注意必须是用户存的 stored.active，而不是官方回退的 this.activeId。
-        postHostState({ active: stored.active })
-      }
+      // active 不在我们列表里（如官方 preference=system 而 host 没记录）：
+      // 跟随官方当前解析结果，但只作为展示，不强制改用户选择。
+      const resolved = this.theme?.getTheme()?.active?.id
+      this.activeId = resolved && isOfficialId(resolved) ? resolved : null
     }
     this.ready = true
     this.emit()
