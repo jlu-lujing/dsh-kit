@@ -275,6 +275,49 @@ function deriveThemeTokens(
     '--shiki-token-link': brand,
     '--shiki-token-string-expression': mixHex(success, warn, 0.5),
     '--dsw-alias-state-business-primary': mixHex(brand, success, 0.25),
+
+    /* ── 补齐官方按钮/工具/状态辅助 token：让它们跟随主题层级而非官方固定灰 ── */
+    // 高置按钮（如「新会话」）：随主题明暗的主体面
+    '--dsw-alias-button-elevated-fill': dark ? mixHex(bgLayer1, labelPrimary, 0.05) : bgLayer1,
+    '--dsw-alias-button-floating-fill': alphaHex(labelPrimary, dark ? 0.06 : 0.04),
+    '--dsw-alias-button-floating-hover': alphaHex(labelPrimary, dark ? 0.12 : 0.08),
+    '--dsw-alias-button-contrast-fill': labelPrimary,
+    '--dsw-alias-button-tool-bar-fill': alphaHex(labelPrimary, dark ? 0.04 : 0.03),
+    '--dsw-alias-button-tool-bar-fill-invisible': 'transparent',
+    '--dsw-alias-button-tool-bar-hover': alphaHex(labelPrimary, dark ? 0.09 : 0.06),
+    // 交互实底 / accent 悬停
+    '--dsw-alias-interactive-bg-hover-solid': alphaHex(brand, dark ? 0.16 : 0.12),
+    '--dsw-alias-interactive-bg-hover-accent': alphaHex(brand, dark ? 0.14 : 0.10),
+    // 掩膜 / 多选 / 骨架 —— 弱中性层
+    '--dsw-alias-bg-mask': alphaHex(bgBase, dark ? 0.55 : 0.45),
+    '--dsw-alias-bg-mask-drop': alphaHex(bgBase, dark ? 0.60 : 0.50),
+    '--dsw-alias-bg-mask-photo': alphaHex(bgBase, 0.6),
+    '--dsw-alias-bg-module-platform': bgLayer2,
+    '--dsw-alias-bg-multi-select': alphaHex(brand, dark ? 0.18 : 0.12),
+    '--dsw-alias-bg-skeleton': alphaHex(labelSecondary, 0.12),
+    // 反向 / 品牌文字 / 强调文字
+    '--dsw-alias-border-inverted': labelPrimary,
+    '--dsw-alias-brand-primary-invert': mixHex(brand, labelPrimary, 0.3),
+    '--dsw-alias-brand-text': brand,
+    // 文字弱层级
+    '--dsw-alias-label-caption': mixHex(labelSecondary, bgBase, 0.3),
+    '--dsw-alias-label-dimmed': mixHex(labelSecondary, bgBase, 0.55),
+    '--dsw-alias-label-primary-bluish': labelPrimary,
+    '--dsw-alias-label-primary-dimmed': mixHex(labelPrimary, bgBase, 0.2),
+    '--dsw-alias-label-primary-foreground': bgLayer1,
+    '--dsw-alias-label-primary-inverted': bgBase,
+    // 状态次级/三级
+    '--dsw-alias-state-business-tertiary': alphaHex(mixHex(brand, success, 0.25), 0.4),
+    '--dsw-alias-state-error-secondary': alphaHex(error, 0.14),
+    '--dsw-alias-state-error-tertiary': alphaHex(error, 0.08),
+    '--dsw-alias-state-success-secondary': alphaHex(success, 0.14),
+    '--dsw-alias-state-success-tertiary': alphaHex(success, 0.08),
+    '--dsw-alias-state-warn-secondary': alphaHex(warn, 0.14),
+    '--dsw-alias-state-warn-tertiary': alphaHex(warn, 0.08),
+    '--dsw-alias-state-warn-label': warn,
+    // 提示 / 浮层
+    '--dsw-alias-toast-bg': dark ? mixHex(bgLayer2, labelPrimary, 0.18) : bgOverlay,
+    '--dsw-alias-tooltip-bg': dark ? mixHex(bgLayer2, labelPrimary, 0.22) : mixHex(bgLayer3, bgBase, 0.4),
   }
 }
 
