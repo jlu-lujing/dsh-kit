@@ -285,10 +285,6 @@ body.dshkit-maximized .wSkVaW_header {
   margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px);
   min-width: 0;
 }
-/* macOS：logo 区右移让红绿灯后，标题行同步右移对齐（与 .dsh-kit-titlebar-left 的 76px 一致） */
-body[data-dsh-platform="darwin"] .wSkVaW_header .wSkVaW_titleRow {
-  margin-left: calc(var(--dsh-kit-left-width, 246px) - 20px + 72px);
-}
 /* ── 左栏折叠：与右栏对称——左栏 absolute + transform 滑出，内容区 margin 过渡 ── */
 .pI_x6G_frame {
   grid-template-columns: minmax(0, 1fr) !important;
