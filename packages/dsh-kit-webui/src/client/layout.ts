@@ -195,8 +195,10 @@ html button.primary:disabled {
 .dsh-kit-titlebar-left > * {
   pointer-events: auto;
 }
-/* 标题栏现在是系统原生 drag 区：左上角 logo/折叠按钮必须 no-drag 才能被点击 */
-.dsh-kit-titlebar-left,
+/* 标题栏现在是系统原生 drag 区：只让 logo/折叠按钮本身 no-drag（可点击），
+   容器其余空白仍是拖拽区 → 左侧整条标题栏都能拖/双击最大化。 */
+.dsh-kit-titlebar-left .dsh-kit-titlebar-logo,
+.dsh-kit-titlebar-left .dsh-kit-left-toggle,
 .dsh-kit-titlebar-left button {
   -webkit-app-region: no-drag;
 }
