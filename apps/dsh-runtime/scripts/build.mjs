@@ -21,7 +21,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
@@ -98,6 +98,52 @@ cpSync(dsh.pkgDir, join(destTree, '@deepseek-ai', 'dsh'), { recursive: true })
 rmIfExists(join(destTree, '@deepseek-ai', 'dsh', 'node_modules'))
 
 /* ------------------------------------------------------------------ */
+/* Stage 1.5 — bundle the dsh-kit family into the runtime              */
+/*                                                                     */
+/* 内置全家桶（dsh-kit 聚合 + 6 个功能包）：随 dsh-runtime 一起分发，    */
+/* 桌面端装配 profile 时用本地路径 link，不再从 npm 运行时拉取。         */
+/* 这样 mac/win 两家一致、离线可用、版本锁死。                          */
+/* ------------------------------------------------------------------ */
+
+// family 包：dsh-kit 聚合 + 6 个 feature 包（与 dsh-kit/package.json 的
+// dependencies 一一对应，硬编码保持可见、防止漏打包）。
+const FAMILY_PACKAGES = [
+  'dsh-kit',
+  'dsh-kit-input-history',
+  'dsh-kit-lan-auth',
+  'dsh-kit-notifier',
+  'dsh-kit-scheduler',
+  'dsh-kit-webui',
+  'dsh-kit-worktree',
+]
+
+// 仓库根 = <apps/dsh-runtime>/../.. ；源码包位于 <root>/packages/<name>
+const repoRoot = resolve(pkgRoot, '..', '..')
+const familyVersions = {}
+for (const name of FAMILY_PACKAGES) {
+  const srcDir = join(repoRoot, 'packages', name)
+  const pkgJson = join(srcDir, 'package.json')
+  if (!existsSync(pkgJson)) {
+    console.warn(`[build] family pkg missing (skipped): ${srcDir}`)
+    continue
+  }
+  const ver = JSON.parse(readFileSync(pkgJson, 'utf8')).version
+  familyVersions[name] = ver
+  // 只带发布物（lib/bin/cordis.patch.yml 等），不整棵拷贝避免塞入源码/node_modules
+  mkdirSync(join(destTree, name), { recursive: true })
+  const files = ['package.json', 'lib', 'cordis.patch.yml', 'preset', 'ecosystem-fallback.json', 'bin']
+  for (const f of files) {
+    const from = join(srcDir, f)
+    if (existsSync(from)) cpSync(from, join(destTree, name, f), { recursive: true })
+  }
+  console.log(`[build] family bundled: ${name}@${ver}`)
+}
+
+// dsh-kit 聚合的 cordis.patch.yml 引用了各 feature 包（node_modules 顶层即可解析，
+// 我们已把包放到 node_modules/<name>）。
+console.log('[build] family bundled:', JSON.stringify(familyVersions))
+
+/* ------------------------------------------------------------------ */
 /* Stage 2 — node binary (optional)                                    */
 /* ------------------------------------------------------------------ */
 
@@ -131,6 +177,8 @@ const runtime = {
   builtAt: new Date().toISOString(),
   bin: skipNodeDownload ? undefined : `node/bin/${nodeExe}`,
   launch: ['--expose-internals', 'node_modules/@deepseek-ai/dsh/lib/bin.js'],
+  // 内置 dsh-kit 全家桶版本（装配端据此决定用本地 link 而非 npm 拉取）
+  family: familyVersions,
 }
 writeFileSync(join(staging, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n')
 writeFileSync(join(staging, 'VERSION'), `${dsh.version}\n`)

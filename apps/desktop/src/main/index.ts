@@ -352,6 +352,7 @@ async function boot(): Promise<void> {
       profile: 'web',
       dshHome: dshHome(),
       profilesDir: join(dshHome(), 'profiles'),
+      runtimeDir: runtime.dir,
       log: (l) => appendLog(l),
     })
 

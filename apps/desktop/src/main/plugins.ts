@@ -13,12 +13,23 @@
  *   - 自动装是「尽力而为」：失败仅记录日志，不阻塞 dsh 启动、不弹错误框。
  */
 
-import { readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync, existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
 
 /** 起装全家桶的最小超时（秒）。pnpm 首次 install 可能较慢。 */
 const INSTALL_TIMEOUT_MS = 120_000
+
+/** dsh-kit 全家桶的 7 个包（聚合 + 6 功能包），与 dsh-runtime 内置一致。 */
+const FAMILY_PACKAGES = [
+  'dsh-kit',
+  'dsh-kit-input-history',
+  'dsh-kit-lan-auth',
+  'dsh-kit-notifier',
+  'dsh-kit-scheduler',
+  'dsh-kit-webui',
+  'dsh-kit-worktree',
+]
 
 export interface FamilyCheckOptions {
   /** 要装到的 profile 名（默认 web）。 */
@@ -27,8 +38,24 @@ export interface FamilyCheckOptions {
   dshHome?: string
   /** dshHome 下 profiles 目录的绝对路径，通常 <dshHome>/profiles。 */
   profilesDir: string
+  /** dsh-runtime 目录：若其内置了 dsh-kit 全家桶，则优先本地 link 不拉 npm。 */
+  runtimeDir?: string
   /** 记录日志的回调（桌面端 appendLog）。 */
   log?: (line: string) => void
+}
+
+/** runtime 是否内置了 dsh-kit 全家桶（package.json 里记录 family，且实际有包）。 */
+export function familyBundledInRuntime(runtimeDir: string | undefined): boolean {
+  if (!runtimeDir) return false
+  try {
+    const id = join(runtimeDir, 'node_modules', 'dsh-kit', 'package.json')
+    if (!existsSync(id)) return false
+    // 校验运行时 metadata 也声明了 family（版本锁定标记）
+    const meta = JSON.parse(readFileSync(join(runtimeDir, 'runtime.json'), 'utf8')) as { family?: Record<string, string> }
+    return !!meta.family && Object.keys(meta.family).length >= 6
+  } catch {
+    return false
+  }
 }
 
 /** 读取某 profile 的 package.json 里的 dependencies（不存在视为空）。 */
@@ -124,7 +151,7 @@ export async function installFamilyTo(
   })
 }
 
-/** 便捷入口：未装则发起安装（内部会 spawn），返回是否已就绪（装好或已存在）。 */
+/** 便捷入口：未装则发起安装，返回是否已就绪（装好或已存在）。 */
 export function ensureFamilyInstalled(nodeBin: string, dshBin: string, opts: FamilyCheckOptions): void {
   if (process.env.DSH_DESKTOP_SKIP_FAMILY === '1') {
     opts.log?.(`family: skipped by DSH_DESKTOP_SKIP_FAMILY=1`)
@@ -135,7 +162,85 @@ export function ensureFamilyInstalled(nodeBin: string, dshBin: string, opts: Fam
     return
   }
   // 后台安装，不阻塞 boot
-  void installFamilyTo(nodeBin, dshBin, opts).then((ok) => {
+  const useLocal = familyBundledInRuntime(opts.runtimeDir)
+  const job = useLocal
+    ? installFamilyFromRuntime(opts.runtimeDir!, opts)
+    : installFamilyTo(nodeBin, dshBin, opts)
+  void job.then((ok) => {
     opts.log?.(`family: ${ok ? 'ready' : 'failed — user can install manually via dsh plugin --profile ${opts.profile} add -w dsh-kit'}`)
   })
+}
+
+/**
+ * 从 runtime 内置的全家桶装配 profile：把 runtime/node_modules/dsh-kit* 用
+ * symlink/junction 链到 profile 的 node_modules，并更新 profile package.json。
+ * 全程本地、离线、不走 npm；dsh 的 cordis loader 解析 node_modules 即可加载。
+ */
+export async function installFamilyFromRuntime(
+  runtimeDir: string,
+  opts: FamilyCheckOptions,
+): Promise<boolean> {
+  const { profile, profilesDir, log } = opts
+  const line = (s: string) => { try { log?.(s) } catch { /* 忽略 */ } }
+  try {
+    const profileDir = join(profilesDir, profile)
+    if (!existsSync(profileDir)) {
+      line(`family: profile "${profile}" dir missing at ${profileDir}`)
+      return false
+    }
+    const nmDir = join(profileDir, 'node_modules')
+    mkdirSync(nmDir, { recursive: true })
+
+    // 1) 列出 runtime 内置的全家桶
+    const bundled: string[] = []
+    for (const name of FAMILY_PACKAGES) {
+      const from = join(runtimeDir, 'node_modules', name)
+      if (existsSync(from)) bundled.push(name)
+    }
+    if (bundled.length === 0) {
+      line(`family: runtime has no bundled dsh-kit family at ${join(runtimeDir, 'node_modules')}`)
+      return false
+    }
+
+    // 2) 在 profile/node_modules 里建 symlink/junction（幂等：已存在则跳过）
+    const linked: string[] = []
+    for (const name of bundled) {
+      const target = join(runtimeDir, 'node_modules', name)
+      const linkPath = join(nmDir, name)
+      if (existsSync(linkPath)) continue
+      symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
+      linked.push(name)
+    }
+    if (linked.length === 0) {
+      line(`family: all bundled packages already linked in ${nmDir}`)
+      return true
+    }
+
+    // 3) 更新 profile/package.json 的 dependencies（记录来源 + 版本），幂等
+    const pkgPath = join(profileDir, 'package.json')
+    const pkg = JSON.parse(existsSync(pkgPath) ? readFileSync(pkgPath, 'utf8') : '{}')
+    const deps: Record<string, string> = pkg.dependencies && typeof pkg.dependencies === 'object'
+      ? pkg.dependencies
+      : {}
+    for (const name of bundled) {
+      try {
+        const meta = JSON.parse(readFileSync(join(runtimeDir, 'node_modules', name, 'package.json'), 'utf8')) as { version?: string }
+        deps[name] = meta.version ? `^${meta.version}` : `file:${join(runtimeDir, 'node_modules', name)}`
+      } catch {
+        deps[name] = `file:${join(runtimeDir, 'node_modules', name)}`
+      }
+    }
+    if (!pkg.bundles) pkg.bundles = {}
+    if (!pkg.bundles.includes?.('dsh-kit')) {
+      pkg.bundles = Array.isArray(pkg.bundles) ? [...new Set([...pkg.bundles, 'dsh-kit'])] : ['dsh-kit']
+    }
+    pkg.dependencies = deps
+    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+
+    line(`family: linked ${linked.length}/${bundled.length} bundled packages into ${profile}`)
+    return true
+  } catch (err) {
+    line(`family: runtime link failed: ${err instanceof Error ? err.message : String(err)}`)
+    return false
+  }
 }
