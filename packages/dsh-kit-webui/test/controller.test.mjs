@@ -41,7 +41,11 @@ test('init：注册 预设+本地自定义+host 自定义，恢复 active，应�
   assert.ok(s.registered.includes('mine-dark'))
   assert.ok(s.registered.includes('host-theme'))
   assert.equal(c.activeId, 'ocean-dark')
-  assert.ok(s.themeCalls.includes('ocean-dark'))
+  // 新设计：预设主题落到官方基底 dark/light（themeCalls 是 dark/light），
+  // 主题 token 经 override 层应用（ACTIVE_SOURCE）。
+  assert.ok(s.themeCalls.includes('dark') || s.themeCalls.includes('light'))
+  const activeOverride = s.overrides.find((o) => o.source === 'dsh-kit-webui.active')
+  assert.ok(activeOverride, 'active override layer present')
   assert.equal(s.overrides[0].source, 'dsh-kit-webui.global')
   assert.deepEqual(s.overrides[0].tokens['--dsw-alias-brand-primary'], { light: '#123456', dark: '#abcdef' })
 })
@@ -75,9 +79,11 @@ test('applyTheme/deleteCustom：切换并持久化；删除正在使用的主题
   await c.init()
   c.applyTheme('new-dark')
   assert.equal(c.activeId, 'new-dark')
-  assert.equal(s.themeCalls.at(-1), 'new-dark')
+  // 预设：setTheme 落官方基底(dark)，并加 override 层
+  assert.equal(s.themeCalls.at(-1), 'dark')
+  assert.ok(s.overrides.some((o) => o.source === 'dsh-kit-webui.active'))
   c.deleteCustom('new-dark')
-  assert.equal(c.activeId, null)
+  assert.equal(c.activeId, 'dark')
   assert.equal(s.themeCalls.at(-1), 'dark')
   assert.equal(c.themes.some((t) => t.id === 'new-dark'), false)
 })

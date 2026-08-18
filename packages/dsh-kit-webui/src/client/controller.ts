@@ -11,12 +11,33 @@ import {
 } from './themes.ts'
 
 const GLOBAL_SOURCE = 'dsh-kit-webui.global'
+/** 当前选中「预设/自定义」主题的 override 层 source（不改官方 preference）。 */
+const ACTIVE_SOURCE = 'dsh-kit-webui.active'
+
+/** 诊断（开发用）：把 init 关键路径/错误写到 window.__dshKitThemeDiag。 */
+declare global {
+  interface Window { __dshKitThemeDiag?: Record<string, unknown> }
+}
+function diag(key: string, value: unknown): void {
+  try {
+    const w = window as Window & { __dshKitThemeDiag?: Record<string, unknown> }
+    w.__dshKitThemeDiag = w.__dshKitThemeDiag ?? {}
+    w.__dshKitThemeDiag[key] = value
+  } catch { /* 忽略 */ }
+}
 
 /** 官方可持久化的主题 id（跟随系统 / 深色 / 浅色）。 */
 const OFFICIAL_IDS = new Set(OFFICIAL_THEMES.map((t) => t.id))
 /** 是否为官方内置主题（id ∈ system/dark/light）。 */
 function isOfficialId(id: string): boolean {
   return OFFICIAL_IDS.has(id)
+}
+
+/** 单值 token 表 → override 层用的双模式表（light/dark 同值，随官方基底取色）��� */
+function tokensToModes(tokens: Record<string, string>): Record<string, TokenModes> {
+  const out: Record<string, TokenModes> = {}
+  for (const [k, v] of Object.entries(tokens)) out[k] = { light: v, dark: v }
+  return out
 }
 
 function mergeThemes(custom: WebUITheme[], fromHost: WebUITheme[]): WebUITheme[] {
@@ -96,6 +117,8 @@ export class ThemeStoreController {
 
   private readonly disposers: Array<() => void> = []
   private globalDisposer: (() => void) | undefined
+  /** 当前选中预设/自定义主题的 override 层 disposer（官方主题无此层）。 */
+  private activeDisposer: (() => void) | undefined
   private readonly listeners = new Set<() => void>()
 
   constructor(private readonly theme?: ThemeService) {}
@@ -113,12 +136,13 @@ export class ThemeStoreController {
 
   private registerAll(): void {
     if (!this.theme) return
-    const previousActive = this.activeId
     for (const d of this.disposers.splice(0)) {
       try { d() } catch { /* no-op */ }
     }
     // 只注册「非官方」主题：官方 system/dark/light 已由官方 ui-theme 注册，
     // 重复 register 会抛 duplicate/“system not registrable”，跳过即可。
+    // 注：注册预设只是为了 registry 有该 id；真正呈现通过 override 层
+    // （applyActiveTheme），不改变官方 preference（避免 adopt 覆盖回官方）。
     for (const t of this.themes) {
       if (isOfficialId(t.id)) continue
       try {
@@ -129,11 +153,47 @@ export class ThemeStoreController {
         }))
       } catch { /* duplicate/invalid: skip */ }
     }
-    // 重新注册会短暂触发官方 dispose 的 active 重置，这里恢复本店主题。
-    if (previousActive && this.themes.some((t) => t.id === previousActive)) {
-      try { this.theme.setTheme(previousActive) } catch { /* ignore */ }
-    }
   }
+
+  /**
+   * 应用当前选中的主题（init/applyTheme 共用权威入口）。
+   *
+   * 为什么不能直接用 setTheme(预设id)：官方 preference 只认 system/light/dark，
+   * setTheme(预设id) 只改内存 active，官方 settings 仍 system → 任何 adopt()
+   * /settings sync 都会把它重置回 system(→dark)，导致启动回官方深色。
+   *
+   * 策略：
+   *   - 官方主题（system/dark/light）→ setTheme(id)（官方处理 preference，稳定）
+   *   - 预设/自定义 → 先 setTheme(对应官方基底 dark/light)（preference 保持官方
+   *     认可值，稳定），再把该主题整表 token 作为 override 层（ACTIVE_SOURCE）
+   *     应用 → 视觉是本主题，底层 preference 稳定不被覆盖。
+   */
+  private applyActiveTheme(id: string | null): void {
+    if (!this.theme) return
+    this.activeId = id
+    const theme = id === null ? undefined : this.themes.find((t) => t.id === id)
+
+    // 清掉旧的 active override 层
+    try { this.activeDisposer?.() } catch { /* ignore */ }
+    this.activeDisposer = undefined
+
+    if (theme === undefined || isOfficialId(id ?? '')) {
+      // 官方主题或空：交给官方 setTheme（system/light/dark），无 override 层。
+      if (id !== null) {
+        try { this.theme.setTheme(id) } catch { /* ignore */ }
+      }
+      return
+    }
+
+    // 预设/自定义：落到官方基底 + override 层
+    try {
+      this.theme.setTheme(theme.colorScheme) // 'light' | 'dark' 官方基底
+    } catch { /* ignore */ }
+    try {
+      this.activeDisposer = this.theme.overrideTokens(ACTIVE_SOURCE, tokensToModes(theme.tokens))
+    } catch { /* ignore */ }
+  }
+
 
   private persistCustom(): void {
     const stored = loadStored()
@@ -142,8 +202,11 @@ export class ThemeStoreController {
 
   /** 启动：恢复本地/远端主题，注册全部主题，应用全局层，恢复 active。 */
   async init(): Promise<void> {
+    diag('init.start', new Date().toISOString())
     const stored = loadStored()
     const host = await fetchHostThemes()
+    diag('host.active', host.active)
+    diag('stored.active', stored.active)
 
     // 选中主题 / 全局层以上收 host 为准（桌面与 LAN 浏览器共享同一份），
     // 本地 localStorage 只兜底首次离线 / 尚未迁移的旧值。
@@ -151,9 +214,13 @@ export class ThemeStoreController {
     this.applyGlobalLayer(this.globalTokens)
 
     this.themes = mergeThemes(stored.custom, host.themes)
+    diag('themes.count', this.themes.length)
+    diag('themes.hasActive', this.themes.some((t) => t.id === (host.active ?? stored.active)))
     // 官方三个主题（system/dark/light）在列表里但由官方注册，注册阶段只注册
     // 非官方主题；随后按权威 active 恢复。
     this.registerAll()
+    diag('theme.servicePresent', !!this.theme)
+    diag('theme.getTheme', this.theme ? JSON.stringify(this.theme.getTheme()) : null)
 
     // 当前 selector 权威顺序：host.active（跨 origin 持久）> stored.active
     // （localStorage 兜底）> 官方 preference（首次 / 都没记录时，跟随官方）。
@@ -164,10 +231,7 @@ export class ThemeStoreController {
       // 完全无记录：跟随官方当前 preference（可能是 system/light/dark）
       this.activeId = null
     } else if (this.themes.some((t) => t.id === active)) {
-      this.activeId = active
-      // setTheme：官方 id（system/dark/light）会同步写官方 settings；
-      // 自定义 id 只切内存，持久化依赖下面我们自己的 host/localStorage 记录。
-      try { this.theme?.setTheme(active) } catch { /* ignore */ }
+      this.applyActiveTheme(active)
       // host 未记录时回写（迁移：把旧 localStorage 或官方 preference 上收到 host，
       // 让桌面与浏览器共享同一份）
       if (host.active !== active) postHostState({ active })
@@ -200,8 +264,7 @@ export class ThemeStoreController {
   }
 
   applyTheme(id: string): void {
-    this.activeId = id
-    try { this.theme?.setTheme(id) } catch { /* ignore */ }
+    this.applyActiveTheme(id)
     const stored = loadStored()
     saveStored({ ...stored, active: id })
     postHostState({ active: id })
@@ -227,8 +290,7 @@ export class ThemeStoreController {
     this.registerAll()
     postHostDelete(id)
     if (this.activeId === id) {
-      this.activeId = null
-      try { this.theme?.setTheme('dark') } catch { /* ignore */ }
+      this.applyActiveTheme('dark')
     }
     this.persistCustom()
     const stored = loadStored()
@@ -244,6 +306,8 @@ export class ThemeStoreController {
     }
     try { this.globalDisposer?.() } catch { /* no-op */ }
     this.globalDisposer = undefined
+    try { this.activeDisposer?.() } catch { /* no-op */ }
+    this.activeDisposer = undefined
     this.listeners.clear()
   }
 }
