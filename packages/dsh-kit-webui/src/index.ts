@@ -1,6 +1,7 @@
 /** dsh-kit-webui host plugin: 主题商店的管理路由（loopback）+ 持久化。 */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { spawnSync } from 'node:child_process'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   loadStoreState, saveStoreState, defaultStateDir,
@@ -26,6 +27,52 @@ const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
 
 /** Max request body (management routes only ever carry small JSON). */
 const MAX_BODY_BYTES = 256 * 1024
+
+/* ── Git 页：只读状态（家在 host 侧跑 git CLI，client 零权限） ── */
+
+export interface GitPaneResult {
+  /** Is this path inside a git work tree. */
+  inRepo: boolean
+  /** Repo root (canonical). */
+  root?: string
+  /** Current branch (or 'HEAD' detached). */
+  branch?: string
+  /** `git status --porcelain=v1` parsed changes. */
+  changes: Array<{ code: string; file: string }>
+  /** `git log --oneline -n 12` raw lines. */
+  log: string[]
+  /** Error message when not a repo / git unavailable. */
+  error?: string
+}
+
+function runGit(args: string[], cwd?: string): { out: string; err: string; status: number | null; error?: boolean } {
+  const res = spawnSync('git', args, {
+    cwd: cwd || undefined,
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 1024 * 1024,
+  })
+  const error = res.error !== undefined
+  return { out: (res.stdout ?? '').toString(), err: (res.stderr ?? '').toString(), status: res.status, error }
+}
+
+function collectGitInfo(origCwd: unknown): GitPaneResult {
+  const cwd = typeof origCwd === 'string' && origCwd.trim() !== '' ? origCwd : process.cwd()
+  const empty: GitPaneResult = { inRepo: false, changes: [], log: [] }
+  const isRepo = runGit(['rev-parse', '--is-inside-work-tree'], cwd)
+  if (isRepo.error || isRepo.status !== 0) {
+    return { ...empty, error: (isRepo.err || 'not a git repository').trim() }
+  }
+  const root = runGit(['rev-parse', '--show-toplevel'], cwd).out.trim()
+  const branch = runGit(['symbolic-ref', '--short', 'HEAD'], cwd).out.trim() || 'HEAD'
+  const changes = runGit(['status', '--porcelain=v1'], cwd)
+    .out.split('\n')
+    .filter((l) => l.length > 0 && !l.startsWith('##'))
+    .map((l) => ({ code: l.slice(0, 2).trim() || '??', file: l.slice(3).trim() }))
+  const log = runGit(['log', '--oneline', '-n', '12'], cwd).out.split('\n').filter(Boolean)
+  return { inRepo: true, root, branch, changes, log }
+}
+
 
 /** Read the request body; rejects (and aborts the request) above MAX_BODY_BYTES. */
 const readBody = (req: IncomingMessage) =>
@@ -186,6 +233,21 @@ export function apply(ctx: Context, config: Config = {}): void {
           }).catch((error) => onBodyError(res, error))
         }
         return sendJson(res, 405, { error: 'method not allowed' })
+      },
+    }),
+    webServer.register({
+      kind: 'exact',
+      path: '/dsh-kit-webui/git',
+      handler: (req, res) => {
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' })
+        return void readBody(req).then((raw) => {
+          try {
+            const { cwd } = JSON.parse(raw) as { cwd?: unknown }
+            sendJson(res, 200, collectGitInfo(cwd))
+          } catch {
+            sendJson(res, 400, { error: 'invalid JSON' })
+          }
+        }).catch((error) => onBodyError(res, error))
       },
     }),
     webServer.register({

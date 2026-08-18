@@ -364,16 +364,22 @@ export function isAuthorized(req: IncomingMessage, store: Store): boolean {
  *
  * All forwarded requests are re-stamped with the loopback target's `Host`
  * (DSH's /api trust fence compares the request authority against loopback).
- * LAN-originated requests additionally drop every browser-context marker
- * header — `origin`, `sec-fetch-*`, `referer`, `referrer-policy` — so DSH
- * does not run its same-origin fence (which would fail: a browser loading
- * from the gateway's LAN origin sends an `Origin` for `https://<lan>:3443`
- * that cannot match the rewritten `Host: 127.0.0.1:3080`). Treating the
- * gateway as the one trusted authentication boundary makes every proxied
+ * Every browser-context marker header is dropped — `origin`, `sec-fetch-*`,
+ * `referer`, `referrer-policy` — for BOTH loopback- and LAN-originated
+ * requests. Without this, a browser reaching the gateway at
+ * `https://127.0.0.1:3443` (or a LAN IP) sends `Origin: https://<gw>:3443`
+ * while the gateway rewrites `Host` to `127.0.0.1:<targetPort>`; DSH's
+ * same-origin fence compares them and answers 403, which breaks every
+ * real-time stream (`/api/events.mux`, `/api/events.host` — the WebSocket
+ * channels the front end needs to show sessions) and the privileged RPCs
+ * (`host.describe`, `agentPreset.list`, `settings.describe`, ...). Treating
+ * the gateway as the one trusted authentication boundary makes every proxied
  * request arrive at DSH as a clean loopback caller (whole-plane access,
  * mirroring how the management plane on the DSH server itself is reached).
+ *
  * The `x-dsh-kit-lan-auth-proxy` sticker marks LAN-derived traffic so the
- * gateway's own management routes can refuse it.
+ * gateway's own management routes can refuse it (loopback-originated
+ * requests do not carry it).
  */
 function outboundHeaders(
   req: IncomingMessage,
@@ -384,14 +390,16 @@ function outboundHeaders(
     ...req.headers,
     host: `${target.hostname}:${Number(target.port || 80)}`,
   }
+  // Gateway is the auth boundary: browser same-origin markers must never
+  // reach DSH, regardless of whether the caller is loopback or LAN.
+  delete headers.origin
+  delete headers['sec-fetch-site']
+  delete headers['sec-fetch-mode']
+  delete headers['sec-fetch-dest']
+  delete headers['sec-fetch-user']
+  delete headers.referer
+  delete headers['referrer-policy']
   if (viaLan) {
-    delete headers.origin
-    delete headers['sec-fetch-site']
-    delete headers['sec-fetch-mode']
-    delete headers['sec-fetch-dest']
-    delete headers['sec-fetch-user']
-    delete headers.referer
-    delete headers['referrer-policy']
     headers['x-dsh-kit-lan-auth-proxy'] = '1'
   }
   return headers
@@ -437,20 +445,40 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
   }
 
   const handle = (req: IncomingMessage, res: ServerResponse): void => {
-    // Loopback requests are already trusted by DSH; we mirror the same rule
-    // and forward them without a marker.
-    if (isLoopback(req)) return forward(req, res, false)
-
     const pathname = (req.url ?? '/').split('?')[0]
     const tokenIn = bearerToken(req)
 
-    // Harmless public static resources (manifest/favicon/robots) are fetched
-    // by the browser without credentials on every load; let them through so
-    // they do not spam the console with 401s. Marked as proxy traffic so DSH
-    // trusts the rewritten loopback Host while the gateway's own management
-    // routes still refuse them.
-    if (isPublicStatic(pathname)) {
-      return forward(req, res, true)
+    // Internal, pre-auth CA endpoints: report whether a root CA is available to
+    // install (login page consumes it to show the "permanent no-warning" CTA),
+    // and serve the root certificate for download. The root cert is public by
+    // design — it must reach every client — so no token is required; the
+    // private CA key is never served. These must be handled BEFORE the loopback
+    // shortcut below: a same-host browser reaching the gateway through
+    // 127.0.0.1:3443 has a loopback socket address, and without this ordering the
+    // request would be transparently proxied to DSH (which answers the HTML app)
+    // instead of the CA endpoints.
+    if (pathname === '/__dsh_kit_lan_ca/state') {
+      const hasCa = caCertPath !== undefined && existsSync(caCertPath)
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ hasCa, selfSigned: !hasCa }))
+      return
+    }
+    if (pathname === '/__dsh_kit_lan_ca') {
+      if (caCertPath === undefined || !existsSync(caCertPath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ error: 'no-root-ca', message: 'no root CA has been generated' }))
+        return
+      }
+      res.writeHead(200, {
+        // .crt + x-x509-ca-cert: Windows associates this with the certificate
+        // import wizard on double-click (plain .pem has no association there),
+        // while macOS and iOS still recognize the PEM content for Keychain /
+        // profile install.
+        'Content-Type': 'application/x-x509-ca-cert; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="dsh-kit-lan-auth-ca.crt"',
+      })
+      res.end(readFileSync(caCertPath))
+      return
     }
 
     // Internal login endpoint lives on the gateway itself (not proxied).
@@ -484,33 +512,18 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
       return
     }
 
-    // Internal, pre-auth CA endpoints: report whether a root CA is available to
-    // install (login page consumes it to show the "permanent no-warning" CTA),
-    // and serve the root certificate for download. The root cert is public by
-    // design — it must reach every client — so no token is required; the
-    // private CA key is never served.
-    if (pathname === '/__dsh_kit_lan_ca/state') {
-      const hasCa = caCertPath !== undefined && existsSync(caCertPath)
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ hasCa, selfSigned: !hasCa }))
-      return
-    }
-    if (pathname === '/__dsh_kit_lan_ca') {
-      if (caCertPath === undefined || !existsSync(caCertPath)) {
-        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
-        res.end(JSON.stringify({ error: 'no-root-ca', message: 'no root CA has been generated' }))
-        return
-      }
-      res.writeHead(200, {
-        // .crt + x-x509-ca-cert: Windows associates this with the certificate
-        // import wizard on double-click (plain .pem has no association there),
-        // while macOS and iOS still recognize the PEM content for Keychain /
-        // profile install.
-        'Content-Type': 'application/x-x509-ca-cert; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="dsh-kit-lan-auth-ca.crt"',
-      })
-      res.end(readFileSync(caCertPath))
-      return
+    // Loopback requests are already trusted by DSH; we mirror the same rule
+    // and forward them without a marker. (Any of the /__dsh_kit_lan_* endpoints
+    // above were already answered on the gateway itself.)
+    if (isLoopback(req)) return forward(req, res, false)
+
+    // Harmless public static resources (manifest/favicon/robots) are fetched
+    // by the browser without credentials on every load; let them through so
+    // they do not spam the console with 401s. Marked as proxy traffic so DSH
+    // trusts the rewritten loopback Host while the gateway's own management
+    // routes still refuse them.
+    if (isPublicStatic(pathname)) {
+      return forward(req, res, true)
     }
 
     if (tokenIn && store.checkToken(tokenIn)) {
@@ -562,7 +575,7 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
         ok = store.checkToken(parsed.token)
         if (ok) token = parsed.token
       } else if (parsed.username && parsed.password) {
-        token = store.loginToken(parsed.username, parsed.password)
+        token = await store.loginToken(parsed.username, parsed.password)
         ok = token !== undefined
       }
     } catch {
@@ -575,8 +588,13 @@ export function startGateway(opts: GatewayOptions): GatewayHandle {
         ok = store.checkToken(params.get('token') ?? '')
         if (ok) token = params.get('token') as string
       } else if (params.get('username') && params.get('password')) {
-        token = store.loginToken(params.get('username') as string, params.get('password') as string)
-        ok = token !== undefined
+        try {
+          token = await store.loginToken(params.get('username') as string, params.get('password') as string)
+          ok = token !== undefined
+        } catch {
+          // scrypt failure — treat as a failed credential attempt, not a crash.
+          ok = false
+        }
       }
     }
     if (token === undefined && !ok) {

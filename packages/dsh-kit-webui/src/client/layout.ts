@@ -67,6 +67,60 @@ html [role="tab"],
 html label {
   cursor: pointer !important;
 }
+/* 控件内部的可视子元素（图标 svg/span/i/img 等）也应继承手型：
+   否则全局 cursor:default 会把按钮/链接内的图标层压回默认箭头。
+   用 ::slotted 无法覆盖，这里按已知控件容器直接给其后代恢复 pointer。 */
+html button svg,
+html button img,
+html button span,
+html button i,
+html a svg,
+html a img,
+html a span,
+html label svg,
+html [role="button"] svg,
+html [role="button"] img,
+html [role="menuitem"] svg,
+html [role="tab"] svg,
+html [role="link"] svg {
+  cursor: pointer !important;
+}
+html [data-chat-flow] button svg,
+html [data-chat-flow] button img,
+html [data-chat-flow] button span,
+html [data-chat-flow] button i,
+html [data-chat-flow] a svg,
+html [data-chat-flow] a img,
+html [data-chat-flow] [role="button"] svg,
+html [data-chat-flow] [role="menuitem"] svg,
+html [data-chat-flow] [role="tab"] svg,
+html [data-chat-flow] [role="link"] svg {
+  cursor: pointer !important;
+}
+/* 按钮内部图标永远不是命中目标：鼠标事件直接落在按钮本体。
+   视觉上图标区仍继承手型（上一段的 svg 规则），交互上不会“点不中”。 */
+html button svg,
+html button img,
+html button i,
+html a svg,
+html a img,
+html [role="button"] svg,
+html [role="button"] img,
+html [role="menuitem"] svg,
+html [role="tab"] svg,
+html [role="link"] svg {
+  pointer-events: none !important;
+}
+/* 官方主发送/停止按钮（.primary）：保留官方 cursor 语义。
+   非禁用=手型、禁用=default；不被全局 cursor:default 覆盖。 */
+html .primary:not(:disabled),
+html button.primary:not(:disabled) {
+  cursor: pointer !important;
+}
+html .primary:disabled,
+html button.primary:disabled {
+  cursor: default !important;
+}
 /* 右栏拖拽柄 */
 .dsh-kit-right-resizer {
   cursor: col-resize !important;
@@ -161,10 +215,15 @@ html label {
 html, body {
   overflow: hidden !important;
   height: 100% !important;
+  /* 顶部/四周底色与左栏一致：hero 页没有 .wSkVaW_header 时，
+     顶部露出 body 背景，若不设会显示官方的 bg-base，和左栏不同色。
+     这里统一用 sidebar-fill（含 dsh-kit 渐变主题的 frame-grad）。 */
+  background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill)) !important;
 }
 #root, [data-slot="root"], .dsh-kit-app-root {
   height: 100% !important;
   overflow: hidden !important;
+  background: transparent !important;
 }
 /* 顶部标题栏：fixed 贯穿整窗（跨左栏+内容区），高度对齐左栏 logo 行 60px */
 /* 带左上/右上 12px 圆角：desktop 透明窗体依赖 #root 的 border-radius 做窗口圆角，
@@ -323,7 +382,8 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
 /* 拖拽右栏宽度时，边距平滑跟随（无过渡：跟手） */
 
 
-/* 右侧栏宽度拖拽边缘（贴面板左缘，col-resize） */
+/* 右侧栏宽度拖拽边缘（贴面板左缘，col-resize）
+   与左栏一致：不显示指示线，保留 8px 可点面积 + col-resize 光标即可 */
 .dsh-kit-right-resizer {
   position: absolute;
   left: 0;
@@ -333,19 +393,6 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   cursor: col-resize;
   z-index: 5;
   touch-action: none;
-}
-.dsh-kit-right-resizer::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: transparent;
-}
-.dsh-kit-right-resizer:hover::before,
-.dsh-kit-right-resizer:active::before {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
 }
 /* 拖拽中：禁用面板滑入/滑出与滚动区 margin 过渡，宽度跟手 */
 .dsh-kit-right-resizing .dsh-kit-right-panel {
@@ -364,6 +411,7 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   right: 0;
   bottom: 6px;
   width: var(--dsh-kit-right-width, 320px);
+  /* 与左栏/标题/外圈使用同一 frame-grad 底色 */
   background: var(--dsh-kit-frame-grad, var(--dsw-specific-sidebar-fill));
   border-left: 1px solid transparent;
   display: flex;
@@ -391,49 +439,58 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   flex: none;
   height: auto;
   display: flex;
-  align-items: flex-end;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  align-items: center;
+  justify-content: center;
+  padding: 12px 10px 10px;
   font-size: 13px;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
-  gap: 22px;
+}
+/* 单页（暂无分段控件）时 header 不占高：信息内容直接贴合面板顶部 */
+.dsh-kit-right-panel-header:empty {
+  display: none;
+}
+/* 页签组：胶囊式分段控件（与信息卡片同圆角、同毛玻璃感） */
+.dsh-kit-right-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 72%, var(--dsw-alias-bg-base));
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--dsw-alias-bg-base) 42%, transparent);
 }
 
-/* 右侧栏标签页 —— 对齐官方 pbvGtq tabs 风格 */
+/* 右侧栏页签：信息 / 会话 —— 胶囊分段控件，选中态 = hover 背景填充 */
 .dsh-kit-right-tab {
+  all: unset;
   flex: none;
+  box-sizing: border-box;
   cursor: pointer;
-  font: inherit;
-  background: transparent;
-  border: 0;
   color: var(--dsw-alias-label-tertiary);
-  padding: 7px 1px 9px;
+  padding: 5px 16px;
   font-size: 13px;
   font-weight: 500;
   line-height: 20px;
-  position: relative;
+  border-radius: 8px;
+  text-align: center;
+  white-space: nowrap;
+  transition: color .18s ease, background-color .18s ease;
 }
-.dsh-kit-right-tab:hover,
+.dsh-kit-right-tab:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
 .dsh-kit-right-tab.is-active {
   color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 26%, transparent);
 }
 .dsh-kit-right-tab:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 2px;
-  color: var(--dsw-alias-label-primary);
-  border-radius: 2px;
-}
-.dsh-kit-right-tab.is-active:after,
-.dsh-kit-right-tab:focus-visible:after {
-  content: "";
-  background: var(--dsw-alias-label-primary);
-  border-radius: 2px 2px 0 0;
-  height: 2px;
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
+  outline-offset: 1px;
 }
 .dsh-kit-right-panel-body {
   flex: 1;
@@ -785,6 +842,130 @@ body.dsh-kit-sidebar-collapsed .wSkVaW_header .wSkVaW_titleRow {
   .dsh-kit-stats-card { padding: 16px; }
   .dsh-kit-stats-body { gap: 18px; }
 }
+
+/* ══════ 右侧栏「Git」页：只读仓库状态（与信息卡同风格） ══════ */
+.dsh-kit-git-root {
+  display: block;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.dsh-kit-git-card {
+  display: block;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--dsw-shadow-lv1, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+.dsh-kit-git-card > * + * {
+  margin-top: 12px;
+}
+.dsh-kit-git-empty {
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 8px 0;
+}
+.dsh-kit-git-branch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-base);
+  border-radius: 10px;
+}
+.dsh-kit-git-branch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+}
+.dsh-kit-git-branch-name {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh-kit-git-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.dsh-kit-git-section-title::before {
+  content: "";
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--dsw-alias-state-business-primary);
+  opacity: .8;
+  flex: none;
+}
+.dsh-kit-git-changes,
+.dsh-kit-git-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dsh-kit-git-change,
+.dsh-kit-git-logitem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.dsh-kit-git-change:hover,
+.dsh-kit-git-logitem:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-kit-git-change-code {
+  flex: none;
+  min-width: 30px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+}
+.dsh-kit-git-change-file {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-secondary);
+}
+.dsh-kit-git-log-hash {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-kit-git-log-msg {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-primary);
+}
 /* ── 标题栏工具栏按钮：左折叠 / VS Code / 右折叠，统一圆角矩形 ──
  * 右侧两个放在同一 group（.dsh-kit-titlebar-actions，见 mountVscodeButton），
  * VS Code 在折叠按钮左侧。 */
@@ -1060,34 +1241,58 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     const header = document.createElement('div')
     header.className = 'dsh-kit-right-panel-header'
 
+    // 右侧栏页签：信息 + Git；后续加文件查看等功能时在此追加一项即可。
     const tabs: Array<{ id: string; label: string }> = [
       { id: 'info', label: '信息' },
-      { id: 'session', label: '会话' },
+      { id: 'git', label: 'Git' },
     ]
     const body = document.createElement('div')
     body.className = 'dsh-kit-right-panel-body'
 
     const panes = new Map<string, HTMLElement>()
+    // 页签多于一页时才显示分段控件；单页直接铺内容，避免空的胶囊托盘。
+    const tabList = tabs.length > 1 ? document.createElement('div') : null
+    if (tabList !== null) {
+      tabList.className = 'dsh-kit-right-tabs'
+      tabList.setAttribute('role', 'tablist')
+      header.appendChild(tabList)
+    }
     for (const t of tabs) {
       const tabBtn = document.createElement('button')
       tabBtn.type = 'button'
       tabBtn.className = 'dsh-kit-right-tab'
       tabBtn.textContent = t.label
       tabBtn.dataset.tab = t.id
-      tabBtn.addEventListener('click', () => {
-        header.querySelectorAll<HTMLElement>('.dsh-kit-right-tab').forEach((b) => b.classList.toggle('is-active', b === tabBtn))
-        panes.forEach((pane, pid) => pane.classList.toggle('is-active', pid === t.id))
-      })
-      header.appendChild(tabBtn)
+      tabBtn.setAttribute('role', 'tab')
+      tabBtn.setAttribute('aria-selected', String(false))
+      if (tabList !== null) {
+        tabBtn.addEventListener('click', () => {
+          tabList.querySelectorAll<HTMLElement>('.dsh-kit-right-tab').forEach((b) => {
+            const on = b === tabBtn
+            b.classList.toggle('is-active', on)
+            b.setAttribute('aria-selected', String(on))
+          })
+          panes.forEach((pane, pid) => {
+            pane.classList.toggle('is-active', pid === t.id)
+            pane.setAttribute('aria-hidden', String(pid !== t.id))
+          })
+          if (t.id === 'git') ensureGitPane(panes.get('git') ?? null)
+        })
+        tabList.appendChild(tabBtn)
+      }
 
       const pane = document.createElement('div')
-      pane.className = 'dsh-kit-right-tabpane'
+      pane.className = 'dsh-kit-right-tabpane' + (tabs.length > 1 ? '' : ' is-active')
       pane.dataset.pane = t.id
+      pane.setAttribute('role', 'tabpanel')
       body.appendChild(pane)
       panes.set(t.id, pane)
     }
-    header.querySelector<HTMLElement>('.dsh-kit-right-tab[data-tab="info"]')?.classList.add('is-active')
-    panes.get('info')?.classList.add('is-active')
+    const infoTab = tabList?.querySelector<HTMLElement>('.dsh-kit-right-tab[data-tab="info"]')
+    infoTab?.classList.add('is-active')
+    infoTab?.setAttribute('aria-selected', 'true')
+    const infoPane = panes.get('info')
+    if (infoPane) infoPane.classList.add('is-active')
 
     panel.appendChild(header)
     panel.appendChild(body)
@@ -1096,6 +1301,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     contentRoot.appendChild(panel)
     mountResizer(panel)
     ensureInfoStats(panes.get('info') ?? null)
+    ensureGitPane(panes.get('git') ?? null)
     return panel
   }
 
@@ -1121,6 +1327,129 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event(SYNC_EVENT))
     })
+  }
+
+  // 右侧栏「Git」页：只读 git 状态（分支 / 变更 / 最近提交）。
+  const ensureGitPane = (pane: HTMLElement | null) => {
+    if (!pane) return
+    let holder = pane.querySelector<HTMLElement>('.dsh-kit-git-root')
+    if (!holder) {
+      holder = document.createElement('div')
+      holder.className = 'dsh-kit-git-root'
+      pane.appendChild(holder)
+    }
+    renderGitPane(holder)
+  }
+
+  interface GitPaneResult {
+    inRepo: boolean
+    root?: string
+    branch?: string
+    changes: string[]
+    log: string[]
+    error?: string
+  }
+
+  /** 消费 cwd（vscode-button 已写入 window），请求 host 路由渲染 git 状态。 */
+  const renderGitPane = (holder: HTMLElement) => {
+    const cwd = (window as unknown as { __dshKitVscodeCwd?: string }).__dshKitVscodeCwd
+    const notice = (text: string, cls = 'dsh-kit-git-empty') => {
+      const box = document.createElement('div')
+      box.className = cls
+      box.textContent = text
+      holder.replaceChildren(box)
+    }
+    if (!cwd) {
+      notice('暂无打开的工作目录')
+      return
+    }
+    const loading = document.createElement('div')
+    loading.className = 'dsh-kit-git-empty'
+    loading.textContent = 'Git 状态加载中…'
+    holder.replaceChildren(loading)
+
+    fetch('/dsh-kit-webui/git', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('git route ' + r.status))))
+      .then((data: GitPaneResult) => {
+        if (!data.inRepo) {
+          notice(data.error || '当前目录不在 git 仓库中')
+          return
+        }
+        const card = document.createElement('div')
+        card.className = 'dsh-kit-git-card'
+
+        // 分支行
+        const row = document.createElement('div')
+        row.className = 'dsh-kit-git-branch'
+        const dot = document.createElement('span')
+        dot.className = 'dsh-kit-git-branch-dot'
+        row.appendChild(dot)
+        const name = document.createElement('span')
+        name.className = 'dsh-kit-git-branch-name'
+        name.textContent = data.branch ?? 'HEAD'
+        row.appendChild(name)
+        card.appendChild(row)
+
+        // 变更列表（host 解析为 { code, file }；兼容旧版字符串行，防版本错配白屏）
+        if (data.changes.length > 0) {
+          card.appendChild(sectionTitle('变更 ' + data.changes.length))
+          const list = document.createElement('ul')
+          list.className = 'dsh-kit-git-changes'
+          for (const ch of data.changes) {
+            const li = document.createElement('li')
+            li.className = 'dsh-kit-git-change'
+            const code = typeof ch === 'string'
+              ? (ch.slice(0, 2).trim() || '??')
+              : (ch.code ?? '')
+            const file = typeof ch === 'string'
+              ? ch.slice(3).trim()
+              : (ch.file ?? '')
+            li.appendChild(mkEl('span', 'dsh-kit-git-change-code', code))
+            li.appendChild(mkEl('span', 'dsh-kit-git-change-file', file))
+            list.appendChild(li)
+          }
+          card.appendChild(list)
+        } else {
+          card.appendChild(mkEl('div', 'dsh-kit-git-empty', '工作区干净，无变更'))
+        }
+
+        // 最近提交
+        if (data.log.length > 0) {
+          card.appendChild(sectionTitle('最近提交'))
+          const ul = document.createElement('ul')
+          ul.className = 'dsh-kit-git-log'
+          for (const l of data.log) {
+            const li = document.createElement('li')
+            li.className = 'dsh-kit-git-logitem'
+            const m = /^([a-f0-9]{7,}) (.+)$/.exec(l)
+            li.appendChild(mkEl('span', 'dsh-kit-git-log-hash', m ? m[1].slice(0, 7) : l.split(' ')[0] ?? l))
+            if (m) li.appendChild(mkEl('span', 'dsh-kit-git-log-msg', m[2]))
+            ul.appendChild(li)
+          }
+          card.appendChild(ul)
+        }
+        holder.replaceChildren(card)
+      })
+      .catch((err: unknown) => notice(err instanceof Error ? err.message : 'Git 获取失败'))
+  }
+
+  const sectionTitle = (text: string) => {
+    const d = document.createElement('div')
+    d.className = 'dsh-kit-git-section-title'
+    d.textContent = text
+    return d
+  }
+
+  /** 轻量元素助手（Git 面板用）。 */
+  const mkEl = (tag: string, className?: string, text?: string) => {
+    const n = document.createElement(tag)
+    if (className) n.className = className
+    if (text !== undefined) n.textContent = text
+    return n
   }
 
   const toggleBtn = () => document.querySelector('.dsh-kit-right-toggle') as HTMLButtonElement | null
