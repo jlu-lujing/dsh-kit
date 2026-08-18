@@ -981,7 +981,8 @@ body[data-dsh-platform="linux"] .dsh-kit-titlebar-actions {
   margin-right: 128px;
 }
 .dsh-kit-right-toggle,
-.dsh-kit-left-toggle {
+.dsh-kit-left-toggle,
+.dsh-kit-new-window {
   cursor: pointer;
   width: 30px;
   height: 28px;
@@ -998,7 +999,8 @@ body[data-dsh-platform="linux"] .dsh-kit-titlebar-actions {
 .dsh-kit-right-toggle:hover,
 .dsh-kit-right-toggle[aria-pressed="true"],
 .dsh-kit-left-toggle:hover,
-.dsh-kit-left-toggle[aria-pressed="true"] {
+.dsh-kit-left-toggle[aria-pressed="true"],
+.dsh-kit-new-window:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 /* win/linux：工具栏整体让位右上角窗口三键（与官方 Session log 同样 128px）；
@@ -1585,6 +1587,36 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   }
   mountVscodeButton()
 
+  // 「新窗口」按钮：多开入口（mac 也放 VS Code 右侧，与右侧栏折叠钮并列）。
+  // 点击 → 主进程 openNewWindow()（共享同一 dsh 后台，新开独立窗口）。
+  const PLUS_PATH = 'M14 7H9V2C9 1.44772 8.55228 1 8 1C7.44772 1 7 1.44772 7 2V7H2C1.44772 7 1 7.44772 1 8C1 8.55228 1.44772 9 2 9H7V14C7 14.5523 7.44772 15 8 15C8.55228 15 9 14.5523 9 14V9H14C14.5523 9 15 8.55228 15 8C15 7.44772 14.5523 7 14 7Z'
+  const mountNewWindowButton = (): void => {
+    if (isNewSession()) return
+    if (document.querySelector('.dsh-kit-new-window') !== null) return
+    const group = getTitlebarActions()
+    if (group === null) return
+    const btnNew = document.createElement('button')
+    btnNew.type = 'button'
+    btnNew.className = 'dsh-kit-new-window'
+    btnNew.setAttribute('aria-label', '新开一个窗口')
+    btnNew.title = '新窗口 (Ctrl/Cmd+N)'
+    btnNew.appendChild(svgIcon(document, PLUS_PATH))
+    btnNew.addEventListener('click', () => {
+      const api = (window as unknown as { __dshDesktop?: { windowControl?: { newWindow?: () => Promise<unknown> } } }).__dshDesktop
+      void api?.windowControl?.newWindow?.()
+    })
+    const toggle = group.querySelector('.dsh-kit-right-toggle')
+    const vscode = group.querySelector('[data-dsh-kit-vscode="1"]')
+    // mac 要求放 VS Code 右边 → 即 vscode 之后、toggle 之前
+    if (vscode && toggle) group.insertBefore(btnNew, toggle)
+    else if (toggle) group.insertBefore(btnNew, toggle)
+    else group.appendChild(btnNew)
+    syncTitlebar()
+  }
+  // 桌面环境（有 __dshDesktop 桥）才挂按钮；纯浏览器不显示。
+  const apiExists = !!(window as unknown as { __dshDesktop?: unknown }).__dshDesktop
+  if (apiExists) mountNewWindowButton()
+
   // 标题栏左侧 logo + 左折叠按钮（自己创建，控制 layout.toggleSidebar）。
   // 不再迁移官方 DOM，避免折叠态 React 重渲染导致图标丢失/无法展开。
   /** 左侧栏是否折叠：官方折叠态 sidebar root 带 .hHd-Xa_collapsed。 */
@@ -1678,6 +1710,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     mountLeftToggle()
     mountLeftResizer()
     mountVscodeButton()
+    if (apiExists) mountNewWindowButton()
     ensureOpenState()
   }, 600)
 }

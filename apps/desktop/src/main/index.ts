@@ -7,7 +7,7 @@
  *   → 运行期仅放行同 origin → 退出时优雅停掉自管 dsh 子进程（external 实例不杀）。
  */
 
-import { app, BrowserWindow, shell, dialog, Tray, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, shell, dialog, Tray, ipcMain, screen, Menu } from 'electron'
 import type { Rectangle } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
@@ -37,20 +37,25 @@ if (!gotLock) {
 
 /** 本次壳管理的 dsh 子进程（external 时为 null → 退出不杀） */
 let managed: DshProcess | null = null
-let mainWindow: BrowserWindow | null = null
+/** 所有打开的窗口（多开：共享同一个 dsh 后台，各自独立 UI 状态）。 */
+const windows = new Set<BrowserWindow>()
 let tray: Tray | null = null
 let dshUrl: string | null = null
 
-/** 手动维护的最大化状态（transparent frameless 下 win.isMaximized() 不可靠） */
-let manualMaximized = false
-/** 最大化前的正常窗口 bounds（手动恢复用） */
-let normalBounds: Rectangle | null = null
-/** 手动拖动状态（记录起始窗口位置 + 起始光标位置） */
-let dragState: { winX: number; winY: number; winW: number; winH: number; cursorX: number; cursorY: number } | null = null
+/** 手动维护的最大化状态（transparent frameless 下 win.isMaximized() 不可靠）。
+ *  多开场景每窗口独立维护，避免��相串状态。 */
+const manualMaximized = new WeakMap<BrowserWindow, boolean>()
+/** 最大化前的正常窗口 bounds（手动恢复用），每窗口独立。 */
+const normalBoundsByWin = new WeakMap<BrowserWindow, Rectangle>()
+/** 手动拖动状态（记录起始窗口位置 + 起始光标位置），每窗口独立。 */
+const dragStateByWin = new WeakMap<BrowserWindow, { winX: number; winY: number; winW: number; winH: number; cursorX: number; cursorY: number }>()
 
 function sendMaximizedState(win: BrowserWindow, isMax: boolean): void {
-  manualMaximized = isMax
+  manualMaximized.set(win, isMax)
   if (!win.isDestroyed()) win.webContents.send('window:maximized-changed', isMax)
+}
+function isMaxed(win: BrowserWindow): boolean {
+  return manualMaximized.get(win) ?? false
 }
 
 /** 用户数据目录（默认 ~/.dsh，与 CLI 共享 profile/插件/会话） */
@@ -71,8 +76,9 @@ function appendLog(line: string): void {
   } catch { /* 忽略 */ }
 }
 
-function createWindow(url: string): void {
-  mainWindow = new BrowserWindow({
+/** 新建一个窗口（多开：所有窗口共享同一 dsh 后台，各自独立 UI 状态）。 */
+function createWindow(url: string): BrowserWindow {
+  const win = new BrowserWindow({
     width: 1280,
     height: 820,
     // 最小窗口尺寸：允许缩得更窄（360px），窄窗口下布局自动收窄/滚动
@@ -95,25 +101,25 @@ function createWindow(url: string): void {
       sandbox: true,
     },
   })
+  windows.add(win)
 
-  mainWindow.once('ready-to-show', () => {
-    normalBounds = mainWindow?.getBounds() ?? null
-    mainWindow?.show()
+  win.once('ready-to-show', () => {
+    if (windows.has(win)) win.show()
   })
-  void mainWindow.loadURL(url)
+  void win.loadURL(url)
 
   // 窗口最大化状态变化 → 通知 renderer（切换按钮图标 / 取消圆角）
-  mainWindow.on('maximize', () => { if (mainWindow) sendMaximizedState(mainWindow, true) })
-  mainWindow.on('unmaximize', () => { if (mainWindow) sendMaximizedState(mainWindow, false) })
+  win.on('maximize', () => { if (windows.has(win)) sendMaximizedState(win, true) })
+  win.on('unmaximize', () => { if (windows.has(win)) sendMaximizedState(win, false) })
 
   // 导航仅放行同 origin；外部链接交给系统浏览器。
-  mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
+  win.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
     if (externalNav(targetUrl)) {
       void shell.openExternal(targetUrl)
     }
     return { action: 'deny' }
   })
-  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+  win.webContents.on('will-navigate', (event, targetUrl) => {
     if (externalNav(targetUrl)) {
       event.preventDefault()
       void shell.openExternal(targetUrl)
@@ -121,11 +127,29 @@ function createWindow(url: string): void {
   })
 
   // 页面加载后注入无边框 chrome（圆角 / 拖拽 / 右上角窗口控制 / Session log 左移）
-  mainWindow.webContents.on('did-finish-load', () => {
-    injectDesktopChrome(mainWindow)
+  win.webContents.on('did-finish-load', () => {
+    injectDesktopChrome(win)
   })
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  win.on('closed', () => {
+    windows.delete(win)
+    dragStateByWin.delete(win)
+    manualMaximized.delete(win)
+    normalBoundsByWin.delete(win)
+  })
+  return win
+}
+
+/** 显式新开一个窗口（工具栏按钮 / 快捷键触发）。 */
+function openNewWindow(): BrowserWindow {
+  const url = dshUrl
+  if (!url) {
+    // dsh 还没就绪：尝试聚焦已有窗口即可
+    const existing = [...windows].find((w) => !w.isDestroyed())
+    if (existing) { existing.focus(); return existing }
+    return createWindow('about:blank')
+  }
+  return createWindow(url)
 }
 
 /** 向 dsh web UI 页面注入无边框窗口自绘 chrome（CSS + 控制按钮）。 */
@@ -153,14 +177,16 @@ function registerWindowControls(): void {
     if (!win) return false
     // Windows transparent frameless 窗口：win.isMaximized() 恒为 false、
     // win.unmaximize() 无效。改为手动保存/恢复 bounds（标准 workaround）。
-    if (manualMaximized) {
-      const target = normalBounds ?? { x: 100, y: 100, width: 1280, height: 820 }
+    if (isMaxed(win)) {
+      const target = normalBoundsByWin.get(win) ?? { x: 100, y: 100, width: 1280, height: 820 }
+      normalBoundsByWin.delete(win)
       win.setBounds(target)
       sendMaximizedState(win, false)
       return false
     }
-    normalBounds = win.getBounds()
-    const display = screen.getDisplayMatching(normalBounds)
+    const bounds = win.getBounds()
+    normalBoundsByWin.set(win, bounds)
+    const display = screen.getDisplayMatching(bounds)
     win.setBounds(display.workArea)
     sendMaximizedState(win, true)
     return true
@@ -168,27 +194,36 @@ function registerWindowControls(): void {
   ipcMain.handle('window:close', (e) => {
     BrowserWindow.fromWebContents(e.sender)?.close()
   })
-  ipcMain.handle('window:is-maximized', () => {
-    return manualMaximized
+  ipcMain.handle('window:is-maximized', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    return win ? isMaxed(win) : false
+  })
+
+  // 多开：新开一个窗口（工具栏按钮 / 快捷键 / preload 桥）。
+  ipcMain.handle('window:new-window', () => {
+    openNewWindow()
+    return true
   })
 
   // 手动拖动窗口（替代 -webkit-app-region: drag，避免吞掉 DOM 事件导致双击失效）
   ipcMain.on('window:drag-start', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win || manualMaximized) return
+    if (!win || isMaxed(win)) return
     const p = win.getPosition()
     const c = screen.getCursorScreenPoint()
     const b = win.getBounds()
-    dragState = { winX: p[0], winY: p[1], winW: b.width, winH: b.height, cursorX: c.x, cursorY: c.y }
+    dragStateByWin.set(win, { winX: p[0], winY: p[1], winW: b.width, winH: b.height, cursorX: c.x, cursorY: c.y })
   })
   ipcMain.on('window:drag-move', (e, _dx, _dy) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win || !dragState) return
+    const state = win ? dragStateByWin.get(win) : undefined
+    if (!win || !state) return
     const c = screen.getCursorScreenPoint()
-    win.setBounds({ x: dragState.winX + (c.x - dragState.cursorX), y: dragState.winY + (c.y - dragState.cursorY), width: dragState.winW, height: dragState.winH })
+    win.setBounds({ x: state.winX + (c.x - state.cursorX), y: state.winY + (c.y - state.cursorY), width: state.winW, height: state.winH })
   })
-  ipcMain.on('window:drag-end', () => {
-    dragState = null
+  ipcMain.on('window:drag-end', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (win) dragStateByWin.delete(win)
   })
 
   // 用 VS Code 打开指定目录：优先 code/code.cmd，失败回退文件管理器
@@ -257,10 +292,12 @@ function ensureTray(): void {
   if (tray) return
   tray = createTray({
     onShow: () => {
-      if (mainWindow) {
-        if (mainWindow.isMinimized()) mainWindow.restore()
-        mainWindow.show()
-        mainWindow.focus()
+      const alive = [...windows].filter((w) => !w.isDestroyed())
+      const target = alive[alive.length - 1] ?? alive[0]
+      if (target) {
+        if (target.isMinimized()) target.restore()
+        target.show()
+        target.focus()
       } else if (dshUrl) {
         createWindow(dshUrl)
       }
@@ -333,11 +370,13 @@ async function boot(): Promise<void> {
   }
 }
 
-/** 展示启动失败错误页（renderer），并保留进程供用户看日志/重试。 */
+/** 展示启动失败错误页（renderer），并保留进程供用户看日志/重试。
+ *  错误页为独立单窗（不参与多开），避免与 dsh 窗口混用。 */
 function showErrorPage(message: string): void {
   try {
-    if (!mainWindow) {
-      mainWindow = new BrowserWindow({
+    let errWin = [...windows].find((w) => w.getTitle().includes('启动失败'))
+    if (!errWin) {
+      errWin = new BrowserWindow({
         width: 1280,
         height: 820,
         minWidth: 360,
@@ -357,10 +396,11 @@ function showErrorPage(message: string): void {
           sandbox: true,
         },
       })
-      mainWindow.once('ready-to-show', () => mainWindow?.show())
-      mainWindow.on('closed', () => { mainWindow = null })
+      windows.add(errWin)
+      errWin.once('ready-to-show', () => errWin?.show())
+      errWin.on('closed', () => windows.delete(errWin!))
     }
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+    void errWin.loadFile(join(__dirname, '../renderer/index.html'), {
       query: { error: message },
     })
   } catch (pageErr) {
@@ -413,10 +453,12 @@ async function checkForUpdates(): Promise<void> {
     // 更新成功：替换壳状态并让窗口加载新 dsh URL
     managed = nextManaged
     dshUrl = url
-    if (mainWindow) {
-      void mainWindow.loadURL(url)
-    } else {
+    // 多开：让所有窗口都加载新 dsh URL；没有窗口则新建一个。
+    const alive = [...windows].filter((w) => !w.isDestroyed() && !w.getTitle().includes('启动失败'))
+    if (alive.length === 0) {
       createWindow(url)
+    } else {
+      for (const w of alive) void w.loadURL(url)
     }
     appendLog(`update: applied, now running dsh ${nextManaged.url}`)
   } catch (err) {
@@ -446,11 +488,13 @@ function shutdown(): void {
   if (managed && !managed.external) stopWeb(managed.child)
 }
 
-// 单实例：第二个实例触发此回调 → 聚焦已有窗口
+// 单实例：第二个实例触发此回调 → 聚焦最近打开的窗口（多开时聚焦一个即可）
 app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+  const alive = [...windows].filter((w) => !w.isDestroyed() && !w.getTitle().includes('启动失败'))
+  const target = alive[alive.length - 1] ?? alive[0]
+  if (target) {
+    if (target.isMinimized()) target.restore()
+    target.focus()
   }
 })
 
@@ -460,7 +504,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (mainWindow === null && dshUrl) createWindow(dshUrl)
+  if (dshUrl && [...windows].filter((w) => !w.isDestroyed()).length === 0) createWindow(dshUrl)
 })
 
 app.on('before-quit', () => {
@@ -475,5 +519,17 @@ app.on('will-quit', () => {
 
 if (gotLock) {
   registerWindowControls()
-  void app.whenReady().then(boot)
+  void app.whenReady().then(() => {
+    // 多开快捷键：CmdOrCtrl+N 新开一个共享同一 dsh 后台的窗口。
+    const template: Electron.MenuItemConstructorOptions[] = [{
+      label: '文件',
+      submenu: [{
+        label: '新窗口',
+        accelerator: 'CmdOrCtrl+N',
+        click: () => openNewWindow(),
+      }],
+    }]
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+    void boot()
+  })
 }
