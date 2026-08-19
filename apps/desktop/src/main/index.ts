@@ -1,5 +1,5 @@
 /**
- * dsh-kit Desktop — Electron 壳主进程。
+ * DSH Studio Desktop — Electron 壳主进程。
  *
  * 流程（docs/DESKTOP.md §6）：
  *   应用启动 → 单实例锁 → 解析 dsh-runtime → 探测已有健康 dsh 实例（复用）
@@ -117,7 +117,7 @@ function createWindow(url: string): BrowserWindow {
           // Windows/Linux：完全无边框，自绘右上角按钮
           titleBarStyle: undefined,
         }),
-    title: `DeepSeek Harness App v${appVersion()}`,
+    title: `DSH Studio v${appVersion()}`,
     icon: windowIconPath(), // 非 darwin 平台窗口图标
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
@@ -378,7 +378,7 @@ async function boot(): Promise<void> {
     appendLog(`boot: dsh ready at ${url}`)
     log.forEach((l) => appendLog(`dsh: ${l.trim()}`))
 
-    // 自管实例就绪后，后台保证 web profile 里已装 dsh-kit 全家桶（开箱即用）。
+    // 自管实例就绪后，后台保证 web profile 里已装 dsh-studio（开箱即用）。
     // 仅自管实例触发：复用外部 3080 时不干预用户已有实例。
     ensureFamilyInstalled(spawnBase.nodeBin, spawnBase.dshBin, {
       profile: 'web',
@@ -416,7 +416,7 @@ function showErrorPage(message: string): void {
         transparent: true,
         hasShadow: true,
         roundedCorners: true,
-        title: 'DeepSeek Harness App — 启动失败',
+        title: 'DSH Studio — 启动失败',
         icon: windowIconPath(),
         webPreferences: {
           preload: join(__dirname, '../preload/index.cjs'),
@@ -443,7 +443,7 @@ function showErrorPage(message: string): void {
   function updateFeedUrl(): string {
   return (
     process.env.DSH_DESKTOP_FEED_URL ??
-    'https://github.com/jlu-lujing/dsh-kit/releases/latest/download/feed.json'
+    'https://github.com/jlu-lujing/dsh-studio/releases/latest/download/feed.json'
   )
 }
 

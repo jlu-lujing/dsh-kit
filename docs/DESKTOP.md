@@ -1,4 +1,4 @@
-# dsh-kit Desktop 桌面客户端设计
+# DSH Studio Desktop 桌面客户端设计
 
 > 更新日期：2026-08-16
 > 状态：M1–M5 已落地并联调（dsh-runtime 子模块 / Electron 壳 / 打包注入 / 更新链路 / 托盘·自启·错误页），见 §9；签名/公证待证书
@@ -6,12 +6,12 @@
 
 ## 1. 定位
 
-dsh-kit Desktop 是一个**独立桌面软件**：
+DSH Studio Desktop 是一个**独立桌面软件**：
 
 - 用户**不需要单独安装 dsh**（dsh 内置在应用里）；
 - dsh 作为**独立子模块（dsh-runtime）**随应用发布，并拥有自己的版本号与更新通道，可脱离 Electron 壳单独更新；
 - Electron 壳只负责窗口、进程生命周期、托盘、更新，不 fork、不修改、不侵入 dsh 代码；
-- dsh-kit 插件包继续保持 npm 发布线与 dsh 的插件机制，桌面端不是插件的替代形态。
+- dsh-studio 插件包继续保持 npm 发布线与 dsh 的插件机制，桌面端不是插件的替代形态。
 
 ## 2. 硬约束与已验证事实（dsh 0.1.0-rc.6 + Electron 43.4.0）
 
@@ -35,7 +35,7 @@ dsh-kit Desktop 是一个**独立桌面软件**：
 6. **launcher flags 必须在 app flags 之前**：
    `dsh web --port 0 --patch x.yml` 会报 `unknown option '--patch'`；
    正确顺序是 `dsh web --patch x.yml --port 0`。
-7. **单实例约束**：同一 profile 下 `dsh-kit-lan-auth` 网关固定监听 3443，
+7. **单实例约束**：同一 profile 下 `dsh-studio-lan-auth` 网关固定监听 3443，
    第二个 dsh 实例会 EADDRINUSE。壳必须做单实例锁与“已有 dsh 实例复用”。
 8. **dsh 本身没有 git worktree 功能**：CLI 只有 `profile` / `web` / `plugin` /
    `--dump-config`；`@deepseek-ai/dsh-workspace` 是 workspace 记录注册表，不是 git
@@ -75,12 +75,12 @@ MVP 阶段允许先用 Electron 内置 Node（方案 A）跑通壳与更新链�
 ## 4. 仓库结构
 
 ```
-dsh-kit/
-├── packages/                    # 现有 dsh-kit 插件（npm 包，发布线不变）
+dsh-studio/
+├── packages/                    # dsh-studio 单包（npm 发布线）
 ├── apps/
 │   ├── desktop/                 # Electron 壳（独立版本线）
 │   │   ├── src/main/            # 运行时发现/启动、单实例锁、托盘、生命周期
-│   │   │   ├── plugins.ts       # 首启自动装 dsh-kit 全家桶（自管实例）
+│   │   │   ├── plugins.ts       # 首启自动装 dsh-studio 全家桶（自管实例）
 │   │   │   ├── updater.ts       # dsh-runtime 更新链路
 │   │   │   └── app-features.ts  # 托盘 / 开机自启 / 图标
 │   │   ├── src/preload/         # 可选：contextBridge 注入 __DSH_DESKTOP__
@@ -161,12 +161,12 @@ dsh-runtime/
 - electron-builder 的 file-copy 会**过滤顶层 `node_modules`**（它假设那是 app 的依赖
   树），所以含 dsh 全依赖树的 runtime **不能用 `extraResources` 原样带入**——实测
   `extraResources` 只复制了 `VERSION`/`runtime.json`，`node_modules` 缺失，且若把
-  `@dsh-kit/dsh-runtime` 作为 shell 的 `file:` 依赖还会把这棵树误塞进 `app.asar`。
+  `@dsh-studio/dsh-runtime` 作为 shell 的 `file:` 依���还会把这棵树误塞进 `app.asar`。
 - 正确做法（已落地）：**把 dsh-runtime 从 shell 的 npm 依赖里移除**（主进程不 require
   它），改由 **`afterPack` 钩子**（`apps/desktop/scripts/afterPack.cjs`）在 pack 后整体
   `cpSync` `resources/dsh-runtime` → `<app>/Contents/Resources/dsh-runtime`。
 - 产物验证：`app.asar` 仅 ~12KB（干净），`Resources/dsh-runtime` 220MB 完整 runtime；
-  打包 `dist/mac-arm64/dsh-kit Desktop.app` 可离线自启 dsh（`process.resourcesPath` 分支找到
+  打包 `dist/mac-arm64/DSH Studio.app` 可离线自启 dsh（`process.resourcesPath` 分支找到
   出厂 runtime）→ ready URL → 退出无残留。
 
 ## 7. dsh-runtime 独立更新链路
@@ -194,7 +194,7 @@ dsh-runtime/
   next/) → `smokeRuntime`(node --version + web --dump-config) → `atomicSwitch`
   (current↔previous) → 重启 → `applyUpdate` 编排；启动失败自动 `rollback` 回滚 previous。
 - **壳集成**：boot 成功后后台 `checkForUpdates()`（监听器写 desktop.log）；feed URL 默认
-  占位 `https://update.dsh-kit.dev/desktop/feed.json`，可 `DSH_DESKTOP_FEED_URL` 覆盖。
+  占位 `https://update.dsh-studio.dev/desktop/feed.json`，可 `DSH_DESKTOP_FEED_URL` 覆盖。
 
 原则：
 
@@ -202,12 +202,12 @@ dsh-runtime/
 - 壳只要求 `runtime.json` 的 schemaVersion 兼容；
 - dsh 与 Node 在同一个运行时发布物里一起更新，避免版本错配。
 
-## 8. 与 dsh-kit 插件的关系
+## 8. 与 dsh-studio 插件的关系
 
-- 桌面壳默认使用 `~/.dsh`，因此用户已装的 dsh-kit 全家桶、状态文件、lan-auth 网关
+- 桌面壳默认使用 `~/.dsh`，因此用户已装的 dsh-studio、状态文件、lan-auth 网关
   配置全部自然可见；
-- dsh-kit 插件继续走 `dsh plugin add` / npm 发布，桌面端不重新实现插件安装；
-- **首启自动装全家桶（已实现）**：`src/main/plugins.ts`（FamilyPlugins）在**自管 dsh 实例**就绪后，后台检测 web profile 的 dependencies 是否含 `dsh-kit`；未装则执行 `dsh plugin --profile web add -w dsh-kit`，失败仅记录日志、不阻塞启动。**复用外部 3080 实例时不干预**用户已有配置。
+- dsh-studio 插件继续走 `dsh plugin add` / npm 发布，桌面端不重新实现插件安装；
+- **首启自动装全家桶（已实现）**：`src/main/plugins.ts`（FamilyPlugins）在**自管 dsh 实例**就绪后，后台检测 web profile 的 dependencies 是否含 `dsh-studio`；未装则执行 `dsh plugin --profile web add -w dsh-studio`，失败仅记录日志、不阻塞启动。**复用外部 3080 实例时不干预**用户已有配置。
 - 后续可在壳里做更完整的“插件管理”页：自己封装 `dsh plugin --profile web ...`，并考虑把 pnpm 纳入 dsh-runtime（当前自动装依赖系统 pnpm 在 PATH）。
 
 ### 8.1 M5 实现（托盘 / 开机自启 / 错误页 / 窗口图标，2026-08-16）
@@ -231,10 +231,10 @@ dsh-runtime/
 |---|---|---|
 | M1 | `apps/dsh-runtime` 骨架 + pin dsh 版本 + 当前平台 runtime 构建脚本 | ✅ 本机产出可运行 runtime（`out/dsh-runtime-0.1.0-rc.6-darwin-arm64.zip`，zstd ~32MB）+ runtime.json，冒烟通过 |
 | M2 | `apps/desktop` 最小 Electron 壳（spawn / 就绪 URL / WebView / 退出清理） | ✅ self-spawn → ready URL → 窗口加载；退出后子进程无残留（2026-08-15 实测） |
-| M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-kit Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
+| M3 | electron-builder 打包 extraResources + 出厂 runtime | ✅ `dist/mac-arm64/dsh-studio Desktop.app` 可构建，产物离线自启 dsh 通过（2026-08-15 实测）；三平台目录包 target 已配 |
 | M4 | dsh-runtime 更新 feed + 原子切换 + 回滚 | ✅ `src/main/updater.ts` 全链路（feed→下载+sha512→纯 JS 解压→冒烟→原子切换→重启→回滚）Node E2E 实测通过（2026-08-16）；发布物 tar.gz 无外部二进制依赖 |
 | M5 | 签名/公证、托盘、开机自启、错误页打磨 | ✅ 托盘/开机自启/错误页/窗口图标已实现并验证（2026-08-16，见 §8.1）；签名/公证待 Apple Developer ID 证书 |
-| 开箱即用 | 首启自动装 dsh-kit 全家桶 | ✅ `src/main/plugins.ts` 自管实例就绪后自动 `dsh plugin --profile web add -w dsh-kit`（2026-08-16，见 §8） |
+| 开箱即用 | 首启自动装 dsh-studio | ✅ `src/main/plugins.ts` 自管实例就绪后自动 `dsh plugin --profile web add -w dsh-studio`（2026-08-19，见 §8） |
 | 后续 | 多 worktree 工作区管理（自研，dsh 不提供） | 单独设计 |
 
 ## 10. 不侵入 dsh 的边界

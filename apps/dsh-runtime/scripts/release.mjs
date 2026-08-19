@@ -8,7 +8,7 @@
  *   - feed.json                                    （sha512 + GitHub 下载 URL）
  *
  * 用法：
- *   node scripts/release.mjs [--skip-node-download] [--owner jlu-lujing --repo dsh-kit]
+ *   node scripts/release.mjs [--skip-node-download] [--owner jlu-lujing --repo dsh-studio]
  *
  * feed.url 默认指向 GitHub Releases：
  *   https://github.com/<owner>/<repo>/releases/download/<tag>/<file>.tar.gz
@@ -25,7 +25,7 @@ const outDir = join(pkgRoot, 'out')
 const argv = process.argv.slice(2)
 const skipNode = argv.includes('--skip-node-download')
 const owner = arg(argv, '--owner') ?? 'jlu-lujing'
-const repo = arg(argv, '--repo') ?? 'dsh-kit'
+const repo = arg(argv, '--repo') ?? 'dsh-studio'
 const tag = arg(argv, '--tag') ?? process.env.GITHUB_REF_NAME
 const feedUrlBase = arg(argv, '--feed-url-base') ?? ''
 

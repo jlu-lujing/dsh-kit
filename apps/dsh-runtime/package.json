@@ -1,8 +1,8 @@
 {
-  "name": "@dsh-kit/dsh-runtime",
+  "name": "@dsh-studio/dsh-runtime",
   "version": "0.1.0-rc.6",
   "private": true,
-  "description": "dsh-kit Desktop 内置的 dsh 独立运行时子模块：自带 Node 二进制 + @deepseek-ai/dsh 全依赖树，独立版本与更新通道",
+  "description": "DSH Studio Desktop 内置的 dsh 独立运行时子模块",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

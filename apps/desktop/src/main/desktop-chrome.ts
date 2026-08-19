@@ -15,7 +15,7 @@
 
 export const DESKTOP_CHROME_CSS = [
   // 不透明窗口 + CSS 圆角：内容铺满（#root overflow:hidden 裁出圆角）。
-  '#root, [data-slot="root"], .dsh-kit-app-root { border-radius: 12px; overflow: hidden; }',
+  '#root, [data-slot="root"], .dsh-studio-app-root { border-radius: 12px; overflow: hidden; }',
   'html, body { background: transparent !important; }',
 
   /* --- 窗口拖拽区：隐藏系统标题栏后，标题栏交给系统原生拖动（Snap/边缘贴靠回归） --- */
@@ -26,11 +26,11 @@ export const DESKTOP_CHROME_CSS = [
   '}',
   /* no-drag 只给真正可点的元素：标题栏右侧动作群 + 左侧 logo/折叠 + 官方可编辑控件。
      标题栏中央的会话标题/面包屑保持 drag（跟随整条标题栏拖动，不显示手型）。 */
-  'body[data-dsh-platform="darwin"] .dsh-kit-titlebar-actions,',
-  'body[data-dsh-platform="darwin"] .dsh-kit-titlebar-left,',
-  'body[data-dsh-platform="darwin"] [data-dsh-kit-vscode="1"],',
-  'body[data-dsh-platform="darwin"] .dsh-kit-right-toggle,',
-  'body[data-dsh-platform="darwin"] .dsh-kit-new-window,',
+  'body[data-dsh-platform="darwin"] .dsh-studio-titlebar-actions,',
+  'body[data-dsh-platform="darwin"] .dsh-studio-titlebar-left,',
+  'body[data-dsh-platform="darwin"] [data-dsh-studio-vscode="1"],',
+  'body[data-dsh-platform="darwin"] .dsh-studio-right-toggle,',
+  'body[data-dsh-platform="darwin"] .dsh-studio-new-window,',
   'body[data-dsh-platform="darwin"] input,',
   'body[data-dsh-platform="darwin"] textarea,',
   'body[data-dsh-platform="darwin"] select {',
@@ -40,11 +40,11 @@ export const DESKTOP_CHROME_CSS = [
   'body:not([data-dsh-platform="darwin"]) .wSkVaW_header {',
   '  -webkit-app-region: drag;',
   '}',
-  'body:not([data-dsh-platform="darwin"]) .dsh-kit-titlebar-actions,',
-  'body:not([data-dsh-platform="darwin"]) .dsh-kit-titlebar-left,',
-  'body:not([data-dsh-platform="darwin"]) [data-dsh-kit-vscode="1"],',
-  'body:not([data-dsh-platform="darwin"]) .dsh-kit-right-toggle,',
-  'body:not([data-dsh-platform="darwin"]) .dsh-kit-new-window,',
+  'body:not([data-dsh-platform="darwin"]) .dsh-studio-titlebar-actions,',
+  'body:not([data-dsh-platform="darwin"]) .dsh-studio-titlebar-left,',
+  'body:not([data-dsh-platform="darwin"]) [data-dsh-studio-vscode="1"],',
+  'body:not([data-dsh-platform="darwin"]) .dsh-studio-right-toggle,',
+  'body:not([data-dsh-platform="darwin"]) .dsh-studio-new-window,',
   'body:not([data-dsh-platform="darwin"]) input,',
   'body:not([data-dsh-platform="darwin"]) textarea,',
   'body:not([data-dsh-platform="darwin"]) select {',
@@ -110,7 +110,7 @@ export const DESKTOP_CHROME_JS = [
   '  window.__dshKitDesktopChrome__ = true',
   '',
   '  var style = document.createElement("style")',
-  '  style.setAttribute("data-dsh-kit", "desktop-chrome")',
+  '  style.setAttribute("data-dsh-studio", "desktop-chrome")',
   '  style.textContent = window.__DSH_DESKTOP_CHROME_CSS__ || ""',
   '  document.head.appendChild(style)',
   '',

@@ -98,24 +98,15 @@ cpSync(dsh.pkgDir, join(destTree, '@deepseek-ai', 'dsh'), { recursive: true })
 rmIfExists(join(destTree, '@deepseek-ai', 'dsh', 'node_modules'))
 
 /* ------------------------------------------------------------------ */
-/* Stage 1.5 — bundle the dsh-kit family into the runtime              */
+/* Stage 1.5 — bundle the dsh-studio family into the runtime              */
 /*                                                                     */
-/* 内置全家桶（dsh-kit 聚合 + 6 个功能包）：随 dsh-runtime 一起分发，    */
+/* 内置 DSH Studio 单包：随 dsh-runtime 一起分发，    */
 /* 桌面端装配 profile 时用本地路径 link，不再从 npm 运行时拉取。         */
 /* 这样 mac/win 两家一致、离线可用、版本锁死。                          */
 /* ------------------------------------------------------------------ */
 
-// family 包：dsh-kit 聚合 + 6 个 feature 包（与 dsh-kit/package.json 的
-// dependencies 一一对应，硬编码保持可见、防止漏打包）。
-const FAMILY_PACKAGES = [
-  'dsh-kit',
-  'dsh-kit-input-history',
-  'dsh-kit-lan-auth',
-  'dsh-kit-notifier',
-  'dsh-kit-scheduler',
-  'dsh-kit-webui',
-  'dsh-kit-worktree',
-]
+// DSH Studio 单包（7 合 1：聚合 + 六个功能）。
+const FAMILY_PACKAGES = ['dsh-studio']
 
 // 仓库根 = <apps/dsh-runtime>/../.. ；源码包位于 <root>/packages/<name>
 const repoRoot = resolve(pkgRoot, '..', '..')
@@ -139,7 +130,7 @@ for (const name of FAMILY_PACKAGES) {
   console.log(`[build] family bundled: ${name}@${ver}`)
 }
 
-// dsh-kit 聚合的 cordis.patch.yml 引用了各 feature 包（node_modules 顶层即可解析，
+// dsh-studio 的 cordis.patch.yml 由单包自身提供（node_modules 顶层即可解析，
 // 我们已把包放到 node_modules/<name>）。
 console.log('[build] family bundled:', JSON.stringify(familyVersions))
 
@@ -177,7 +168,7 @@ const runtime = {
   builtAt: new Date().toISOString(),
   bin: skipNodeDownload ? undefined : `node/bin/${nodeExe}`,
   launch: ['--expose-internals', 'node_modules/@deepseek-ai/dsh/lib/bin.js'],
-  // 内置 dsh-kit 全家桶版本（装配端据此决定用本地 link 而非 npm 拉取）
+  // 内置 dsh-studio 全家桶版本（装配端据此决定用本地 link 而非 npm 拉取）
   family: familyVersions,
 }
 writeFileSync(join(staging, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n')

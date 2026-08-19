@@ -1,8 +1,8 @@
 {
-  "name": "@dsh-kit/desktop",
+  "name": "@dsh-studio/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "dsh-kit Desktop — Electron 壳：spawn 内置 dsh-runtime，加载 loopback web UI",
+  "description": "DSH Studio Desktop — Electron 壳：spawn 内置 dsh-runtime，加载 loopback web UI",
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {

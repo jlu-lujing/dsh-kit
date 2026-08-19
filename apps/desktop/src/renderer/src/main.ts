@@ -52,7 +52,7 @@ function render(): void {
       retry.classList.remove('hidden')
       retry.addEventListener('click', () => window.location.reload())
     }
-    document.title = 'DeepSeek Harness App — 启动失败'
+    document.title = 'DSH Studio — 启动失败'
   } else {
     // 启动页
     const url = desktop?.dshUrl
@@ -62,7 +62,7 @@ function render(): void {
     if (detail) {
       detail.textContent = '若长时间停留在此页，请查看应用日志（用户数据目录 desktop.log）'
     }
-    document.title = 'DeepSeek Harness App'
+    document.title = 'DSH Studio'
   }
 }
 

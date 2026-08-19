@@ -5,7 +5,7 @@
 
 ## 为什么有这份补丁
 
-`dsh-kit-worktree` 的「新建会话页 worktree 选择器」要求与官方「项目文件夹 /
+`dsh-studio-worktree` 的「新建会话页 worktree 选择器」要求与官方「项目文件夹 /
 模式 preset」**同一行**渲染。但 DSH 官方前端新会话那一行是死的三样：
 
 - `WorkspaceChip`（项目文件夹）
@@ -79,10 +79,10 @@ lan-auth）：
 
 ```
 curl -s http://127.0.0.1:<port>/ |
-  grep -o 'dsh-kit-worktree/client.js?rev=[a-f0-9]*'
+  grep -o 'dsh-studio-worktree/client.js?rev=[a-f0-9]*'
 curl -s http://127.0.0.1:<port>/plugins/@deepseek-ai/dsh-client-ui-conversation/client.js |
   grep -c 'conversation.hero.worktree'   # 期望 2
-curl -s http://127.0.0.1:<port>/plugins/dsh-kit-worktree/client.js |
+curl -s http://127.0.0.1:<port>/plugins/dsh-studio-worktree/client.js |
   grep -c 'conversation.hero.worktree'   # 期望 >=1（注册槽）
 ```
 
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:<port>/plugins/dsh-kit-worktree/client.js |
 
 ## 关联
 
-- 插件代码：`packages/dsh-kit-worktree/`
+- 插件代码：`packages/dsh-studio-worktree/`
   - `src/client/index.ts` —— 注册 `conversation.hero.worktree`（新建会话同行）
   - `src/client/dock.ts` —— 进行中对话输入区下方的「当前 + 在新 worktree 新建会话」
   - `src/client/selector.ts` / `badge.ts` —— 新建页选择胶囊 / 会话头部徽标

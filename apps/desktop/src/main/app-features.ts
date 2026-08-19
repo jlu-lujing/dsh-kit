@@ -45,7 +45,7 @@ export function createTray(callbacks: TrayCallbacks): Tray | null {
   // macOS：黑色爪印当 template 图标（系统自动适配深/浅色菜单栏）
   icon.setTemplateImage(process.platform === 'darwin')
   const tray = new Tray(icon)
-  tray.setToolTip('DeepSeek Harness App')
+  tray.setToolTip('DSH Studio')
   const menu = Menu.buildFromTemplate([
     { label: '显示窗口', click: () => callbacks.onShow() },
     { label: '检查更新', click: () => callbacks.onCheckUpdate() },
