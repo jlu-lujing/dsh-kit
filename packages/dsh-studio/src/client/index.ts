@@ -15,7 +15,9 @@
 import { createElement, useEffect, useState } from 'react'
 
 export const name = 'dsh-studio'
-export const inject = ['connection', 'locale']
+// 并集声明：dsh-studio 聚合面板用 connection/locale；功能子模块还依赖
+// theme/slots/workspaces/layout。cordis 注入后这些在 ctx.get() 里都可用。
+export const inject = ['connection', 'locale', 'theme', 'slots', 'workspaces', 'layout']
 
 /* ── 核心：state 驱动的功能注册器 ───────────────────────────────────── */
 
@@ -75,9 +77,9 @@ function syncFeatureUIs(ctx: unknown): void {
   }
 }
 
-function startStateWatcher(ctx: unknown): () => void {
+function startStateWatcher(ctx: unknown, initialKey: string): () => void {
   let running = true
-  let prev = ''
+  let prev = initialKey
   const tick = async () => {
     if (!running) return
     try {
@@ -86,7 +88,6 @@ function startStateWatcher(ctx: unknown): () => void {
       if (key !== prev) { prev = key; syncFeatureUIs(ctx) }
     } catch { /* 本机状态端点暂时不可达——稍后重试 */ }
   }
-  void tick()
   const timer = setInterval(() => void tick(), 5000)
   return () => { running = false; clearInterval(timer) }
 }
@@ -394,16 +395,23 @@ export function apply(ctx: { get(name: string): unknown }): void {
     slots.register({ name: 'settings.section', id: 'dsh-studio-version', priority: 42, label: () => 'dsh 版本' }, () => createElement(VersionPanel, null)),
   )
 
-  // feature UI：按同一份 host state 门控，并轮询跟随启停变化。
-  syncFeatureUIs(ctx)
-
-  const stopWatcher = startStateWatcher(ctx)
-
-  // 通过 ctx.effect 注册卸载回调（若宿主提供）；否则挂到 unload。
-  const eff = (ctx as { effect?: (fn: () => unknown, label?: string) => void }).effect
-  if (typeof eff === 'function') {
-    eff(() => { stopWatcher(); teardownFeatureUIs() }, 'dsh-studio: client feature gate')
-  } else {
-    window.addEventListener('beforeunload', () => { stopWatcher(); teardownFeatureUIs() })
+  // feature UI：先异步取一次 state → 首次挂载，再让 watcher 从这个 state
+  // 起跟随变化。这样首帧不重复注册（slot 不会冲突），切启停也只重建一次。
+  let initialKey = ''
+  const boot = async () => {
+    try {
+      const state = await fetchFeatureState()
+      initialKey = JSON.stringify(Object.entries(state).sort())
+    } catch { /* 端点暂不可达：按默认状态挂载 */ }
+    syncFeatureUIs(ctx)
+    const stopWatcher = startStateWatcher(ctx, initialKey)
+    // 通过 ctx.effect 注册卸载回调（若宿主提供）；否则挂到 unload。
+    const eff = (ctx as { effect?: (fn: () => unknown, label?: string) => void }).effect
+    if (typeof eff === 'function') {
+      eff(() => { stopWatcher(); teardownFeatureUIs() }, 'dsh-studio: client feature gate')
+    } else {
+      window.addEventListener('beforeunload', () => { stopWatcher(); teardownFeatureUIs() })
+    }
   }
+  void boot()
 }
