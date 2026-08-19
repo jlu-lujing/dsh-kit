@@ -51,15 +51,15 @@ function notify(title: string, body: string): void {
       '[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] | Out-Null',
       '$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)',
       '$texts = $template.GetElementsByTagName("text")',
-      '$title = [Environment]::GetEnvironmentVariable("DSH_KIT_TOAST_TITLE")',
-      '$body = [Environment]::GetEnvironmentVariable("DSH_KIT_TOAST_BODY")',
+      '$title = [Environment]::GetEnvironmentVariable("DSH_STUDIO_TOAST_TITLE")',
+      '$body = [Environment]::GetEnvironmentVariable("DSH_STUDIO_TOAST_BODY")',
       '$texts.Item(0).AppendChild($template.CreateTextNode([string]$title)) | Out-Null',
       '$texts.Item(1).AppendChild($template.CreateTextNode([string]$body)) | Out-Null',
       '$toast = New-Object Windows.UI.Notifications.ToastNotification($template)',
-      '[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("dsh-kit").Show($toast)',
+      '[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("dsh-studio").Show($toast)',
     ].join('; ')
     execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
-      env: { ...process.env, DSH_KIT_TOAST_TITLE: title, DSH_KIT_TOAST_BODY: body },
+      env: { ...process.env, DSH_STUDIO_TOAST_TITLE: title, DSH_STUDIO_TOAST_BODY: body },
     }, () => {})
     return
   }
@@ -86,7 +86,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     if (event.type !== 'turn/end') return
     const kind = event.data.reason.kind
     if (!reasons.has(kind)) return
-    const title = 'dsh-kit'
+    const title = 'dsh-studio'
     const body = `${reasonLabel(kind)}（第 ${event.data.turn} 回合）`
     notify(title, body)
   })

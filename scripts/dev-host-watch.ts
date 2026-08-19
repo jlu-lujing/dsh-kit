@@ -1,5 +1,5 @@
 /**
- * Host-side TypeScript watch build for the dsh-kit workspace.
+ * Host-side TypeScript watch build for the dsh-studio workspace.
  *
  * `pnpm dev` previously only watched client plugins (`scripts/dev-web.ts`),
  * so host logic (`src/index.ts` → `lib/index.js`) had to be rebuilt manually
@@ -47,7 +47,7 @@ function resolveTscPath(): string {
  */
 export function discoverHostDirs(root = repoRoot): string[] {
   const dirs: string[] = []
-  for (const manifestPath of globSync('packages/dsh-kit*/package.json', { cwd: root }).sort()) {
+  for (const manifestPath of globSync('packages/dsh-studio*/package.json', { cwd: root }).sort()) {
     const pkgDir = join(root, dirname(manifestPath))
     if (existsSync(join(pkgDir, 'tsconfig.json'))) dirs.push(pkgDir)
   }

@@ -15,5 +15,19 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/client",
+    "src/client/**/*",
+    "src/webui/client",
+    "src/webui/client/**/*",
+    "src/worktree/client",
+    "src/worktree/client/**/*",
+    "src/lan-auth/client",
+    "src/lan-auth/client/**/*",
+    "src/input-history/client",
+    "src/input-history/client/**/*"
+  ]
 }

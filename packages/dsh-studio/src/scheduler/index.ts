@@ -1,13 +1,13 @@
 /**
- * dsh-kit-scheduler host plugin (定时任务).
+ * dsh-studio-scheduler host plugin (定时任务).
  *
  * User-level cron scheduled tasks: each task holds a five-field cron
  * expression ((minute hour day month weekday)) and a shell command; the
  * plugin ticks every second and fires due tasks via child_process.exec
  * (full /bin/sh — intentional: operator-provided commands may use pipes /
  * redirection / &&), recording the last run time. Tasks persist to
- * ~/.dsh/dsh-kit-scheduler/tasks.json and survive restarts. A small
- * management route set (/dsh-kit-scheduler/tasks) backs the store panel.
+ * ~/.dsh/dsh-studio-scheduler/tasks.json and survive restarts. A small
+ * management route set (/dsh-studio-scheduler/tasks) backs the store panel.
  *
  * The cron vocabulary is the standard five-field form; asterisk and numeric
  * ranges/lists (0-30/10, 1,15,30) are supported. Weekday is 0–6 (0 =
@@ -107,7 +107,7 @@ function matches(date: Date, fields: Array<Set<number>>): boolean {
 
 function loadTasks(dir: string): Task[] {
   try {
-    const parsed = JSON.parse(readFileSync(join(dir, 'dsh-kit-scheduler', 'tasks.json'), 'utf8')) as TaskStoreFile
+    const parsed = JSON.parse(readFileSync(join(dir, 'dsh-studio-scheduler', 'tasks.json'), 'utf8')) as TaskStoreFile
     return Array.isArray(parsed.tasks) ? parsed.tasks : []
   } catch {
     return []
@@ -115,7 +115,7 @@ function loadTasks(dir: string): Task[] {
 }
 
 function saveTasks(dir: string, tasks: Task[]): void {
-  const file = join(dir, 'dsh-kit-scheduler', 'tasks.json')
+  const file = join(dir, 'dsh-studio-scheduler', 'tasks.json')
   mkdirSync(dirname(file), { recursive: true })
   // Atomic write (tmp + rename): a crash mid-write must never leave a torn
   // tasks file behind.
@@ -153,7 +153,7 @@ const readBody = (req: IncomingMessage) =>
 export function apply(ctx: Context, config: { stateDir?: string } = {}): void {
   const home = process.env.DSH_HOME ?? join(process.env.HOME ?? '.', '.dsh')
   const stateDir = config.stateDir ?? home
-  const PREFIX = '/dsh-kit-scheduler/tasks'
+  const PREFIX = '/dsh-studio-scheduler/tasks'
 
   let tasks = loadTasks(stateDir)
   const persist = () => saveTasks(stateDir, tasks)
@@ -179,7 +179,7 @@ export function apply(ctx: Context, config: { stateDir?: string } = {}): void {
 
   // Fire due tasks every second against the current wall clock.
   const timer = setInterval(() => tick(new Date()), 1000)
-  ctx.effect(() => () => clearInterval(timer), 'dsh-kit-scheduler.tick')
+  ctx.effect(() => () => clearInterval(timer), 'dsh-studio-scheduler.tick')
   // Catch up once immediately on boot (a task due during shutdown).
   tick(new Date())
 
@@ -207,7 +207,7 @@ export function apply(ctx: Context, config: { stateDir?: string } = {}): void {
       }
       return sendJson(res, 405, { error: 'method not allowed' })
     }
-    const idMatch = /^\/dsh-kit-scheduler\/tasks\/([A-Za-z0-9-]+)$/.exec(pathname)
+    const idMatch = /^\/dsh-studio-scheduler\/tasks\/([A-Za-z0-9-]+)$/.exec(pathname)
     if (idMatch !== null && req.method === 'DELETE') {
       const before = tasks.length
       tasks = tasks.filter(t => t.id !== idMatch[1])
@@ -235,5 +235,5 @@ export function apply(ctx: Context, config: { stateDir?: string } = {}): void {
   }
 
   const dispose = webServer.register({ kind: 'prefix', path: PREFIX, handler })
-  ctx.effect(() => () => dispose?.(), 'dsh-kit-scheduler.http-routes')
+  ctx.effect(() => () => dispose?.(), 'dsh-studio-scheduler.http-routes')
 }

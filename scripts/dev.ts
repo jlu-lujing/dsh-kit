@@ -1,5 +1,5 @@
 /**
- * Unified dsh-kit dev loop: client watch + host watch in one command.
+ * Unified DSH Studio dev loop: client watch + host watch in one command.
  *
  * Previously `pnpm dev` only ran the client watch (`dev-web.ts`), so host
  * logic required a manual `pnpm build`. This orchestrator runs both:

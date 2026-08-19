@@ -6,12 +6,14 @@ import { build } from 'tsdown'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pluginDirs = []
-// `dsh-kit` itself (the aggregate) and `dsh-kit-*` feature bundles are all
+// `dsh-studio` itself (the aggregate) and `dsh-studio-*` feature bundles are all
 // candidates; only those declaring dsh.client.platform web are built.
-for (const m of globSync('packages/dsh-kit*/package.json', { cwd: root }).sort()) {
+for (const m of globSync('packages/dsh-studio*/package.json', { cwd: root }).sort()) {
   const p = JSON.parse(readFileSync(join(root, m), 'utf8'))
   if (p.dsh?.client?.platform === 'web') pluginDirs.push(dirname(m).split('/').join('/'))
 }
 console.log('client bundles for:', pluginDirs)
-await build({ cwd: root, workspace: pluginDirs, watch: false })
+for (const dir of pluginDirs) {
+  await build({ cwd: join(root, dir), watch: false })
+}
 console.log('done')

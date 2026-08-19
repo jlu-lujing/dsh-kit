@@ -1,5 +1,5 @@
 /**
- * Watch-build for dsh-kit client-plugin HMR.
+ * Watch-build for dsh-studio client-plugin HMR.
  *
  * Runs every package under packages/ that declares `dsh.client` (platform
  * "web") through the tsdown JS API in watch mode. The host webserver's
@@ -9,7 +9,7 @@
  * rebuilt on source change.
  *
  * Usage: `pnpm dev`. Mirrors the official dev-web.ts; this variant scans the
- * `dsh-kit` aggregate plus the `dsh-kit-*` feature packages (single-star glob)
+ * `dsh-studio` aggregate plus the `dsh-studio-*` feature packages (single-star glob)
  * instead of a whole monorepo.
  *
  * The official `--poll` chokidar passthrough (`inputOptions.watch.watcher`)
@@ -24,10 +24,10 @@ import { build } from 'tsdown'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
-/** Every package.json carrying dsh.client.platform "web" under the dsh-kit* packages. */
+/** Every package.json carrying dsh.client.platform "web" under the dsh-studio* packages. */
 export function discoverPluginDirs(root = repoRoot): string[] {
   const dirs: string[] = []
-  for (const manifestPath of globSync('packages/dsh-kit*/package.json', { cwd: root }).sort()) {
+  for (const manifestPath of globSync('packages/dsh-studio*/package.json', { cwd: root }).sort()) {
     const manifest = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as {
       dsh?: { client?: { platform?: unknown } }
     }
@@ -41,11 +41,11 @@ export async function watchClientPlugins(
   root: string,
   pluginDirs: readonly string[],
 ): Promise<void> {
-  const bundles = await build({
-    cwd: root,
-    workspace: [...pluginDirs],
-    watch: true,
-  })
+  // 单包方案：每个包单独起 tsdown watch（workspace 模式无意义）。
+  const bundles: unknown[] = []
+  for (const dir of pluginDirs) {
+    bundles.push(await build({ cwd: join(root, dir), watch: true }))
+  }
   return void bundles
 }
 

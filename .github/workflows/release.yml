@@ -49,20 +49,8 @@ jobs:
         run: |
           node - <<'EOF'
           const fs = require('fs')
-          const pkgs = ['dsh-kit-input-history','dsh-kit-lan-auth','dsh-kit-notifier','dsh-kit-scheduler','dsh-kit-webui','dsh-kit-worktree','dsh-kit']
-          const versions = new Set()
-          for (const p of pkgs) {
-            const j = JSON.parse(fs.readFileSync(`packages/${p}/package.json`, 'utf8'))
-            versions.add(j.version)
-          }
-          if (versions.size !== 1) { console.error('版本不一致:', [...versions]); process.exit(1) }
-          const agg = JSON.parse(fs.readFileSync('packages/dsh-kit/package.json', 'utf8'))
-          for (const p of pkgs.slice(0, -1)) {
-            if (agg.dependencies?.[p] !== `^${[...versions][0]}`) {
-              console.error(`聚合依赖 ${p} 未指向当前版本`); process.exit(1)
-            }
-          }
-          console.log('版本校验通过:', [...versions])
+          const pkg = JSON.parse(fs.readFileSync('packages/dsh-studio/package.json', 'utf8'))
+          console.log('单包版本:', pkg.version)
           EOF
 
       # pnpm 发布时禁止 workspace 解析：聚合包依赖必须指向 npm 上的真实版本

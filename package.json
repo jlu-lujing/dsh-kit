@@ -1,8 +1,8 @@
 {
-  "name": "dsh-kit",
+  "name": "dsh-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "DeepSeek Harness (DSH) 傻瓜式插件全家桶 - 装一个包，所有功能开箱即用",
+  "description": "DSH Studio —— 基于 DSH (dsh) 定制的桌面助手全家桶（单包）",
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
