@@ -1074,6 +1074,46 @@ body[data-dsh-platform="darwin"] .dsh-studio-titlebar-actions {
 .wSkVaW_headerActions [data-dsh-studio-vscode="1"] {
   display: none !important;
 }
+/* ── 底部（侧栏脚）设置/刷新一排：把官方「整行」设置钮改成圆角矩形，
+   刷新钮并排在其左侧，两个钮从左到右。 ── */
+html .hHd-Xa_root:not(.hHd-Xa_collapsed) button[aria-haspopup="dialog"][aria-expanded] {
+  display: inline-flex !important;
+  width: auto !important;
+  height: 34px !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  flex: none !important;
+  background: transparent !important;
+}
+html .hHd-Xa_root:not(.hHd-Xa_collapsed) button[aria-haspopup="dialog"][aria-expanded]:hover {
+  background: var(--dsw-alias-interactive-bg-hover) !important;
+}
+.dsh-studio-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 6px 10px;
+  margin: 0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  cursor: pointer;
+}
+.dsh-studio-refresh:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+/* rail 折叠态：刷新钮隐藏，设置保持官方圆形 rail 图标 */
+html .hHd-Xa_root.hHd-Xa_collapsed .dsh-studio-refresh {
+  display: none !important;
+}
 `
 
 /** 右侧面板图标 = 左侧 IconPanelLeftOutline16 的水平镜像（createElementNS 构建，可靠）。 */
@@ -1129,6 +1169,22 @@ function svgIcon(elem: Document, d: string): SVGSVGElement {
   path.setAttribute('fill', 'currentColor')
   g.appendChild(path)
   svg.appendChild(g)
+  return svg
+}
+
+/** 不成像版的 svgIcon（刷新/设置等方向性图标用，避免被水平镜像翻转）。 */
+function svgIconFlat(elem: Document, d: string): SVGSVGElement {
+  const svg = elem.createElementNS(SVG_NS, 'svg')
+  svg.setAttribute('width', '16')
+  svg.setAttribute('height', '16')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('fill', 'none')
+  const path = elem.createElementNS(SVG_NS, 'path')
+  path.setAttribute('fill-rule', 'evenodd')
+  path.setAttribute('clip-rule', 'evenodd')
+  path.setAttribute('d', d)
+  path.setAttribute('fill', 'currentColor')
+  svg.appendChild(path)
   return svg
 }
 
@@ -1684,6 +1740,35 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
   const apiExists = !!(window as unknown as { __dshDesktop?: unknown }).__dshDesktop
   if (apiExists) mountNewWindowButton()
 
+  // 「刷新」按钮：侧栏底部、设置按钮左边的重载按钮（等同 Ctrl+R，重新拉 client bundle）。
+  // 16x16 刷新（Material refresh：顺时针弯曲箭头 + 右上小头）。
+  const REFRESH_PATH_FILL = 'M13.5 8C13.5 4.96243 11.0376 2.5 8 2.5C4.96243 2.5 2.5 4.96243 2.5 8C2.5 11.0376 4.96243 13.5 8 13.5C9.76745 13.5 11.3624 12.7163 12.4237 11.4907L13.4763 10.8546C13.2212 11.8657 12.7386 12.7886 12.0863 13.5787C10.9726 14.9447 9.13297 15.75 7.11158 15.75C3.64059 15.75 0.75 12.8594 0.75 9.3884C0.75 5.91741 3.64059 3.02682 7.11158 3.02682C10.5826 3.02682 13.4732 5.91741 13.4732 9.3884V9.64006L12.1062 8.27307L11.0436 9.3357L13.5 11.7921L15.9564 9.3357L14.8938 8.27307L13.5268 9.64006V9.3884M8 4.5C5.51472 4.5 3.5 6.51472 3.5 9C3.5 11.4853 5.51472 13.5 8 13.5C10.4853 13.5 12.5 11.4853 12.5 9C12.5 6.51472 10.4853 4.5 8 4.5Z'
+  const findSettingsTrigger = (): HTMLElement | null =>
+    document.querySelector('.hHd-Xa_root button[aria-haspopup="dialog"][aria-expanded]') as HTMLElement | null
+  const mountFooterExtras = (): void => {
+    const trig = findSettingsTrigger()
+    if (trig === null) return
+    const parent = trig.parentElement
+    if (parent === null) return
+    // 刷新 + 设置 两个钮排在同一行（从左到右）。
+    parent.style.display = 'flex'
+    parent.style.alignItems = 'center'
+    parent.style.gap = '4px'
+    if (parent.querySelector('.dsh-studio-refresh') !== null) return
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'dsh-studio-refresh'
+    btn.setAttribute('aria-label', '刷新页面')
+    btn.title = '刷新页面'
+    btn.appendChild(svgIconFlat(document, REFRESH_PATH_FILL))
+    const label = document.createElement('span')
+    label.textContent = '刷新'
+    btn.appendChild(label)
+    btn.addEventListener('click', () => location.reload())
+    trig.before(btn)
+  }
+  mountFooterExtras()
+
   // 标题栏左侧 logo + 左折叠按钮（自己创建，控制 layout.toggleSidebar）。
   // 不再迁移官方 DOM，避免折叠态 React 重渲染导致图标丢失/无法展开。
   /** 左侧栏是否折叠：官方折叠态 sidebar root 带 .hHd-Xa_collapsed。 */
@@ -1752,6 +1837,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     mountToggle()
     mountLeftToggle()
     mountLeftResizer()
+    mountFooterExtras()
     ensureOpenState()
   })
   // 同时监听 class（折叠态/右栏开合）与 data-phase（新会话↔对话切换）
@@ -1768,6 +1854,7 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     mountLeftResizer()
     mountVscodeButton()
     if (apiExists) mountNewWindowButton()
+    mountFooterExtras()
     ensureOpenState()
   }, 600)
 }
