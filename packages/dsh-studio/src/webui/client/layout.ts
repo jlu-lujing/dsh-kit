@@ -211,6 +211,10 @@ html .wSkVaW_header [class*="crumb"] {
   cursor: default !important;
   pointer-events: none !important;
 }
+/* Windows/Linux：logo 稍往右，左侧留一点空，视觉更平衡（mac 由红绿灯 margin 处理）。 */
+body:not([data-dsh-platform="darwin"]) .dsh-studio-titlebar-left {
+  padding-left: 24px;
+}
 /* macOS：系统红绿灯（titleBarStyle:hidden + trafficLightPosition）在左上角占位。
    直接给 logo / 折叠按钮 margin-left 右移避开红绿灯（容器布局不动，最直接生效）。 */
 body[data-dsh-platform="darwin"] .dsh-studio-titlebar-left {
@@ -232,7 +236,29 @@ body[data-dsh-platform="darwin"] .dsh-studio-titlebar-left .dsh-studio-titlebar-
   height: 24px;
   width: auto;
 }
-/* 折叠/展开均显示完整 BrandWordmark（鲸鱼+DSH Studio），无需缩小 */
+/* DSH Studio 字标：爪印徽标 + 文字，横向 flex，深/浅色跟随文字色 */
+.dsh-studio-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.dsh-studio-logo-mark svg {
+  flex: none;
+  color: var(--dsw-alias-label-primary, currentColor);
+}
+.dsh-studio-logo-text {
+  color: var(--dsw-alias-label-primary, currentColor);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+/* 折叠态只留爪印（文字隐藏），展开恢复完整字标 */
+.dsh-studio-titlebar-left.is-collapsed .dsh-studio-logo-text {
+  display: none;
+}
+/* 折叠/展开均显示完整 DSH Studio 字标（爪印 + 文字） */
 
 /* 标题栏 fixed 脱离文档流：根容器钉死视口高度、隐藏溢出，
    让普通浏览器（127.0.0.1:3443）与桌面一致——不再出现整页滚动条。 */
@@ -1071,6 +1097,23 @@ function buildFishLogo(elem: Document, size = 22): SVGSVGElement {
   return svg
 }
 
+/**
+ * DSH Studio 品牌字标：爪印徽标 + 「DSH Studio」文字。
+ * 不依赖官方 DOM 的 BrandWordmark（那仍显示 DeepSeek Harness）；
+ * icon 用爪印、旁边跟粗体字标，深/浅色用 currentColor 自适应。
+ */
+function buildStudioLogo(elem: Document, iconSize = 22): HTMLElement {
+  const wrap = elem.createElement('span')
+  wrap.className = 'dsh-studio-logo-mark'
+  const icon = buildFishLogo(elem, iconSize)
+  const text = elem.createElement('span')
+  text.className = 'dsh-studio-logo-text'
+  text.textContent = 'DSH Studio'
+  wrap.appendChild(icon)
+  wrap.appendChild(text)
+  return wrap
+}
+
 function svgIcon(elem: Document, d: string): SVGSVGElement {
   const svg = elem.createElementNS(SVG_NS, 'svg')
   svg.setAttribute('width', '16')
@@ -1657,8 +1700,8 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
       document.body.appendChild(bar)
     }
 
-    // logo（最左）：展开时显示官方 BrandWordmark（鲸鱼+DSH Studio 文字），
-    // 折叠时只显示鲸鱼 FishLogo（不显示文字），并与折叠按钮对齐。
+    // logo（最左）：DSH Studio 品牌字标 = 爪印徽标 + 「DSH Studio」文字。
+    // 不再克隆官方 BrandWordmark（那仍显示 DeepSeek Harness），始终用我们自己的。
     let logo = bar.querySelector<HTMLElement>('.dsh-studio-titlebar-logo')
     if (logo === null) {
       logo = document.createElement('button')
@@ -1673,21 +1716,11 @@ export function installLayoutTweaks(layout?: { toggleSidebar: () => void }): voi
     bar.classList.toggle('is-collapsed', collapsed)
     // 全局标记：供标题行右移量与左栏隐藏使用
     document.body.classList.toggle('dsh-studio-sidebar-collapsed', collapsed)
-    const brand = document.querySelector<HTMLElement>('.hHd-Xa_brand')
-    const brandSvg = brand ? brand.querySelector('svg') : null
 
-    // 一律显示完整 BrandWordmark（鲸鱼 + DSH Studio），折叠/展开均保持；
-    // 拿不到官方 brand 时才 fallback 内置鲸鱼 FishLogo。
-    const hasFull = !!logo.querySelector('.dsh-studio-titlebar-logo-brand')
-    if (brandSvg && !hasFull) {
+    // 一律显示完整 DSH Studio 字标（爪印 + 文字），折叠/展开均保持。
+    if (logo.querySelector('.dsh-studio-logo-mark') === null) {
       while (logo.firstChild) logo.removeChild(logo.firstChild)
-      const clone = brandSvg.cloneNode(true) as SVGSVGElement
-      clone.classList.add('dsh-studio-titlebar-logo-brand')
-      logo.appendChild(clone)
-    } else if (!brandSvg && logo.firstChild === null) {
-      const fish = buildFishLogo(document, 24)
-      fish.dataset.kind = 'fish'
-      logo.appendChild(fish)
+      logo.appendChild(buildStudioLogo(document, 24))
     }
 
     // 折叠按钮（logo 右侧）。

@@ -135,9 +135,12 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   // ── feature host mounts (respect the store's per-feature on/off) ─────────
   // 单包方案：所有功能都在这一个 host apply 里按 state 独立挂载；停用的功能
-  // 不挂载 → 路由/定时器/网关/通知一律不运行。lan-auth 默认关，需显式开启。
+  // 不挂载 → 路由/定时器/网关/通知一律不运行。
+  // 例外：lan-auth 总是挂载（其管理路由 status/start/stop 始终在线），网关
+  // 本体由 lan-auth 插件内部按 state 热启停，因此功能商店/CLI 切换开关
+  // 即时生效、无需重启。
   if (store.isEnabled('dsh-studio-notifier')) applyNotifier(ctx)
-  if (store.isEnabled('dsh-studio-lan-auth')) applyLanAuth(ctx)
+  applyLanAuth(ctx)
   if (store.isEnabled('dsh-studio-worktree')) applyWorktree(ctx)
   if (store.isEnabled('dsh-studio-webui')) applyWebui(ctx)
   if (store.isEnabled('dsh-studio-scheduler')) applyScheduler(ctx)

@@ -1,13 +1,14 @@
 /** dsh-studio-lan-auth host plugin: HTTPS gateway over the loopback DSH web server. */
 
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { ensureCertBundle } from './cert.ts'
-import { startGateway } from './gateway.ts'
-import { createStore, lanAuthRoot } from './store.ts'
+import { startGateway, type GatewayHandle } from './gateway.ts'
+import { createStore as createLanStore, lanAuthRoot } from './store.ts'
 
 /** Cordis plugin name. */
 export const name = 'dsh-studio-lan-auth'
@@ -19,6 +20,12 @@ export const name = 'dsh-studio-lan-auth'
  * injects loader entries itself.
  */
 export const inject = ['webServer']
+
+/** Feature id in the aggregate store (state.json) — must match store.ts. */
+export const FEATURE_ID = 'dsh-studio-lan-auth' as const
+
+/** How often to re-read state.json and reconcile gateway on/off. */
+const RECONCILE_MS = 2000
 
 export interface Config {
   /** Gateway bind host (all-interfaces). */
@@ -58,30 +65,100 @@ const sendJson = (res: ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body))
 }
 
+/**
+ * Aggregate feature-switch state lives in `~/.dsh/dsh-studio/state.json`
+ * (owned by the dsh-studio aggregate `state.ts`), NOT in the lan-auth users/
+ * tokens store. These two helpers read/write that shared switch so the
+ * management routes and the state poller agree with `dsh-studio
+ * enable/disable` and the store panel — hot, without a restart.
+ */
+function studioStateFile(home = process.env.DSH_HOME ?? path.join(process.env.HOME ?? '.', '.dsh')): string {
+  return path.join(home, 'dsh-studio', 'state.json')
+}
+
+function studioFeatureEnabled(): boolean {
+  try {
+    const s = JSON.parse(readFileSync(studioStateFile(), 'utf8')) as { features?: Record<string, boolean> }
+    return s.features?.[FEATURE_ID] === true
+  } catch {
+    return false
+  }
+}
+
+function setStudioFeatureEnabled(enabled: boolean): void {
+  const file = studioStateFile()
+  let features: Record<string, boolean> = {}
+  try {
+    const s = JSON.parse(readFileSync(file, 'utf8')) as { features?: Record<string, boolean> }
+    features = s.features ?? {}
+  } catch {
+    // no file yet → start empty
+  }
+  features[FEATURE_ID] = enabled
+  mkdirSync(path.dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify({ features }, null, 2))
+  renameSync(tmp, file)
+}
+
 export function apply(ctx: Context, config: Config = {}): void {
   // $DSH_HOME is the dsh per-user config root (~/.dsh). Never append `.dsh`
-  // again — createStore/lanAuthRoot already resolve that correctly.
+  // again — createLanStore/lanAuthRoot already resolve that correctly.
   const root = lanAuthRoot()
   const certDir = config.certDir ?? path.join(root, 'dsh-studio-lan-auth', 'certs')
   const stateDir = config.stateDir ?? root
 
-  const store = createStore(stateDir)
+  const store = createLanStore(stateDir)
   store.load()
 
   const webServer = ctx.get('webServer')
   if (webServer === undefined) return
-  const targetPort = typeof webServer.port === 'number' ? webServer.port : 3080
+  const targetPort = typeof (webServer as { port?: unknown }).port === 'number'
+    ? (webServer as { port: number }).port
+    : 3080
   const target = `http://127.0.0.1:${targetPort}`
 
   // Zero-config TLS: exists → use verbatim; empty dir → auto-generate a private
   // CA + leaf (clients may install the root once for permanent no-warning).
   const tls = ensureCertBundle(certDir)
   const caCertPath = path.join(certDir, 'ca.pem')
-  const gateway = startGateway({
-    target, tls,
-    host: config.host ?? '0.0.0.0', port: config.port ?? 3443, store,
-    caCertPath,
-  })
+
+  // ── gateway lifecycle ────────────────────────────────────────────────────
+  // `gateway` is the sole handle to the network resource. start() is
+  // idempotent (already running → no-op), stop() likewise. Management routes
+  // and the state poller both drive the same reconciliation.
+  let gateway: GatewayHandle | null = null
+
+  const start = (): boolean => {
+    if (gateway !== null) return true
+    try {
+      gateway = startGateway({
+        target, tls,
+        host: config.host ?? '0.0.0.0', port: config.port ?? 3443, store,
+        caCertPath,
+      })
+      return true
+    } catch (error) {
+      // Non-fatal: keep the admin plane alive and report.
+      console.warn('[dsh-studio-lan-auth] start failed:', error)
+      gateway = null
+      return false
+    }
+  }
+
+  const stop = async (): Promise<void> => {
+    const g = gateway
+    gateway = null
+    if (g !== null) await g.close().catch(() => undefined)
+  }
+
+  // Reconcile to the desired state from store; returns whether it's now running.
+  const reconcile = async (): Promise<boolean> => {
+    const desired = studioFeatureEnabled()
+    if (desired) return start()
+    await stop()
+    return false
+  }
 
   // ── admin / management routes (loopback-hosted on DSH webServer) ────────
   // Management is local-only: it must be a genuine loopback request AND not
@@ -102,11 +179,37 @@ export function apply(ctx: Context, config: Config = {}): void {
         if (req.method !== 'GET') return sendJson(res, 405, { error: 'method not allowed' })
         if (!adminOnly(req)) return sendJson(res, 403, { error: 'local only' })
         return sendJson(res, 200, {
-          port: gateway.port(),
+          running: gateway !== null,
+          port: gateway?.port(),
+          desired: studioFeatureEnabled(),
           target,
           users: store.listUsers(),
           tokens: store.listTokens(),
         })
+      },
+    },
+    {
+      kind: 'exact',
+      path: '/dsh-studio-lan-auth/start',
+      handler: async (req, res) => {
+        if (!adminOnly(req)) return sendJson(res, 403, { error: 'local only' })
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' })
+        setStudioFeatureEnabled(true)
+        const ok = start()
+        return sendJson(res, ok ? 200 : 500, {
+          ok, running: gateway !== null, port: gateway?.port(), profile: 'hot',
+        })
+      },
+    },
+    {
+      kind: 'exact',
+      path: '/dsh-studio-lan-auth/stop',
+      handler: async (req, res) => {
+        if (!adminOnly(req)) return sendJson(res, 403, { error: 'local only' })
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' })
+        setStudioFeatureEnabled(false)
+        await stop()
+        return sendJson(res, 200, { ok: true, running: false, profile: 'hot' })
       },
     },
     {
@@ -177,5 +280,14 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   const disposers = routes.map((r) => webServer.register(r))
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-studio-lan-auth.admin-routes')
-  ctx.effect(() => () => { gateway.close().catch(() => undefined) }, 'dsh-studio-lan-auth.gateway')
+
+  // ── boot reconcile + periodic hot reconciliation ─────────────────────────
+  // Initial: honor the persisted state so a fresh dsh boot still starts the
+  // gateway when enabled. Then poll state.json: `dsh-studio enable/disable`
+  // and the store panel flip the switch without touching this process, so we
+  // reconcile the network resource to match — no restart needed.
+  void reconcile()
+
+  const timer = setInterval(() => void reconcile(), RECONCILE_MS)
+  ctx.effect(() => () => { clearInterval(timer); void stop() }, 'dsh-studio-lan-auth.gateway')
 }
