@@ -1,6 +1,6 @@
 # DSH Studio · 品牌迁移与单包化重构
 
-> 状态：规划中（2026-08-19）
+> 状态：已完成（2026-08-19，阶段 0–4 全部落地）
 > 目标：全仓库品牌统一为 **DSH Studio**；把 7 个 `dsh-kit*` 包合并为 **1 个 `dsh-studio` 包**。
 
 ## 1. 背景与目标
@@ -112,11 +112,16 @@ packages/dsh-studio/
 
 ## 6. 待办清单（Checklist）
 
-- [ ] 阶段 0：基线绿 + 清理临时文件
-- [ ] 阶段 1：`packages/dsh-studio` 建包、7 包源码迁入、import 统一、旧包进 `_legacy`
-- [ ] 阶段 2：全仓库品牌 → `DSH Studio`（排除白名单）
-- [ ] 阶段 3：包名/bin/依赖/桌面/CI/状态路径 → `dsh-studio`
-- [ ] 阶段 4：build/typecheck/test 绿、桌面冒烟、docs 更新
+- [x] 阶段 0：基线绿 + 清理临时文件
+- [x] 阶段 1：`packages/dsh-studio` 建包、7 包源码迁入、import 统一、旧包进 `_legacy`
+- [x] 阶段 2：全仓库品牌 → `DSH Studio`（排除白名单）
+- [x] 阶段 3：包名/bin/依赖/桌面/CI/状态路径 → `dsh-studio`
+- [x] 阶段 4：build/typecheck/test 绿、客户端 bundle 构建、docs 更新
+
+> 收尾备注（2026-08-19）：
+> - 提交：`82ad478`（单包化）、`d5cf636`（品牌替换）
+> - 门禁：`pnpm build` / `pnpm build:client` / `pnpm typecheck` / `pnpm test`(43) / 桌面 node typecheck 全绿
+> - 旧包保留在 `packages/_legacy/`（一代备份，不参与 workspace）；CI 增加 `build:client` 步骤产出单一 client bundle
 
 ## 7. 命名约定
 
