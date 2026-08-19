@@ -34,13 +34,14 @@ function start(cmd: string, args: string[], label: string) {
   return p
 }
 
-// Resolve tsx/tsc through the local node_modules .bin so we don't depend on a
-// global install.
-const tsxBin = resolve(root, 'node_modules/.bin/tsx')
+// 用 Node 直接运行 tsx 的 CLI 入口，避免平台差异（Windows 上 .bin/tsx 是
+// POSIX sh 脚本、.CMD 不能直接被 Node spawn；统一走 node + ESM CLI 最稳）。
+const tsxCli = resolve(root, 'node_modules/tsx/dist/cli.mjs')
+const nodeBin = process.execPath
 
 const procs = [
-  start(tsxBin, [clientScript], 'client'),
-  start(tsxBin, [hostScript], 'host'),
+  start(nodeBin, [tsxCli, clientScript], 'client'),
+  start(nodeBin, [tsxCli, hostScript], 'host'),
 ]
 
 let shuttingDown = false
